@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "main": {
+      "type": "eccomi-noleggio-product",
+      "settings": {}
+    }
+  },
+  "order": ["main"]
+}

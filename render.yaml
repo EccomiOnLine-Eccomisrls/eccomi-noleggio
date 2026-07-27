@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: eccomi-noleggio
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22.13.0

@@ -1,0 +1,168 @@
+{% liquid
+  assign ec = product.metafields.eccomi_noleggio
+  assign monthly_cents = ec.monthly_gross_cents.value | default: 0
+  assign deposit_cents = ec.deposit_gross_cents.value | default: 0
+  assign duration = ec.duration_months.value | default: 0
+  assign total_km = ec.total_km.value | default: 0
+  assign valid_until = ec.valid_until.value
+  assign services = ec.services.value
+  assign warnings = ec.warnings.value
+  assign request_url = section.settings.request_url
+  if request_url == blank
+    assign request_url = ec.request_url.value
+  endif
+%}
+
+<script>
+  document.documentElement.classList.add('ecn-noleggio-template');
+</script>
+
+<section class="ecn-product" aria-labelledby="ecn-title-{{ section.id }}">
+  <div class="ecn-product__inner">
+    <div class="ecn-product__media">
+      <div class="ecn-product__image">
+        {% if product.featured_image %}
+          {{ product.featured_image | image_url: width: 1400 | image_tag: loading: 'eager', widths: '480, 720, 960, 1200, 1400', alt: product.title }}
+        {% endif %}
+      </div>
+      <p class="ecn-product__verified">✓ Quotazione verificata da ECCOMI</p>
+      <small>Immagine illustrativa. Allestimento e colore fanno fede alla quotazione.</small>
+    </div>
+
+    <div class="ecn-product__summary">
+      <p class="ecn-product__eyebrow">NOLEGGIO A LUNGO TERMINE</p>
+      <h1 id="ecn-title-{{ section.id }}">{{ product.title }}</h1>
+      <div class="ecn-product__price">
+        <strong>{{ monthly_cents | money }}</strong><span>/mese</span><small>IVA inclusa</small>
+      </div>
+
+      <div class="ecn-product__terms">
+        <div><span>Anticipo</span><strong>{{ deposit_cents | money }}</strong></div>
+        <div><span>Durata</span><strong>{{ duration }} mesi</strong></div>
+        <div><span>Chilometri</span><strong>{{ total_km }} km</strong></div>
+      </div>
+
+      {% if valid_until != blank %}
+        <p class="ecn-product__expiry">Offerta valida fino al <strong>{{ valid_until | date: '%d/%m/%Y' }}</strong>, salvo disponibilità.</p>
+      {% endif %}
+
+      {% if request_url != blank %}
+        <a class="ecn-product__primary" href="{{ request_url }}?promozione={{ ec.promotion_id.value | url_encode }}">AVVIA LA RICHIESTA DI NOLEGGIO →</a>
+      {% else %}
+        <span class="ecn-product__primary ecn-product__primary--disabled">AVVIA LA RICHIESTA DI NOLEGGIO</span>
+      {% endif %}
+
+      <div class="ecn-product__help">
+        <strong>HAI BISOGNO DI AIUTO?</strong>
+        <span>Scrivici su WhatsApp dal pulsante già presente sul sito.</span>
+      </div>
+
+      <p class="ecn-product__legal">{{ section.settings.legal_notice }}</p>
+    </div>
+  </div>
+
+  <div class="ecn-product__details">
+    <div class="ecn-product__heading">
+      <p class="ecn-product__eyebrow">COSA È INCLUSO</p>
+      <h2>Un canone chiaro, con i servizi essenziali.</h2>
+    </div>
+    {% if services != blank %}
+      <div class="ecn-product__services">
+        {% for service in services %}<span>✓ {{ service }}</span>{% endfor %}
+      </div>
+    {% endif %}
+    <div class="ecn-product__specs">
+      <span><small>Alimentazione</small><strong>{{ ec.fuel.value }}</strong></span>
+      <span><small>Cambio</small><strong>{{ ec.transmission.value }}</strong></span>
+      <span><small>Consegna prevista</small><strong>{{ ec.delivery.value }}</strong></span>
+      <span><small>Offerta</small><strong>{{ ec.offer_number.value }}</strong></span>
+    </div>
+    {% if warnings != blank %}
+      <div class="ecn-product__warnings">
+        {% for warning in warnings %}<span>⚠ {{ warning }}</span>{% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{% style %}
+  html.ecn-noleggio-template product-form,
+  html.ecn-noleggio-template .product-form,
+  html.ecn-noleggio-template .product-form__buttons,
+  html.ecn-noleggio-template .shopify-payment-button,
+  html.ecn-noleggio-template [data-shopify="payment-button"],
+  html.ecn-noleggio-template button[name="add"],
+  html.ecn-noleggio-template .quick-add,
+  html.ecn-noleggio-template .quick-add-modal,
+  html.ecn-noleggio-template .sticky-add-to-cart,
+  html.ecn-noleggio-template .sticky-cart { display:none!important; }
+  #shopify-section-{{ section.id }} { --ecn-blue:#075392; --ecn-navy:#08243f; --ecn-green:#1ba66a; --ecn-ink:#10253e; --ecn-muted:#6f8091; }
+  #shopify-section-{{ section.id }} * { box-sizing:border-box; }
+  #shopify-section-{{ section.id }} .ecn-product { color:var(--ecn-ink); }
+  #shopify-section-{{ section.id }} .ecn-product__inner { max-width:1180px; display:grid; grid-template-columns:minmax(0,1.08fr) minmax(390px,.92fr); gap:clamp(34px,5vw,72px); margin:0 auto; padding:clamp(34px,5vw,68px) 28px; }
+  #shopify-section-{{ section.id }} .ecn-product__image { width:100%; aspect-ratio:1.04; overflow:hidden; border-radius:22px; background:#f5f7fa; box-shadow:0 20px 55px rgba(8,36,63,.11); }
+  #shopify-section-{{ section.id }} .ecn-product__image img { width:100%; height:100%; object-fit:contain; }
+  #shopify-section-{{ section.id }} .ecn-product__media > small { display:block; margin-top:7px; color:#8c99a6; font-size:12px; line-height:1.5; }
+  #shopify-section-{{ section.id }} .ecn-product__verified { margin:16px 0 0; color:#24734f; font-size:13px; font-weight:700; }
+  #shopify-section-{{ section.id }} .ecn-product__summary { align-self:center; }
+  #shopify-section-{{ section.id }} .ecn-product__eyebrow { margin:0; color:var(--ecn-blue); font-size:12px; font-weight:800; letter-spacing:.15em; }
+  #shopify-section-{{ section.id }} h1 { margin:9px 0 0; color:var(--ecn-navy); font-size:clamp(34px,4vw,50px); line-height:1.04; letter-spacing:-.04em; }
+  #shopify-section-{{ section.id }} .ecn-product__price { display:flex; align-items:baseline; gap:7px; margin-top:26px; color:var(--ecn-blue); }
+  #shopify-section-{{ section.id }} .ecn-product__price strong { font-size:clamp(42px,5vw,58px); letter-spacing:-.06em; }
+  #shopify-section-{{ section.id }} .ecn-product__price span { font-size:17px; font-weight:700; }
+  #shopify-section-{{ section.id }} .ecn-product__price small { color:var(--ecn-muted); font-size:12px; }
+  #shopify-section-{{ section.id }} .ecn-product__terms { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:20px; }
+  #shopify-section-{{ section.id }} .ecn-product__terms div { min-width:0; display:flex; flex-direction:column; padding:14px 12px; border:1px solid #dce6ee; border-radius:12px; background:#f8fafc; }
+  #shopify-section-{{ section.id }} .ecn-product__terms span { color:#8795a3; font-size:10px; font-weight:700; text-transform:uppercase; }
+  #shopify-section-{{ section.id }} .ecn-product__terms strong { margin-top:5px; overflow:hidden; color:#334c63; font-size:14px; text-overflow:ellipsis; white-space:nowrap; }
+  #shopify-section-{{ section.id }} .ecn-product__expiry { margin:14px 0 0; padding:12px; border-radius:11px; background:#fff6df; color:#8d641a; font-size:12px; }
+  #shopify-section-{{ section.id }} .ecn-product__primary { width:100%; min-height:56px; display:flex; align-items:center; justify-content:center; margin-top:18px; border-radius:13px; background:linear-gradient(135deg,#147bd1,var(--ecn-blue)); color:#fff; font-size:14px; font-weight:800; letter-spacing:.025em; text-align:center; text-decoration:none; box-shadow:0 13px 28px rgba(7,83,146,.24); }
+  #shopify-section-{{ section.id }} .ecn-product__primary--disabled { opacity:.55; cursor:not-allowed; }
+  #shopify-section-{{ section.id }} .ecn-product__help { display:flex; flex-direction:column; margin-top:15px; padding:13px; border:1px solid #cfe8db; border-radius:12px; background:#f3fbf7; color:#267651; }
+  #shopify-section-{{ section.id }} .ecn-product__help strong { font-size:11px; letter-spacing:.04em; }
+  #shopify-section-{{ section.id }} .ecn-product__help span { margin-top:3px; color:#658376; font-size:11px; }
+  #shopify-section-{{ section.id }} .ecn-product__legal { margin:13px 0 0; color:#909da9; font-size:10px; line-height:1.55; }
+  #shopify-section-{{ section.id }} .ecn-product__details { padding:60px clamp(28px,7vw,90px) 72px; background:#f5f8fb; }
+  #shopify-section-{{ section.id }} .ecn-product__heading { max-width:700px; margin:0 auto; text-align:center; }
+  #shopify-section-{{ section.id }} .ecn-product__heading h2 { margin:8px 0 0; color:var(--ecn-navy); font-size:32px; }
+  #shopify-section-{{ section.id }} .ecn-product__services { max-width:960px; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:28px auto 0; }
+  #shopify-section-{{ section.id }} .ecn-product__services span { min-height:52px; display:flex; align-items:center; padding:11px 13px; border:1px solid #dfe8ef; border-radius:11px; background:#fff; color:#405971; font-size:12px; font-weight:700; }
+  #shopify-section-{{ section.id }} .ecn-product__specs { max-width:960px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:24px auto 0; padding-top:22px; border-top:1px solid #dfe7ee; }
+  #shopify-section-{{ section.id }} .ecn-product__specs span { display:flex; flex-direction:column; }
+  #shopify-section-{{ section.id }} .ecn-product__specs small { color:#8996a3; font-size:11px; }
+  #shopify-section-{{ section.id }} .ecn-product__specs strong { margin-top:5px; color:#3d556c; font-size:13px; }
+  #shopify-section-{{ section.id }} .ecn-product__warnings { max-width:960px; display:flex; flex-wrap:wrap; gap:10px; margin:24px auto 0; color:#8f681f; font-size:11px; }
+  @media(max-width:749px){
+    #shopify-section-{{ section.id }} .ecn-product__inner { display:block; padding:20px 15px 36px; }
+    #shopify-section-{{ section.id }} .ecn-product__image { border-radius:16px; }
+    #shopify-section-{{ section.id }} .ecn-product__summary { margin-top:30px; }
+    #shopify-section-{{ section.id }} h1 { font-size:34px; }
+    #shopify-section-{{ section.id }} .ecn-product__price strong { font-size:44px; }
+    #shopify-section-{{ section.id }} .ecn-product__terms { gap:6px; }
+    #shopify-section-{{ section.id }} .ecn-product__terms div { padding:12px 8px; }
+    #shopify-section-{{ section.id }} .ecn-product__terms strong { font-size:12px; }
+    #shopify-section-{{ section.id }} .ecn-product__details { padding:42px 15px 52px; }
+    #shopify-section-{{ section.id }} .ecn-product__heading h2 { font-size:26px; }
+    #shopify-section-{{ section.id }} .ecn-product__services, #shopify-section-{{ section.id }} .ecn-product__specs { grid-template-columns:repeat(2,1fr); gap:8px; }
+  }
+{% endstyle %}
+
+{% schema %}
+{
+  "name": "ECCOMI Noleggio",
+  "settings": [
+    {
+      "type": "url",
+      "id": "request_url",
+      "label": "Pagina richiesta noleggio"
+    },
+    {
+      "type": "textarea",
+      "id": "legal_notice",
+      "label": "Nota legale",
+      "default": "La richiesta non costituisce acquisto né approvazione del noleggio. La decisione finale resta al noleggiatore."
+    }
+  ],
+  "presets": [{ "name": "ECCOMI Noleggio" }]
+}
+{% endschema %}
