@@ -35,6 +35,19 @@ function jsonArray(value: string) {
   }
 }
 
+function safeExternalUrl(value: string | null | undefined) {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 async function readCover(
   request: Request,
   coverKey: string,
@@ -169,8 +182,9 @@ export async function POST(
               coverKey,
             )
           ),
-          sourceUrl:
+          sourceUrl: safeExternalUrl(
             promotion.coverSourceUrl,
+          ),
           attribution:
             promotion.coverAttribution,
         }
@@ -209,7 +223,7 @@ export async function POST(
           coverSourceKind:
             automatic.sourceKind,
           coverSourceUrl:
-            automatic.sourceUrl,
+            safeExternalUrl(automatic.sourceUrl),
           coverAttribution:
             automatic.attribution,
           automationStatus:
@@ -229,7 +243,7 @@ export async function POST(
         mimeType:
           automatic.mimeType,
         sourceUrl:
-          automatic.sourceUrl,
+          safeExternalUrl(automatic.sourceUrl),
         attribution:
           automatic.attribution,
       };
