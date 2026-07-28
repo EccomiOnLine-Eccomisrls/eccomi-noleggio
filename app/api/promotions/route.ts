@@ -262,8 +262,17 @@ export async function POST(request: Request) {
         payloadJson: JSON.stringify({ error: message }),
       }).catch(() => undefined);
     } else {
-      if (quoteKey) await getRuntimeEnv().BUCKET.delete(quoteKey).catch(() => undefined);
-      if (coverKey) await getRuntimeEnv().BUCKET.delete(coverKey).catch(() => undefined);
+      const bucket = getRuntimeEnv().BUCKET;
+
+      if (bucket?.delete) {
+        if (quoteKey) {
+          await bucket.delete(quoteKey).catch(() => undefined);
+        }
+
+        if (coverKey) {
+          await bucket.delete(coverKey).catch(() => undefined);
+        }
+      }
     }
     if (/UNIQUE constraint failed/i.test(message)) {
       return Response.json({ error: "Questa quotazione risulta già caricata." }, { status: 409 });
