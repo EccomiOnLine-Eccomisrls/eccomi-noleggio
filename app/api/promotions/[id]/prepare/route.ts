@@ -3,7 +3,6 @@ import { getDb } from "../../../../../db";
 import { auditLogs, hubEvents, promotions } from "../../../../../db/schema";
 import { requireCeo, routeError } from "../../../../lib/server/authz";
 import { createPromotionDraftOnShopify, isShopifyConfigured } from "../../../../lib/server/shopify";
-import { getRuntimeEnv } from "../../../../lib/server/runtime";
 import { storageGet, storagePut } from "../../../../lib/server/storage";
 import { retrieveVehicleCover } from "../../../../lib/server/vehicle-image";
 
@@ -19,7 +18,7 @@ function jsonArray(value: string) {
 async function readCover(request: Request, coverKey: string) {
   if (coverKey.startsWith("asset:")) {
     const path = coverKey.slice("asset:".length);
-    const response = await getRuntimeEnv().ASSETS.fetch(new Request(new URL(path, request.url)));
+    const response = await fetch(new URL(path, request.url));
     if (!response.ok) throw new Error("Immagine promozionale non disponibile.");
     return {
       bytes: await response.arrayBuffer(),

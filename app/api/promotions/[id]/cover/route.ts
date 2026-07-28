@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
 import { auditLogs, promotions } from "../../../../../db/schema";
 import { requireActor, routeError } from "../../../../lib/server/authz";
-import { getRuntimeEnv } from "../../../../lib/server/runtime";
 import { storageDelete, storageGet, storagePut } from "../../../../lib/server/storage";
 
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -25,7 +24,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (!promotion.coverKey) return Response.json({ error: "Immagine non disponibile." }, { status: 404 });
     if (promotion.coverKey.startsWith("asset:")) {
       const path = promotion.coverKey.slice("asset:".length);
-      return getRuntimeEnv().ASSETS.fetch(new Request(new URL(path, request.url)));
+      return fetch(new URL(path, request.url));
     }
     const object = await storageGet(promotion.coverKey);
     if (!object) return Response.json({ error: "Immagine non disponibile." }, { status: 404 });

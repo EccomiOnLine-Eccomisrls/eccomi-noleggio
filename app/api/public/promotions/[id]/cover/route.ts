@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../../db";
 import { promotions } from "../../../../../../db/schema";
 import { corsHeaders, jsonWithCors, publicCorsOrigin } from "../../../../../lib/server/public-origin";
-import { getRuntimeEnv } from "../../../../../lib/server/runtime";
 import { storageGet } from "../../../../../lib/server/storage";
 
 export async function OPTIONS(request: Request) {
@@ -26,7 +25,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   let response: Response;
   if (promotion.coverKey.startsWith("asset:")) {
     const path = promotion.coverKey.slice("asset:".length);
-    response = await getRuntimeEnv().ASSETS.fetch(new Request(new URL(path, request.url)));
+    response = await fetch(new URL(path, request.url));
   } else {
     const object = await storageGet(promotion.coverKey);
     if (!object) return jsonWithCors({ error: "Immagine non disponibile." }, 404, origin);
