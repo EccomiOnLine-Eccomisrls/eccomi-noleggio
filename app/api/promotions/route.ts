@@ -5,7 +5,7 @@ import type { QuoteDraft } from "../../lib/quote-parser";
 import { extractQuoteWithAi } from "../../lib/server/ai";
 import { requireActor, routeError } from "../../lib/server/authz";
 import { integerFromText, italianDateToIso, listPromotionsForActor, moneyToCents } from "../../lib/server/promotion-service";
-import { getRuntimeEnv } from "../../lib/server/runtime";
+import { storageDelete, storagePut } from "../../lib/server/storage";
 import { createPromotionDraftOnShopify, isShopifyConfigured } from "../../lib/server/shopify";
 import { retrieveVehicleCover } from "../../lib/server/vehicle-image";
 
@@ -93,10 +93,11 @@ export async function POST(request: Request) {
 
     promotionId = crypto.randomUUID();
     quoteKey = `quotations/${partnerId}/${promotionId}/${safeFilename(quote.name) || "quotazione.pdf"}`;
-    await getRuntimeEnv().BUCKET.put(quoteKey, bytes, {
-      httpMetadata: { contentType: "application/pdf" },
-      customMetadata: { promotionId, uploadedBy: actor.email },
-    });
+    await storagePut(
+      quoteKey,
+      bytes,
+      "application/pdf",
+    );
 
     const now = new Date().toISOString();
     const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
@@ -160,14 +161,11 @@ export async function POST(request: Request) {
     });
     const extension = cover.mimeType === "image/png" ? "png" : cover.mimeType === "image/webp" ? "webp" : "jpg";
     coverKey = `covers/${partnerId}/${promotionId}/automatic-cover.${extension}`;
-    await getRuntimeEnv().BUCKET.put(coverKey, cover.bytes, {
-      httpMetadata: { contentType: cover.mimeType },
-      customMetadata: {
-        promotionId,
-        sourceKind: cover.sourceKind,
-        sourceUrl: cover.sourceUrl || "",
-      },
-    });
+    await storagePut(
+      coverKey,
+      cover.bytes,
+      cover.mimeType,
+    );
     await getDb().update(promotions).set({
       coverKey,
       coverSourceKind: cover.sourceKind,
@@ -262,16 +260,14 @@ export async function POST(request: Request) {
         payloadJson: JSON.stringify({ error: message }),
       }).catch(() => undefined);
     } else {
-      const bucket = getRuntimeEnv().BUCKET;
+      if (quoteKey) {
+        await storageDelete(quoteKey)
+          .catch(() => undefined);
+      }
 
-      if (bucket?.delete) {
-        if (quoteKey) {
-          await bucket.delete(quoteKey).catch(() => undefined);
-        }
-
-        if (coverKey) {
-          await bucket.delete(coverKey).catch(() => undefined);
-        }
+      if (coverKey) {
+        await storageDelete(coverKey)
+          .catch(() => undefined);
       }
     }
     if (/UNIQUE constraint failed/i.test(message)) {

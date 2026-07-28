@@ -34,6 +34,9 @@ export type EccomiRuntimeEnv = {
   OPENAI_API_KEY?: string;
   OPENAI_TEXT_MODEL?: string;
   OPENAI_IMAGE_MODEL?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  SUPABASE_STORAGE_BUCKET?: string;
   CRON_SECRET?: string;
   HUB_READ_SECRET?: string;
 };

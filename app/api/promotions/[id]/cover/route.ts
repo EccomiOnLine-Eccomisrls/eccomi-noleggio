@@ -3,6 +3,7 @@ import { getDb } from "../../../../../db";
 import { auditLogs, promotions } from "../../../../../db/schema";
 import { requireActor, routeError } from "../../../../lib/server/authz";
 import { getRuntimeEnv } from "../../../../lib/server/runtime";
+import { storageDelete, storageGet, storagePut } from "../../../../lib/server/storage";
 
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_COVER_BYTES = 8 * 1024 * 1024;
@@ -26,11 +27,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       const path = promotion.coverKey.slice("asset:".length);
       return getRuntimeEnv().ASSETS.fetch(new Request(new URL(path, request.url)));
     }
-    const object = await getRuntimeEnv().BUCKET.get(promotion.coverKey);
+    const object = await storageGet(promotion.coverKey);
     if (!object) return Response.json({ error: "Immagine non disponibile." }, { status: 404 });
-    return new Response(object.body, {
+    return new Response(object.bytes, {
       headers: {
-        "content-type": object.httpMetadata?.contentType || "application/octet-stream",
+        "content-type": object.contentType || "application/octet-stream",
         "cache-control": "private, max-age=300",
       },
     });
@@ -50,13 +51,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (cover.size <= 0 || cover.size > MAX_COVER_BYTES) return Response.json({ error: "L'immagine deve pesare meno di 8 MB." }, { status: 400 });
     const extension = cover.type === "image/png" ? "png" : cover.type === "image/webp" ? "webp" : "jpg";
     const key = `covers/${promotion.partnerId}/${id}/shopify-cover.${extension}`;
-    await getRuntimeEnv().BUCKET.put(key, await cover.arrayBuffer(), {
-      httpMetadata: { contentType: cover.type },
-      customMetadata: { promotionId: id, uploadedBy: actor.email },
-    });
+    await storagePut(
+      key,
+      await cover.arrayBuffer(),
+      cover.type,
+    );
     const oldKey = promotion.coverKey && !promotion.coverKey.startsWith("asset:") ? promotion.coverKey : null;
     await getDb().update(promotions).set({ coverKey: key, updatedAt: new Date().toISOString() }).where(eq(promotions.id, id));
-    if (oldKey && oldKey !== key) await getRuntimeEnv().BUCKET.delete(oldKey);
+    if (oldKey && oldKey !== key) {
+      await storageDelete(oldKey);
+    }
     await getDb().insert(auditLogs).values({
       id: crypto.randomUUID(),
       actorEmail: actor.email,

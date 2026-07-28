@@ -4,6 +4,7 @@ import { auditLogs, hubEvents, promotions } from "../../../../../db/schema";
 import { requireCeo, routeError } from "../../../../lib/server/authz";
 import { createPromotionDraftOnShopify, isShopifyConfigured } from "../../../../lib/server/shopify";
 import { getRuntimeEnv } from "../../../../lib/server/runtime";
+import { storageGet, storagePut } from "../../../../lib/server/storage";
 import { retrieveVehicleCover } from "../../../../lib/server/vehicle-image";
 
 function jsonArray(value: string) {
@@ -28,12 +29,12 @@ async function readCover(request: Request, coverKey: string) {
       attribution: null as string | null,
     };
   }
-  const object = await getRuntimeEnv().BUCKET.get(coverKey);
+  const object = await storageGet(coverKey);
   if (!object) throw new Error("Immagine promozionale non disponibile.");
   return {
-    bytes: await object.arrayBuffer(),
+    bytes: object.bytes,
     filename: coverKey.split("/").pop() || "eccomi-noleggio.png",
-    mimeType: object.httpMetadata?.contentType || "image/png",
+    mimeType: object.contentType || "image/png",
     sourceUrl: null as string | null,
     attribution: null as string | null,
   };
@@ -69,14 +70,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       });
       const extension = automatic.mimeType === "image/png" ? "png" : automatic.mimeType === "image/webp" ? "webp" : "jpg";
       coverKey = `covers/${promotion.partnerId}/${promotion.id}/automatic-cover.${extension}`;
-      await getRuntimeEnv().BUCKET.put(coverKey, automatic.bytes, {
-        httpMetadata: { contentType: automatic.mimeType },
-        customMetadata: {
-          promotionId: promotion.id,
-          sourceKind: automatic.sourceKind,
-          sourceUrl: automatic.sourceUrl || "",
-        },
-      });
+      await storagePut(
+        coverKey,
+        automatic.bytes,
+        automatic.mimeType,
+      );
       await getDb().update(promotions).set({
         coverKey,
         coverSourceKind: automatic.sourceKind,

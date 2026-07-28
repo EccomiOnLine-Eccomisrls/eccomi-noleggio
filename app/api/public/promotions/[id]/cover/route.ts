@@ -3,6 +3,7 @@ import { getDb } from "../../../../../../db";
 import { promotions } from "../../../../../../db/schema";
 import { corsHeaders, jsonWithCors, publicCorsOrigin } from "../../../../../lib/server/public-origin";
 import { getRuntimeEnv } from "../../../../../lib/server/runtime";
+import { storageGet } from "../../../../../lib/server/storage";
 
 export async function OPTIONS(request: Request) {
   const origin = await publicCorsOrigin(request);
@@ -27,10 +28,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const path = promotion.coverKey.slice("asset:".length);
     response = await getRuntimeEnv().ASSETS.fetch(new Request(new URL(path, request.url)));
   } else {
-    const object = await getRuntimeEnv().BUCKET.get(promotion.coverKey);
+    const object = await storageGet(promotion.coverKey);
     if (!object) return jsonWithCors({ error: "Immagine non disponibile." }, 404, origin);
-    response = new Response(object.body, {
-      headers: { "content-type": object.httpMetadata?.contentType || "application/octet-stream" },
+    response = new Response(object.bytes, {
+      headers: { "content-type": object.contentType || "application/octet-stream" },
     });
   }
 
