@@ -83,19 +83,38 @@ export default function PromotionManagementControls() {
         nav.appendChild(trash);
       }
 
-      const register = Array.from(document.querySelectorAll<HTMLElement>("section,article,div"))
-        .find((element) => element.textContent?.includes("Registro automatico") && element.querySelector("h2,h3,strong"));
-      if (register && register.dataset.registerReady !== "true") {
-        register.dataset.registerReady = "true";
-        register.style.cursor = "pointer";
-        register.setAttribute("role", "link");
-        register.setAttribute("tabindex", "0");
-        register.title = "Apri il registro completo";
-        const open = () => { window.location.href = "/registro"; };
-        register.addEventListener("click", open);
-        register.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") open();
+      const title = Array.from(document.querySelectorAll<HTMLElement>("h1,h2,h3,strong"))
+        .find((element) => element.textContent?.trim() === "Registro automatico");
+      const registerCard = title?.closest<HTMLElement>("section,article");
+
+      if (registerCard && registerCard.dataset.registerButtonReady !== "true") {
+        registerCard.dataset.registerButtonReady = "true";
+        registerCard.style.cursor = "default";
+        registerCard.removeAttribute("role");
+        registerCard.removeAttribute("tabindex");
+        registerCard.removeAttribute("title");
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Apri registro completo";
+        button.setAttribute("aria-label", "Apri il registro automatico completo");
+        Object.assign(button.style, {
+          width: "100%",
+          minHeight: "38px",
+          marginTop: "12px",
+          borderRadius: "10px",
+          border: "1px solid #dce6f1",
+          background: "#ffffff",
+          color: "#073f73",
+          fontWeight: "800",
+          cursor: "pointer",
         });
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          window.location.href = "/registro";
+        });
+        registerCard.appendChild(button);
       }
     };
 
