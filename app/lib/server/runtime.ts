@@ -43,7 +43,15 @@ export function installRuntimeEnv(value: unknown) {
 }
 
 export function getRuntimeEnv(): EccomiRuntimeEnv {
-  const value = runtimeGlobal.__ECCOMI_RUNTIME_ENV__;
-  if (!value) throw new Error("Ambiente ECCOMI NOLEGGIO non disponibile.");
-  return value;
+  const installedRuntime = runtimeGlobal.__ECCOMI_RUNTIME_ENV__;
+
+  if (installedRuntime) {
+    return installedRuntime;
+  }
+
+  if (typeof process !== "undefined" && process.env) {
+    return process.env as EccomiRuntimeEnv;
+  }
+
+  throw new Error("Ambiente ECCOMI NOLEGGIO non disponibile.");
 }
