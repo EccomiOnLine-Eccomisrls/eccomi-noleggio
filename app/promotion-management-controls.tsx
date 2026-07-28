@@ -40,13 +40,7 @@ export default function PromotionManagementControls() {
 
     const execute = async (promotion: DashboardPromotion, action: "REFRESH" | "SUSPEND" | "ARCHIVE" | "DELETE") => {
       if (action === "DELETE") {
-        const first = window.confirm("Eliminare definitivamente questa promozione anche da Shopify? L'operazione non può essere annullata.");
-        if (!first) return;
-        const typed = window.prompt("Per confermare scrivi ELIMINA");
-        if (typed !== "ELIMINA") {
-          window.alert("Eliminazione annullata.");
-          return;
-        }
+        if (!window.confirm("Spostare questa promozione nel cestino? Verrà rimossa dalla dashboard e archiviata su Shopify, ma potrà essere ripristinata.")) return;
       } else {
         const labels = { REFRESH: "aggiornare Shopify", SUSPEND: "sospendere l'offerta", ARCHIVE: "archiviare l'offerta" };
         if (!window.confirm(`Confermi di voler ${labels[action]}?`)) return;
@@ -59,18 +53,54 @@ export default function PromotionManagementControls() {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: action === "REFRESH" ? undefined : JSON.stringify({ action, confirm: action === "DELETE" ? "ELIMINA" : undefined }),
+        body: action === "REFRESH" ? undefined : JSON.stringify({ action }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         window.alert(payload.error || "Operazione non riuscita.");
         return;
       }
-      window.alert(action === "REFRESH" ? "Offerta aggiornata su Shopify." : action === "DELETE" ? "Offerta eliminata." : action === "SUSPEND" ? "Offerta sospesa." : "Offerta archiviata.");
+      window.alert(action === "REFRESH" ? "Offerta aggiornata su Shopify." : action === "DELETE" ? "Offerta spostata nel cestino." : action === "SUSPEND" ? "Offerta sospesa." : "Offerta archiviata.");
       window.location.reload();
     };
 
+    const injectNavigation = () => {
+      const nav = document.querySelector<HTMLElement>(".side-nav");
+      if (nav && nav.dataset.extraLinksReady !== "true") {
+        nav.dataset.extraLinksReady = "true";
+        const separator = document.createElement("div");
+        separator.style.height = "1px";
+        separator.style.background = "rgba(255,255,255,.12)";
+        separator.style.margin = "10px 12px";
+
+        const trash = document.createElement("button");
+        trash.type = "button";
+        trash.className = "side-nav__item";
+        trash.innerHTML = '<span style="font-size:18px">🗑️</span><span>Cestino</span>';
+        trash.addEventListener("click", () => { window.location.href = "/cestino"; });
+
+        nav.appendChild(separator);
+        nav.appendChild(trash);
+      }
+
+      const register = Array.from(document.querySelectorAll<HTMLElement>("section,article,div"))
+        .find((element) => element.textContent?.includes("Registro automatico") && element.querySelector("h2,h3,strong"));
+      if (register && register.dataset.registerReady !== "true") {
+        register.dataset.registerReady = "true";
+        register.style.cursor = "pointer";
+        register.setAttribute("role", "link");
+        register.setAttribute("tabindex", "0");
+        register.title = "Apri il registro completo";
+        const open = () => { window.location.href = "/registro"; };
+        register.addEventListener("click", open);
+        register.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") open();
+        });
+      }
+    };
+
     const enhance = async () => {
+      injectNavigation();
       const footer = document.querySelector<HTMLElement>(".promotion-modal__footer");
       if (!footer || footer.dataset.managementReady === "true") return;
       await loadPromotions();
@@ -94,7 +124,7 @@ export default function PromotionManagementControls() {
         { action: "REFRESH", label: "Aggiorna Shopify" },
         { action: "SUSPEND", label: "Sospendi" },
         { action: "ARCHIVE", label: "Archivia" },
-        { action: "DELETE", label: "Elimina definitivamente", danger: true },
+        { action: "DELETE", label: "Sposta nel cestino", danger: true },
       ];
 
       for (const item of actions) {
