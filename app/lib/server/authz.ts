@@ -190,14 +190,65 @@ export function routeError(
     return error;
   }
 
-  const message =
-    error instanceof Error
-      ? error.message
-      : "Errore inatteso.";
+  const errorRecord =
+    error && typeof error === "object"
+      ? error as {
+          message?: unknown;
+          cause?: unknown;
+          code?: unknown;
+        }
+      : null;
+
+  const causeRecord =
+    errorRecord?.cause &&
+    typeof errorRecord.cause === "object"
+      ? errorRecord.cause as {
+          message?: unknown;
+          code?: unknown;
+          detail?: unknown;
+          constraint_name?: unknown;
+          table_name?: unknown;
+          column_name?: unknown;
+        }
+      : null;
+
+  console.error("ECCOMI_SERVER_ERROR", {
+    message:
+      typeof errorRecord?.message === "string"
+        ? errorRecord.message.split(" params:")[0]
+        : "Errore inatteso.",
+    code:
+      typeof causeRecord?.code === "string"
+        ? causeRecord.code
+        : typeof errorRecord?.code === "string"
+          ? errorRecord.code
+          : null,
+    cause:
+      typeof causeRecord?.message === "string"
+        ? causeRecord.message
+        : null,
+    detail:
+      typeof causeRecord?.detail === "string"
+        ? causeRecord.detail
+        : null,
+    constraint:
+      typeof causeRecord?.constraint_name === "string"
+        ? causeRecord.constraint_name
+        : null,
+    table:
+      typeof causeRecord?.table_name === "string"
+        ? causeRecord.table_name
+        : null,
+    column:
+      typeof causeRecord?.column_name === "string"
+        ? causeRecord.column_name
+        : null,
+  });
 
   return Response.json(
     {
-      error: message,
+      error:
+        "Errore interno durante il salvataggio. Controlla i log del server.",
     },
     {
       status: 500,
