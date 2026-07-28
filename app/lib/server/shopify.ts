@@ -304,8 +304,15 @@ export async function connectShopifyIntegration(input: {
   return getShopifyConnectionStatus();
 }
 
-async function graphql<T>(query: string, variables: Record<string, unknown>) {
-  return graphqlWithConfiguration<T>(await configuration(), query, variables);
+export async function shopifyAdminFetch<T>(
+  query: string,
+  variables: Record<string, unknown> = {},
+) {
+  return graphqlWithConfiguration<T>(
+    await configuration(),
+    query,
+    variables,
+  );
 }
 
 function escapeHtml(value: string) {
@@ -362,7 +369,7 @@ function descriptionFor(promotion: ShopifyPromotion, requestBaseUrl: string, cov
 }
 
 async function stageProductImage(cover: ProductCover) {
-  const data = await graphql<{
+  const data = await shopifyAdminFetch<{
     stagedUploadsCreate: {
       stagedTargets: Array<{ url: string; resourceUrl: string; parameters: Array<{ name: string; value: string }> }>;
       userErrors: Array<{ message: string }>;
@@ -693,3 +700,4 @@ export async function unpublishPromotionFromShopify(productId: string) {
     throw new Error(data.publishableUnpublish.userErrors.map((error) => error.message).join(" · "));
   }
 }
+
