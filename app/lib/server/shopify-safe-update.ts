@@ -42,13 +42,29 @@ function euro(cents: number) {
   }).format(cents / 100);
 }
 
-function descriptionFor(promotion: SafeShopifyPromotion) {
+function requestUrlFor(requestBaseUrl: string, promotionId: string) {
+  if (!requestBaseUrl) return "";
+
+  try {
+    const url = new URL(requestBaseUrl);
+    url.searchParams.set("promozione", promotionId);
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+function descriptionFor(
+  promotion: SafeShopifyPromotion,
+  requestBaseUrl: string,
+) {
   const services = promotion.services
     .map((service) => `<li>${escapeHtml(service)}</li>`)
     .join("");
   const warnings = promotion.warnings
     .map((warning) => `<li>${escapeHtml(warning)}</li>`)
     .join("");
+  const requestUrl = requestUrlFor(requestBaseUrl, promotion.id);
 
   return [
     `<h2>${escapeHtml(promotion.brand)} ${escapeHtml(promotion.model)}</h2>`,
@@ -56,6 +72,9 @@ function descriptionFor(promotion: SafeShopifyPromotion) {
     `<p><strong>Anticipo:</strong> ${euro(promotion.depositGrossCents)} · <strong>Durata:</strong> ${promotion.durationMonths} mesi · <strong>Chilometri:</strong> ${promotion.totalKm.toLocaleString("it-IT")} km</p>`,
     promotion.delivery
       ? `<p><strong>Consegna prevista:</strong> ${escapeHtml(promotion.delivery)}</p>`
+      : "",
+    requestUrl
+      ? `<p style="margin:22px 0;"><a href="${escapeHtml(requestUrl)}" style="display:block;padding:17px 22px;border-radius:12px;background:#075392;color:#ffffff;font-size:16px;font-weight:800;text-align:center;text-decoration:none;">INIZIA LA TUA RICHIESTA →</a></p>`
       : "",
     `<h3>Servizi inclusi</h3><ul>${services}</ul>`,
     `<details><summary>Dettagli e condizioni dell'offerta</summary>`,
@@ -76,6 +95,9 @@ export async function updatePromotionOnShopifyWithoutUrlMetafields(
   const templateSuffix =
     runtime.SHOPIFY_NOLEGGIO_TEMPLATE_SUFFIX?.trim() ||
     "eccomi-noleggio";
+  const requestBaseUrl =
+    runtime.PUBLIC_REQUEST_BASE_URL?.trim() ||
+    "https://eccomi-noleggio.onrender.com/richiesta";
 
   const data = await shopifyAdminFetch<{
     productUpdate: {
@@ -109,7 +131,7 @@ export async function updatePromotionOnShopifyWithoutUrlMetafields(
       product: {
         id: productId,
         title: `${promotion.brand} ${promotion.model} a noleggio lungo termine – ${euro(promotion.monthlyGrossCents)}/mese`,
-        descriptionHtml: descriptionFor(promotion),
+        descriptionHtml: descriptionFor(promotion, requestBaseUrl),
         productType: "Noleggio a lungo termine",
         vendor: "ECCOMI NOLEGGIO",
         status: "ACTIVE",
