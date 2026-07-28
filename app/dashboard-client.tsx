@@ -805,6 +805,12 @@ export default function Home() {
   const [busyPromotionId, setBusyPromotionId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState("");
 
   const changeView = (view: ViewName) => { setActiveView(view); setMobileMenuOpen(false); };
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 4200); };
@@ -827,28 +833,97 @@ export default function Home() {
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/dashboard", { cache: "no-store" })
+
+    fetch("/api/dashboard", {
+      cache: "no-store",
+      credentials: "same-origin",
+    })
       .then(async (response) => {
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Dati non disponibili.");
+
+        if (response.status === 401) {
+          if (mounted) {
+            setAuthRequired(true);
+            setAuthChecking(false);
+          }
+          return null;
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Dati non disponibili.");
+        }
+
         return payload as {
           promotions: Promotion[];
           leads?: LeadSummary[];
           hubEvents?: HubEvent[];
-          integrations: { shopify: ShopifyConnectionState; ai: AiConnectionState };
+          integrations: {
+            shopify: ShopifyConnectionState;
+            ai: AiConnectionState;
+          };
         };
       })
       .then((payload) => {
-        if (!mounted) return;
+        if (!mounted || !payload) return;
+
         setPromotionItems(payload.promotions);
         setLeadItems(payload.leads || []);
         setHubEvents(payload.hubEvents || []);
         setShopify(payload.integrations.shopify);
         setAi(payload.integrations.ai);
+        setAuthRequired(false);
+        setAuthChecking(false);
       })
-      .catch(() => undefined);
-    return () => { mounted = false; };
+      .catch(() => {
+        if (mounted) {
+          setAuthChecking(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  const handleCeoLogin = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setLoginBusy(true);
+    setLoginError("");
+
+    try {
+      const response = await fetch("/api/auth/ceo-login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email: loginEmail,
+          password: loginPassword,
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error || "Accesso non riuscito.",
+        );
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setLoginError(
+        error instanceof Error
+          ? error.message
+          : "Accesso non riuscito.",
+      );
+    } finally {
+      setLoginBusy(false);
+    }
+  };
 
   const updatePromotion = (id: string, changes: Partial<Promotion>) => {
     setPromotionItems((current) => current.map((promotion) => promotion.id === id ? { ...promotion, ...changes } : promotion));
@@ -935,6 +1010,239 @@ export default function Home() {
       setBusyPromotionId(null);
     }
   };
+
+  if (authChecking) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "#f4f7fb",
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            color: "#073f73",
+            fontWeight: 700,
+          }}
+        >
+          <Loader2 className="spin" size={24} />
+          Verifica accesso…
+        </div>
+      </main>
+    );
+  }
+
+  if (authRequired) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background:
+            "linear-gradient(135deg, #073f73 0%, #0c5597 100%)",
+          padding: 24,
+        }}
+      >
+        <section
+          style={{
+            width: "100%",
+            maxWidth: 430,
+            background: "#ffffff",
+            borderRadius: 22,
+            padding: 30,
+            boxShadow: "0 24px 70px rgba(0, 0, 0, 0.22)",
+          }}
+        >
+          <div style={{ marginBottom: 28 }}>
+            <BrandMark />
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                color: "#0c5597",
+                fontSize: 12,
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+              }}
+            >
+              <ShieldCheck size={17} />
+              ACCESSO RISERVATO
+            </span>
+
+            <h1
+              style={{
+                margin: "12px 0 8px",
+                color: "#102033",
+                fontSize: 29,
+                lineHeight: 1.15,
+              }}
+            >
+              Entra in ECCOMI NOLEGGIO
+            </h1>
+
+            <p
+              style={{
+                margin: 0,
+                color: "#5b6778",
+                lineHeight: 1.55,
+              }}
+            >
+              Inserisci le credenziali CEO configurate sul server.
+            </p>
+          </div>
+
+          <form
+            onSubmit={handleCeoLogin}
+            style={{
+              display: "grid",
+              gap: 18,
+            }}
+          >
+            <label
+              style={{
+                display: "grid",
+                gap: 7,
+                color: "#102033",
+                fontWeight: 700,
+              }}
+            >
+              <span>Email</span>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(event) =>
+                  setLoginEmail(event.target.value)
+                }
+                autoComplete="email"
+                autoCapitalize="none"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid #dce6f1",
+                  borderRadius: 12,
+                  padding: "13px 14px",
+                  fontSize: 16,
+                  color: "#102033",
+                  background: "#ffffff",
+                }}
+              />
+            </label>
+
+            <label
+              style={{
+                display: "grid",
+                gap: 7,
+                color: "#102033",
+                fontWeight: 700,
+              }}
+            >
+              <span>Password</span>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(event) =>
+                  setLoginPassword(event.target.value)
+                }
+                autoComplete="current-password"
+                required
+                style={{
+                  width: "100%",
+                  border: "1px solid #dce6f1",
+                  borderRadius: 12,
+                  padding: "13px 14px",
+                  fontSize: 16,
+                  color: "#102033",
+                  background: "#ffffff",
+                }}
+              />
+            </label>
+
+            {loginError ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 9,
+                  borderRadius: 12,
+                  padding: "12px 13px",
+                  background: "#fff1f2",
+                  color: "#b42318",
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                <AlertTriangle size={18} />
+                <span>{loginError}</span>
+              </div>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={
+                loginBusy ||
+                !loginEmail.trim() ||
+                !loginPassword
+              }
+              style={{
+                minHeight: 48,
+                border: 0,
+                borderRadius: 12,
+                padding: "12px 18px",
+                background: "#2563eb",
+                color: "#ffffff",
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: loginBusy
+                  ? "wait"
+                  : "pointer",
+                opacity:
+                  loginBusy ||
+                  !loginEmail.trim() ||
+                  !loginPassword
+                    ? 0.65
+                    : 1,
+                display: "inline-flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 9,
+              }}
+            >
+              {loginBusy ? (
+                <Loader2 className="spin" size={19} />
+              ) : (
+                <LockKeyhole size={19} />
+              )}
+              {loginBusy
+                ? "Accesso in corso…"
+                : "Accedi come CEO"}
+            </button>
+          </form>
+
+          <p
+            style={{
+              margin: "22px 0 0",
+              color: "#7a8797",
+              fontSize: 13,
+              textAlign: "center",
+            }}
+          >
+            Sessione protetta tramite cookie HttpOnly.
+          </p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell">

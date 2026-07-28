@@ -19,6 +19,8 @@ export type EccomiRuntimeEnv = {
   BUCKET: R2BucketLike;
   ASSETS: FetcherLike;
   CEO_EMAIL?: string;
+  CEO_ACCESS_PASSWORD?: string;
+  CEO_SESSION_SECRET?: string;
   SHOPIFY_SHOP_DOMAIN?: string;
   SHOPIFY_ADMIN_ACCESS_TOKEN?: string;
   SHOPIFY_ONLINE_STORE_PUBLICATION_ID?: string;
@@ -50,7 +52,7 @@ export function getRuntimeEnv(): EccomiRuntimeEnv {
   }
 
   if (typeof process !== "undefined" && process.env) {
-    return process.env as EccomiRuntimeEnv;
+    return process.env as unknown as EccomiRuntimeEnv;
   }
 
   throw new Error("Ambiente ECCOMI NOLEGGIO non disponibile.");
