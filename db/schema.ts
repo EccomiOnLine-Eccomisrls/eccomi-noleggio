@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { boolean, index, integer, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
-export const partners = sqliteTable("partners", {
+export const partners = pgTable("partners", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   legalName: text("legal_name").notNull(),
@@ -12,17 +12,17 @@ export const partners = sqliteTable("partners", {
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   email: text("email").primaryKey(),
   displayName: text("display_name").notNull(),
   role: text("role").notNull(),
   partnerId: text("partner_id").references(() => partners.id),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: boolean("active").notNull().default(true),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [index("users_partner_idx").on(table.partnerId)]);
 
-export const promotions = sqliteTable("promotions", {
+export const promotions = pgTable("promotions", {
   id: text("id").primaryKey(),
   offerNumber: text("offer_number").notNull(),
   provider: text("provider").notNull(),
@@ -73,7 +73,7 @@ export const promotions = sqliteTable("promotions", {
   index("promotions_valid_until_idx").on(table.validUntil),
 ]);
 
-export const leads = sqliteTable("leads", {
+export const leads = pgTable("leads", {
   id: text("id").primaryKey(),
   promotionId: text("promotion_id").notNull().references(() => promotions.id),
   partnerId: text("partner_id").notNull().references(() => partners.id),
@@ -85,14 +85,14 @@ export const leads = sqliteTable("leads", {
   customerType: text("customer_type"),
   businessName: text("business_name"),
   vatNumber: text("vat_number"),
-  tradeIn: integer("trade_in", { mode: "boolean" }).notNull().default(false),
+  tradeIn: boolean("trade_in").notNull().default(false),
   contactWindow: text("contact_window"),
   status: text("status").notNull().default("NEW"),
   documentStatus: text("document_status").notNull().default("PENDING_EMAIL_VERIFICATION"),
   emailVerificationStatus: text("email_verification_status").notNull().default("PENDING"),
   privacyVersion: text("privacy_version").notNull(),
   privacyAcceptedAt: text("privacy_accepted_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-  marketingConsent: integer("marketing_consent", { mode: "boolean" }).notNull().default(false),
+  marketingConsent: boolean("marketing_consent").notNull().default(false),
   submissionKey: text("submission_key"),
   source: text("source").notNull().default("SHOPIFY"),
   assignedAt: text("assigned_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -105,7 +105,7 @@ export const leads = sqliteTable("leads", {
   index("leads_status_idx").on(table.status),
 ]);
 
-export const commissions = sqliteTable("commissions", {
+export const commissions = pgTable("commissions", {
   id: text("id").primaryKey(),
   leadId: text("lead_id").notNull().references(() => leads.id),
   partnerId: text("partner_id").notNull().references(() => partners.id),
@@ -118,7 +118,7 @@ export const commissions = sqliteTable("commissions", {
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [index("commissions_partner_idx").on(table.partnerId)]);
 
-export const auditLogs = sqliteTable("audit_logs", {
+export const auditLogs = pgTable("audit_logs", {
   id: text("id").primaryKey(),
   actorEmail: text("actor_email").notNull(),
   action: text("action").notNull(),
@@ -131,7 +131,7 @@ export const auditLogs = sqliteTable("audit_logs", {
   index("audit_actor_idx").on(table.actorEmail),
 ]);
 
-export const hubEvents = sqliteTable("hub_events", {
+export const hubEvents = pgTable("hub_events", {
   id: text("id").primaryKey(),
   eventType: text("event_type").notNull(),
   ecosystem: text("ecosystem").notNull().default("ECCOMI_NOLEGGIO"),
@@ -146,7 +146,7 @@ export const hubEvents = sqliteTable("hub_events", {
   index("hub_events_created_idx").on(table.createdAt),
 ]);
 
-export const integrations = sqliteTable("integrations", {
+export const integrations = pgTable("integrations", {
   id: text("id").primaryKey(),
   provider: text("provider").notNull(),
   shopDomain: text("shop_domain").notNull(),
@@ -156,7 +156,7 @@ export const integrations = sqliteTable("integrations", {
   encryptedClientSecret: text("encrypted_client_secret").notNull(),
   publicationId: text("publication_id").notNull(),
   publicationLabel: text("publication_label").notNull().default("Negozio online"),
-  publicationAutoPublish: integer("publication_auto_publish", { mode: "boolean" }).notNull().default(false),
+  publicationAutoPublish: boolean("publication_auto_publish").notNull().default(false),
   status: text("status").notNull().default("CONNECTED"),
   connectedBy: text("connected_by").notNull(),
   connectedAt: text("connected_at").notNull(),
@@ -167,7 +167,7 @@ export const integrations = sqliteTable("integrations", {
   uniqueIndex("integrations_provider_idx").on(table.provider),
 ]);
 
-export const aiIntegrations = sqliteTable("ai_integrations", {
+export const aiIntegrations = pgTable("ai_integrations", {
   id: text("id").primaryKey(),
   provider: text("provider").notNull().default("OPENAI"),
   encryptedApiKey: text("encrypted_api_key").notNull(),

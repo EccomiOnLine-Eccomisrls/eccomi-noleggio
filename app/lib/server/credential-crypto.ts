@@ -31,7 +31,11 @@ async function encryptionKey() {
 async function encryptForPurpose(value: string, purpose: Uint8Array) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv, additionalData: purpose },
+    {
+     name: "AES-GCM",
+     iv,
+     additionalData: purpose.buffer as ArrayBuffer,
+    },
     await encryptionKey(),
     encoder.encode(value),
   );
@@ -43,7 +47,11 @@ async function decryptForPurpose(value: string, purpose: Uint8Array) {
   if (version !== "v1" || !ivValue || !ciphertextValue) throw new Error("Credenziale archiviata in formato non valido.");
   try {
     const decrypted = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: base64UrlToBytes(ivValue), additionalData: purpose },
+      {
+      name: "AES-GCM",
+      iv: base64UrlToBytes(ivValue),
+      additionalData: purpose.buffer as ArrayBuffer,
+    },
       await encryptionKey(),
       base64UrlToBytes(ciphertextValue),
     );

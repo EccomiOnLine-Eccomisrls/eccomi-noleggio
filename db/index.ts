@@ -1,14 +1,26 @@
-import { drizzle } from "drizzle-orm/d1";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema";
-import { getRuntimeEnv } from "../app/lib/server/runtime";
+
+let client: ReturnType<typeof postgres> | null = null;
+let db: ReturnType<typeof drizzle> | null = null;
 
 export function getDb() {
-  const binding = getRuntimeEnv().DB;
-  if (!binding) {
-    throw new Error(
-      "Cloudflare D1 binding `DB` is unavailable. Set the `d1` field in .openai/hosting.json to `DB` or let your control plane inject the real binding values before using the database."
-    );
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL mancante");
   }
 
-  return drizzle(binding as Parameters<typeof drizzle>[0], { schema });
+  if (!client) {
+    client = postgres(databaseUrl, {
+      prepare: false,
+    });
+  }
+
+  if (!db) {
+    db = drizzle(client, { schema });
+  }
+
+  return db;
 }

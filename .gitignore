@@ -41,3 +41,16 @@ next-env.d.ts
 /.sites-runtime/
 /outputs/
 /work/
+
+# vinext
+/.vinext/
+
+# typescript cache
+*.tsbuildinfo
+
+# local migration backups
+/db-backup-before-supabase/
+/drizzle-backup-sqlite/
+
+# temporary database test
+/test-db.mjs
