@@ -1,11 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
 import { auditLogs, hubEvents, integrations, leads, promotions } from "../../../../../db/schema";
 import { requireCeo, routeError } from "../../../../lib/server/authz";
 import { decryptCredential } from "../../../../lib/server/credential-crypto";
 import { getRuntimeEnv } from "../../../../lib/server/runtime";
 
-type Action = "SUSPEND" | "ARCHIVE" | "DELETE";
+type Action = "SUSPEND" | "ARCHIVE" | "DELETE" | "RESTORE" | "PURGE";
 
 type ShopifyAuth = { shop: string; token: string; apiVersion: string };
 
@@ -102,23 +102,47 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { id } = await context.params;
     const body = await request.json().catch(() => ({})) as { action?: Action; confirm?: string };
     const action = body.action;
-    if (!action || !["SUSPEND", "ARCHIVE", "DELETE"].includes(action)) {
+    if (!action || !["SUSPEND", "ARCHIVE", "DELETE", "RESTORE", "PURGE"].includes(action)) {
       return Response.json({ error: "Azione non valida." }, { status: 400 });
     }
 
     const [promotion] = await getDb().select().from(promotions).where(eq(promotions.id, id)).limit(1);
     if (!promotion) return Response.json({ error: "Promozione non trovata." }, { status: 404 });
 
-    if (action === "DELETE") {
+    const [linkedLead] = await getDb().select({ id: leads.id }).from(leads).where(eq(leads.promotionId, id)).limit(1);
+
+    if (action === "PURGE") {
       if (body.confirm !== "ELIMINA") {
         return Response.json({ error: "Conferma eliminazione non valida." }, { status: 400 });
       }
-      const [linkedLead] = await getDb().select({ id: leads.id }).from(leads).where(eq(leads.promotionId, id)).limit(1);
+      if (promotion.status !== "TRASHED") {
+        return Response.json({ error: "Prima sposta la promozione nel cestino." }, { status: 409 });
+      }
       if (linkedLead) {
-        return Response.json({ error: "La promozione ha già pratiche collegate: può essere archiviata ma non eliminata." }, { status: 409 });
+        return Response.json({ error: "La promozione ha pratiche collegate e non può essere cancellata definitivamente." }, { status: 409 });
       }
       if (promotion.shopifyProductId) await deleteProduct(promotion.shopifyProductId);
       await getDb().delete(promotions).where(eq(promotions.id, id));
+    } else if (action === "DELETE") {
+      if (promotion.shopifyProductId) await setProductStatus(promotion.shopifyProductId, "ARCHIVED");
+      await getDb().update(promotions).set({
+        status: "TRASHED",
+        automationStatus: "TRASHED",
+        automationError: null,
+        shopifyUrl: null,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(promotions.id, id));
+    } else if (action === "RESTORE") {
+      if (promotion.status !== "TRASHED") {
+        return Response.json({ error: "La promozione non si trova nel cestino." }, { status: 409 });
+      }
+      if (promotion.shopifyProductId) await setProductStatus(promotion.shopifyProductId, "DRAFT");
+      await getDb().update(promotions).set({
+        status: "DRAFT",
+        automationStatus: "RESTORED",
+        automationError: null,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(promotions.id, id));
     } else {
       const shopifyStatus = action === "SUSPEND" ? "DRAFT" : "ARCHIVED";
       if (promotion.shopifyProductId) await setProductStatus(promotion.shopifyProductId, shopifyStatus);
@@ -133,11 +157,24 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const now = new Date().toISOString();
-    const label = action === "SUSPEND" ? "sospesa" : action === "ARCHIVE" ? "archiviata" : "eliminata";
+    const label = action === "SUSPEND"
+      ? "sospesa"
+      : action === "ARCHIVE"
+        ? "archiviata"
+        : action === "DELETE"
+          ? "spostata nel cestino"
+          : action === "RESTORE"
+            ? "ripristinata dal cestino"
+            : "eliminata definitivamente";
+
     await getDb().insert(auditLogs).values({
       id: crypto.randomUUID(), actorEmail: actor.email,
       action: `PROMOTION_${action}`, entityType: "promotion", entityId: id,
-      payloadJson: JSON.stringify({ action, shopifyProductId: promotion.shopifyProductId }),
+      payloadJson: JSON.stringify({
+        action,
+        previousStatus: promotion.status,
+        shopifyProductId: promotion.shopifyProductId,
+      }),
     });
     await getDb().insert(hubEvents).values({
       id: crypto.randomUUID(), eventType: `NOLEGGIO_PROMOTION_${action}`,
@@ -147,7 +184,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       actorEmail: actor.email, createdAt: now,
     });
 
-    return Response.json({ ok: true, action, deleted: action === "DELETE", status: action === "SUSPEND" ? "DRAFT" : action === "ARCHIVE" ? "ARCHIVED" : null });
+    return Response.json({
+      ok: true,
+      action,
+      trashed: action === "DELETE",
+      deleted: action === "PURGE",
+      restored: action === "RESTORE",
+      status: action === "SUSPEND"
+        ? "DRAFT"
+        : action === "ARCHIVE"
+          ? "ARCHIVED"
+          : action === "DELETE"
+            ? "TRASHED"
+            : action === "RESTORE"
+              ? "DRAFT"
+              : null,
+    });
   } catch (error) {
     return routeError(error);
   }
