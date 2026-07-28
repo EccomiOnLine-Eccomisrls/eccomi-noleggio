@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, ne } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { partners, promotions } from "../../../db/schema";
 import type { Actor } from "./authz";
@@ -12,6 +12,7 @@ export const promotionStatuses = [
   "EXPIRING",
   "EXPIRED",
   "ARCHIVED",
+  "TRASHED",
 ] as const;
 
 export type PromotionStatus = (typeof promotionStatuses)[number];
@@ -60,6 +61,7 @@ export function statusLabel(status: string) {
     EXPIRING: "IN SCADENZA",
     EXPIRED: "SCADUTA",
     ARCHIVED: "ARCHIVIATA",
+    TRASHED: "NEL CESTINO",
   } as Record<string, string>)[status] || status;
 }
 
@@ -74,13 +76,23 @@ export async function expireStalePromotions() {
     ));
 }
 
-export async function listPromotionsForActor(actor: Actor) {
+function actorFilter(actor: Actor, includeTrash: boolean) {
+  const partnerFilter = actor.role === "PARTNER" && actor.partnerId
+    ? eq(promotions.partnerId, actor.partnerId)
+    : undefined;
+  const trashFilter = includeTrash
+    ? eq(promotions.status, "TRASHED")
+    : ne(promotions.status, "TRASHED");
+  return partnerFilter ? and(partnerFilter, trashFilter) : trashFilter;
+}
+
+export async function listPromotionsForActor(actor: Actor, includeTrash = false) {
   const db = getDb();
   const rows = await db
     .select({ promotion: promotions, partnerName: partners.name })
     .from(promotions)
     .innerJoin(partners, eq(promotions.partnerId, partners.id))
-    .where(actor.role === "PARTNER" && actor.partnerId ? eq(promotions.partnerId, actor.partnerId) : undefined)
+    .where(actorFilter(actor, includeTrash))
     .orderBy(asc(promotions.validUntil), asc(promotions.createdAt));
 
   return rows.map(({ promotion, partnerName }) => ({
@@ -123,5 +135,6 @@ export async function listPromotionsForActor(actor: Actor) {
     extractionMethod: promotion.extractionMethod,
     coverSourceKind: promotion.coverSourceKind,
     coverAttribution: promotion.coverAttribution,
+    updatedAt: promotion.updatedAt,
   }));
 }
