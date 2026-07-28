@@ -160,7 +160,7 @@ async function configuration(): Promise<ShopifyConfiguration> {
   const [record] = await getDb()
     .select()
     .from(integrations)
-    .where(eq(integrations.id, SHOPIFY_INTEGRATION_ID))
+    .where(eq(integrations.provider, "SHOPIFY"))
     .limit(1);
   if (!record || record.status !== "CONNECTED") throw new Error("Collegamento Shopify non ancora configurato.");
   const clientSecret = await decryptCredential(record.encryptedClientSecret);
@@ -196,7 +196,7 @@ export async function getShopifyConnectionStatus(): Promise<ShopifyConnectionSta
   const [record] = await getDb()
     .select()
     .from(integrations)
-    .where(eq(integrations.id, SHOPIFY_INTEGRATION_ID))
+    .where(eq(integrations.provider, "SHOPIFY"))
     .limit(1);
   return {
     connected: Boolean(record && record.status === "CONNECTED"),
@@ -284,7 +284,7 @@ export async function connectShopifyIntegration(input: {
     verifiedAt: now,
     updatedAt: now,
   }).onConflictDoUpdate({
-    target: integrations.id,
+    target: integrations.provider,
     set: {
       shopDomain,
       shopName: verification.shop.name,
