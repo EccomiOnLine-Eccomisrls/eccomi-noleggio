@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { auditLogs, hubEvents, promotions } from "../../../db/schema";
 import type { QuoteDraft } from "../../lib/quote-parser";
@@ -7,6 +7,7 @@ import { requireActor, routeError } from "../../lib/server/authz";
 import { integerFromText, italianDateToIso, listPromotionsForActor, moneyToCents } from "../../lib/server/promotion-service";
 import { storageDelete, storagePut } from "../../lib/server/storage";
 import { createPromotionDraftOnShopify, isShopifyConfigured } from "../../lib/server/shopify";
+import { applyEccomiEditorialRules } from "../../lib/server/shopify-editorial";
 import { retrieveVehicleCover } from "../../lib/server/vehicle-image";
 
 const MAX_QUOTE_BYTES = 15 * 1024 * 1024;
@@ -47,7 +48,11 @@ function safeFilename(value: string) {
 }
 
 function errorText(error: unknown) {
-  return error instanceof Error ? error.message.slice(0, 1200) : "Errore inatteso.";
+  if (error instanceof Error) {
+    const cause = error.cause instanceof Error ? ` ${error.cause.message}` : "";
+    return `${error.message}${cause}`.slice(0, 1200);
+  }
+  return "Errore inatteso.";
 }
 
 export async function POST(request: Request) {
@@ -90,6 +95,23 @@ export async function POST(request: Request) {
         ? "goal-rent"
         : "eccomi-direct";
     if (!partnerId) return Response.json({ error: "Partner non associato all’utente." }, { status: 403 });
+
+    const [alreadyLoaded] = await getDb()
+      .select({ id: promotions.id, status: promotions.status })
+      .from(promotions)
+      .where(and(
+        eq(promotions.offerNumber, draft.offerNumber),
+        eq(promotions.provider, draft.provider),
+      ))
+      .limit(1);
+
+    if (alreadyLoaded) {
+      return Response.json({
+        error: "Questa stessa quotazione risulta già caricata. Apri la promozione esistente invece di creare un duplicato.",
+        promotionId: alreadyLoaded.id,
+        status: alreadyLoaded.status,
+      }, { status: 409 });
+    }
 
     promotionId = crypto.randomUUID();
     quoteKey = `quotations/${partnerId}/${promotionId}/${safeFilename(quote.name) || "quotazione.pdf"}`;
@@ -182,6 +204,8 @@ export async function POST(request: Request) {
       payloadJson: JSON.stringify({ sourceKind: cover.sourceKind, sourceUrl: cover.sourceUrl, attribution: cover.attribution }),
     });
 
+    const services = jsonArray(JSON.stringify(draft.services));
+    const warnings = jsonArray(JSON.stringify(draft.warnings));
     const shopify = await createPromotionDraftOnShopify({
       id: promotionId,
       offerNumber: draft.offerNumber,
@@ -198,8 +222,8 @@ export async function POST(request: Request) {
       fuel: draft.fuel,
       transmission: draft.transmission,
       color: draft.color,
-      services: jsonArray(JSON.stringify(draft.services)),
-      warnings: jsonArray(JSON.stringify(draft.warnings)),
+      services,
+      warnings,
     }, {
       bytes: cover.bytes,
       filename: cover.filename,
@@ -207,6 +231,23 @@ export async function POST(request: Request) {
       sourceUrl: cover.sourceUrl,
       attribution: cover.attribution,
     });
+
+    const editorial = await applyEccomiEditorialRules({
+      productId: shopify.productId,
+      promotion: {
+        id: promotionId,
+        brand: draft.brand,
+        model: draft.model,
+        version: draft.version,
+        monthlyGrossCents,
+        depositGrossCents: moneyToCents(draft.depositGross),
+        durationMonths,
+        totalKm,
+        delivery: draft.delivery,
+        services,
+      },
+    });
+
     await getDb().update(promotions).set({
       shopifyProductId: shopify.productId,
       shopifyHandle: shopify.handle,
@@ -220,7 +261,14 @@ export async function POST(request: Request) {
       action: "PROMOTION_DRAFT_CREATED_SHOPIFY",
       entityType: "promotion",
       entityId: promotionId,
-      payloadJson: JSON.stringify({ productId: shopify.productId, handle: shopify.handle, automatic: true }),
+      payloadJson: JSON.stringify({
+        productId: shopify.productId,
+        handle: shopify.handle,
+        automatic: true,
+        editorial,
+        status: "DRAFT",
+        approvalRequired: true,
+      }),
     });
     await getDb().insert(hubEvents).values({
       id: crypto.randomUUID(),
@@ -228,8 +276,14 @@ export async function POST(request: Request) {
       ecosystem: "ECCOMI_NOLEGGIO",
       entityType: "promotion",
       entityId: promotionId,
-      title: `${draft.brand.toUpperCase()} ${draft.model}: bozza Shopify pronta per il CEO`,
-      payloadJson: JSON.stringify({ offerNumber: draft.offerNumber, partnerId, productId: shopify.productId }),
+      title: `${editorial.title}: bozza Shopify pronta per il CEO`,
+      payloadJson: JSON.stringify({
+        offerNumber: draft.offerNumber,
+        partnerId,
+        productId: shopify.productId,
+        status: "DRAFT",
+        approvalRequired: true,
+      }),
       actorEmail: actor.email,
     });
 
@@ -240,6 +294,9 @@ export async function POST(request: Request) {
         aiExtracted: true,
         coverPrepared: true,
         shopifyDraftCreated: true,
+        editorialRulesApplied: true,
+        status: "READY_FOR_CEO",
+        requiresCeoApproval: true,
         adminUrl: shopify.adminUrl,
       },
     }, { status: 201 });
@@ -270,8 +327,8 @@ export async function POST(request: Request) {
           .catch(() => undefined);
       }
     }
-    if (/UNIQUE constraint failed/i.test(message)) {
-      return Response.json({ error: "Questa quotazione risulta già caricata." }, { status: 409 });
+    if (/UNIQUE constraint failed|duplicate key value|promotions_offer_provider_idx/i.test(message)) {
+      return Response.json({ error: "Questa stessa quotazione risulta già caricata. Apri la promozione esistente invece di creare un duplicato." }, { status: 409 });
     }
     const response = routeError(error);
     if (promotionId && response instanceof Response) {
