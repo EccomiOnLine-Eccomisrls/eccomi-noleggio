@@ -5,6 +5,7 @@ const decoder = new TextDecoder();
 const PURPOSES = {
   shopify: encoder.encode("ECCOMI_NOLEGGIO_SHOPIFY_CREDENTIALS_V1"),
   openai: encoder.encode("ECCOMI_NOLEGGIO_OPENAI_CREDENTIALS_V1"),
+  sensitivePracticeData: encoder.encode("ECCOMI_NOLEGGIO_SENSITIVE_PRACTICE_DATA_V1"),
 } as const;
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -22,9 +23,9 @@ function base64UrlToBytes(value: string) {
 
 async function encryptionKey() {
   const configured = getRuntimeEnv().SHOPIFY_CREDENTIALS_ENCRYPTION_KEY?.trim();
-  if (!configured) throw new Error("Protezione delle credenziali non ancora predisposta.");
+  if (!configured) throw new Error("Protezione dei dati sensibili non ancora predisposta.");
   const raw = base64UrlToBytes(configured);
-  if (raw.byteLength !== 32) throw new Error("Configurazione di sicurezza delle credenziali non valida.");
+  if (raw.byteLength !== 32) throw new Error("Configurazione di sicurezza dei dati non valida.");
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
@@ -32,9 +33,9 @@ async function encryptForPurpose(value: string, purpose: Uint8Array) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
     {
-     name: "AES-GCM",
-     iv,
-     additionalData: purpose.buffer as ArrayBuffer,
+      name: "AES-GCM",
+      iv,
+      additionalData: purpose.buffer as ArrayBuffer,
     },
     await encryptionKey(),
     encoder.encode(value),
@@ -44,20 +45,20 @@ async function encryptForPurpose(value: string, purpose: Uint8Array) {
 
 async function decryptForPurpose(value: string, purpose: Uint8Array) {
   const [version, ivValue, ciphertextValue] = value.split(".");
-  if (version !== "v1" || !ivValue || !ciphertextValue) throw new Error("Credenziale archiviata in formato non valido.");
+  if (version !== "v1" || !ivValue || !ciphertextValue) throw new Error("Dato archiviato in formato non valido.");
   try {
     const decrypted = await crypto.subtle.decrypt(
       {
-      name: "AES-GCM",
-      iv: base64UrlToBytes(ivValue),
-      additionalData: purpose.buffer as ArrayBuffer,
-    },
+        name: "AES-GCM",
+        iv: base64UrlToBytes(ivValue),
+        additionalData: purpose.buffer as ArrayBuffer,
+      },
       await encryptionKey(),
       base64UrlToBytes(ciphertextValue),
     );
     return decoder.decode(decrypted);
   } catch {
-    throw new Error("Impossibile leggere in sicurezza la credenziale.");
+    throw new Error("Impossibile leggere in sicurezza il dato protetto.");
   }
 }
 
@@ -75,4 +76,12 @@ export function encryptOpenAiCredential(value: string) {
 
 export function decryptOpenAiCredential(value: string) {
   return decryptForPurpose(value, PURPOSES.openai);
+}
+
+export function encryptSensitivePracticeData(value: string) {
+  return encryptForPurpose(value, PURPOSES.sensitivePracticeData);
+}
+
+export function decryptSensitivePracticeData(value: string) {
+  return decryptForPurpose(value, PURPOSES.sensitivePracticeData);
 }
