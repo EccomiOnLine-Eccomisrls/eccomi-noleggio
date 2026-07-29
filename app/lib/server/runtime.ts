@@ -37,6 +37,9 @@ export type EccomiRuntimeEnv = {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   SUPABASE_STORAGE_BUCKET?: string;
+  RESEND_API_KEY?: string;
+  ECCOMI_FROM_EMAIL?: string;
+  ECCOMI_PARTNER_DASHBOARD_URL?: string;
   CRON_SECRET?: string;
   HUB_READ_SECRET?: string;
 };
