@@ -1,9 +1,9 @@
 import { desc, eq } from "drizzle-orm";
-import { getDb } from "../../../../../db";
-import { auditLogs, leads, partners, practiceDocuments, promotions } from "../../../../../db/schema";
-import { requireActor, routeError } from "../../../../lib/server/authz";
-import { decryptSensitivePracticeData } from "../../../../lib/server/credential-crypto";
-import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
+import { getDb } from "../../../../db";
+import { auditLogs, leads, partners, practiceDocuments, promotions } from "../../../../db/schema";
+import { requireActor, routeError } from "../../../lib/server/authz";
+import { decryptSensitivePracticeData } from "../../../lib/server/credential-crypto";
+import { ensurePracticeSchema } from "../../../lib/server/practice-schema";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
