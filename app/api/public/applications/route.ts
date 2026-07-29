@@ -10,6 +10,7 @@ const PRIVACY_VERSION = "ECCOMI-NOLEGGIO-2026-07";
 const customerTypes = new Set(["PRIVATE", "PROFESSIONAL", "COMPANY"]);
 const MAX_TOTAL_BYTES = 40 * 1024 * 1024;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FILES_PER_REQUIREMENT = 10;
 const ALLOWED_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
 
 const requiredDocuments: Record<string, Array<{ field: string; type: string; label: string }>> = {
@@ -118,18 +119,24 @@ export async function POST(request: Request) {
   if (submissionKey && !/^[a-zA-Z0-9:_-]{8,100}$/.test(submissionKey)) return invalid("Identificativo di invio non valido.", origin);
 
   const expectedDocuments = requiredDocuments[customerType];
-  const files = expectedDocuments.map((document) => ({ ...document, file: form.get(document.field) }));
-  for (const document of files) {
-    if (!(document.file instanceof File) || document.file.size <= 0) {
-      return invalid(`Carica: ${document.label}.`, origin);
-    }
-    if (document.file.size > MAX_FILE_BYTES) {
-      return invalid(`${document.label}: il file supera 10 MB.`, origin);
-    }
-    if (!ALLOWED_MIME_TYPES.has(document.file.type)) {
-      return invalid(`${document.label}: usa un file PDF, JPG o PNG.`, origin);
-    }
+  const files = expectedDocuments.flatMap((document) => {
+    const entries = form.getAll(document.field).filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    return entries.map((file, index) => ({ ...document, file, index }));
+  });
+
+  for (const document of expectedDocuments) {
+    const entries = files.filter((file) => file.field === document.field);
+    if (!entries.length) return invalid(`Carica: ${document.label}.`, origin);
+    if (entries.length > MAX_FILES_PER_REQUIREMENT) return invalid(`${document.label}: puoi caricare al massimo ${MAX_FILES_PER_REQUIREMENT} file.`, origin);
   }
+
+  let totalBytes = 0;
+  for (const document of files) {
+    totalBytes += document.file.size;
+    if (document.file.size > MAX_FILE_BYTES) return invalid(`${document.label}: un file supera 10 MB.`, origin);
+    if (!ALLOWED_MIME_TYPES.has(document.file.type)) return invalid(`${document.label}: usa file PDF, JPG o PNG.`, origin);
+  }
+  if (totalBytes > MAX_TOTAL_BYTES) return jsonWithCors({ error: "La somma degli allegati supera 40 MB." }, 413, origin);
 
   await ensurePracticeSchema();
   const db = getDb();
@@ -158,9 +165,7 @@ export async function POST(request: Request) {
     .from(leads)
     .where(and(eq(leads.promotionId, promotionId), eq(leads.email, email), gte(leads.createdAt, tenMinutesAgo)))
     .limit(1);
-  if (recentDuplicate) {
-    return jsonWithCors({ ok: true, practiceCode: recentDuplicate.id, status: recentDuplicate.status, duplicate: true }, 200, origin);
-  }
+  if (recentDuplicate) return jsonWithCors({ ok: true, practiceCode: recentDuplicate.id, status: recentDuplicate.status, duplicate: true }, 200, origin);
 
   const id = practiceCode();
   const now = new Date().toISOString();
@@ -196,11 +201,7 @@ export async function POST(request: Request) {
 
   try {
     for (const document of files) {
-      const stored = await uploadPracticeDocument({
-        practiceCode: id,
-        documentType: document.type,
-        file: document.file as File,
-      });
+      const stored = await uploadPracticeDocument({ practiceCode: id, documentType: document.type, file: document.file });
       await db.insert(practiceDocuments).values({
         id: crypto.randomUUID(),
         leadId: id,
@@ -217,34 +218,17 @@ export async function POST(request: Request) {
       });
     }
 
-    await db.update(leads).set({
-      status: "NEW",
-      documentStatus: "COMPLETE",
-      completedAt: now,
-      updatedAt: now,
-    }).where(eq(leads.id, id));
-
+    await db.update(leads).set({ status: "NEW", documentStatus: "COMPLETE", completedAt: now, updatedAt: now }).where(eq(leads.id, id));
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
       actorEmail: "public-form@eccomi.local",
       action: "PRACTICE_CREATED_WITH_DOCUMENTS",
       entityType: "lead",
       entityId: id,
-      payloadJson: JSON.stringify({
-        promotionId,
-        partnerId: offer.promotion.partnerId,
-        customerType,
-        documentCount: files.length,
-        ibanLast4: iban.slice(-4),
-        source: "ECCOMI_NOLEGGIO_WEB",
-      }),
+      payloadJson: JSON.stringify({ promotionId, partnerId: offer.promotion.partnerId, customerType, documentCount: files.length, ibanLast4: iban.slice(-4), source: "ECCOMI_NOLEGGIO_WEB" }),
     });
   } catch (error) {
-    await db.update(leads).set({
-      status: "UPLOAD_ERROR",
-      documentStatus: "ERROR",
-      updatedAt: new Date().toISOString(),
-    }).where(eq(leads.id, id));
+    await db.update(leads).set({ status: "UPLOAD_ERROR", documentStatus: "ERROR", updatedAt: new Date().toISOString() }).where(eq(leads.id, id));
     return jsonWithCors({ error: error instanceof Error ? error.message : "Caricamento documenti non riuscito." }, 500, origin);
   }
 
