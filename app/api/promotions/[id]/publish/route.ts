@@ -5,8 +5,124 @@ import { requireCeo, routeError } from "../../../../lib/server/authz";
 import {
   isShopifyPublishingReady,
   publishPreparedPromotionToShopify,
+  shopifyAdminFetch,
 } from "../../../../lib/server/shopify";
 import { publishProductToAllConfiguredShopifyChannels } from "../../../../lib/server/shopify-channels";
+
+async function prepareProductForAutomaticCollection(productId: string) {
+  const tagResult = await shopifyAdminFetch<{
+    tagsAdd: {
+      userErrors: Array<{ message: string }>;
+    };
+  }>(
+    `mutation AddEccomiNoleggioTag($id: ID!, $tags: [String!]!) {
+      tagsAdd(id: $id, tags: $tags) {
+        userErrors {
+          field
+          message
+        }
+      }
+    }`,
+    {
+      id: productId,
+      tags: ["eccomi-noleggio"],
+    },
+  );
+
+  if (tagResult.tagsAdd.userErrors.length) {
+    throw new Error(
+      tagResult.tagsAdd.userErrors.map((error) => error.message).join(" · "),
+    );
+  }
+
+  const collectionData = await shopifyAdminFetch<{
+    collectionByHandle: {
+      id: string;
+      ruleSet: {
+        appliedDisjunctively: boolean;
+        rules: Array<{
+          column: string;
+          relation: string;
+          condition: string;
+        }>;
+      } | null;
+    } | null;
+  }>(
+    `query EccomiNoleggioCollectionForPublishing($handle: String!) {
+      collectionByHandle(handle: $handle) {
+        id
+        ruleSet {
+          appliedDisjunctively
+          rules {
+            column
+            relation
+            condition
+          }
+        }
+      }
+    }`,
+    { handle: "eccomi-noleggio" },
+  );
+
+  const collection = collectionData.collectionByHandle;
+
+  if (!collection?.ruleSet) {
+    return;
+  }
+
+  const hasCorrectTagRule = collection.ruleSet.rules.some(
+    (rule) =>
+      rule.column === "TAG" &&
+      rule.relation === "EQUALS" &&
+      rule.condition.trim().toLowerCase() === "eccomi-noleggio",
+  );
+
+  const hasExtraRules = collection.ruleSet.rules.some(
+    (rule) => rule.column !== "TAG",
+  );
+
+  if (hasCorrectTagRule && !hasExtraRules) {
+    return;
+  }
+
+  const updateResult = await shopifyAdminFetch<{
+    collectionUpdate: {
+      userErrors: Array<{ message: string }>;
+    };
+  }>(
+    `mutation NormalizeEccomiNoleggioCollection($input: CollectionInput!) {
+      collectionUpdate(input: $input) {
+        userErrors {
+          field
+          message
+        }
+      }
+    }`,
+    {
+      input: {
+        id: collection.id,
+        ruleSet: {
+          appliedDisjunctively: false,
+          rules: [
+            {
+              column: "TAG",
+              relation: "EQUALS",
+              condition: "eccomi-noleggio",
+            },
+          ],
+        },
+      },
+    },
+  );
+
+  if (updateResult.collectionUpdate.userErrors.length) {
+    throw new Error(
+      updateResult.collectionUpdate.userErrors
+        .map((error) => error.message)
+        .join(" · "),
+    );
+  }
+}
 
 export async function POST(
   request: Request,
@@ -72,6 +188,8 @@ export async function POST(
         { status: 409 },
       );
     }
+
+    await prepareProductForAutomaticCollection(promotion.shopifyProductId);
 
     const result = await publishPreparedPromotionToShopify(
       promotion.shopifyProductId,
@@ -149,4 +267,4 @@ export async function POST(
   } catch (error) {
     return routeError(error);
   }
-} 
+}
