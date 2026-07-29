@@ -78,6 +78,7 @@ export async function POST(request: Request) {
     const validUntil = italianDateToIso(draft.validUntil);
     if (!validUntil) return Response.json({ error: "L’AI non ha riconosciuto correttamente la data di scadenza." }, { status: 422 });
     const monthlyGrossCents = moneyToCents(draft.monthlyGross);
+    const depositGrossCents = moneyToCents(draft.depositGross);
     const durationMonths = integerFromText(draft.durationMonths);
     const totalKm = integerFromText(draft.totalKm);
     if (!monthlyGrossCents || !durationMonths || !totalKm) {
@@ -87,7 +88,6 @@ export async function POST(request: Request) {
     const partnerId = actor.role === "PARTNER" ? actor.partnerId : /GOAL\s+RENT/i.test(draft.partner) ? "goal-rent" : "eccomi-direct";
     if (!partnerId) return Response.json({ error: "Partner non associato all’utente." }, { status: 403 });
 
-    // La ripetizione non blocca più il flusso: viene solo segnalata al validatore.
     const [similarQuotation] = await getDb()
       .select({ id: promotions.id, status: promotions.status })
       .from(promotions)
@@ -95,7 +95,6 @@ export async function POST(request: Request) {
       .limit(1);
     const duplicateWarning = Boolean(similarQuotation);
 
-    // Rimuove anche sui database già esistenti il vecchio vincolo che impediva la valutazione umana.
     await getDb().execute(sql`DROP INDEX IF EXISTS promotions_offer_provider_idx`);
     await getDb().execute(sql`CREATE INDEX IF NOT EXISTS promotions_offer_provider_idx ON promotions (offer_number, provider)`);
 
@@ -120,7 +119,7 @@ export async function POST(request: Request) {
       version: draft.version,
       monthlyGrossCents,
       monthlyNetCents: draft.monthlyNet ? moneyToCents(draft.monthlyNet) : null,
-      depositGrossCents: moneyToCents(draft.depositGross),
+      depositGrossCents,
       durationMonths,
       totalKm,
       validFrom: italianDateToIso(draft.validFrom) || null,
@@ -153,7 +152,16 @@ export async function POST(request: Request) {
 
     if (validUntil <= today) throw new Error("La quotazione risulta già scaduta e non può creare una bozza Shopify.");
 
-    const cover = await retrieveVehicleCover({ brand: draft.brand, model: draft.model, version: draft.version, color: draft.color });
+    const cover = await retrieveVehicleCover({
+      brand: draft.brand,
+      model: draft.model,
+      version: draft.version,
+      color: draft.color,
+      monthlyGrossCents,
+      depositGrossCents,
+      durationMonths,
+      totalKm,
+    });
     const extension = cover.mimeType === "image/png" ? "png" : cover.mimeType === "image/webp" ? "webp" : "jpg";
     coverKey = `covers/${partnerId}/${promotionId}/automatic-cover.${extension}`;
     await storagePut(coverKey, cover.bytes, cover.mimeType);
@@ -168,14 +176,14 @@ export async function POST(request: Request) {
     const shopify = await createPromotionDraftOnShopify({
       id: promotionId, offerNumber: draft.offerNumber, brand: draft.brand.toUpperCase(), model: draft.model,
       version: draft.version, provider: draft.provider, monthlyGrossCents,
-      depositGrossCents: moneyToCents(draft.depositGross), durationMonths, totalKm, validUntil,
+      depositGrossCents, durationMonths, totalKm, validUntil,
       delivery: draft.delivery, fuel: draft.fuel, transmission: draft.transmission, color: draft.color,
       services, warnings,
     }, { bytes: cover.bytes, filename: cover.filename, mimeType: cover.mimeType, sourceUrl: cover.sourceUrl, attribution: cover.attribution });
 
     const editorial = await applyEccomiEditorialRules({
       productId: shopify.productId,
-      promotion: { id: promotionId, brand: draft.brand, model: draft.model, version: draft.version, monthlyGrossCents, depositGrossCents: moneyToCents(draft.depositGross), durationMonths, totalKm, delivery: draft.delivery, services },
+      promotion: { id: promotionId, brand: draft.brand, model: draft.model, version: draft.version, monthlyGrossCents, depositGrossCents, durationMonths, totalKm, delivery: draft.delivery, services },
     });
 
     await getDb().update(promotions).set({ shopifyProductId: shopify.productId, shopifyHandle: shopify.handle, automationStatus: "READY_FOR_CEO", automationError: null, updatedAt: new Date().toISOString() }).where(eq(promotions.id, promotionId));
@@ -189,7 +197,7 @@ export async function POST(request: Request) {
     await getDb().insert(hubEvents).values({
       id: crypto.randomUUID(), eventType: "NOLEGGIO_PROMOTION_READY_FOR_CEO", ecosystem: "ECCOMI_NOLEGGIO",
       entityType: "promotion", entityId: promotionId,
-      title: `${editorial.title}: bozza Shopify pronta per il CEO`,
+      title: `${editorial.title}: bozza Eccomi OnLine pronta per il CEO`,
       payloadJson: JSON.stringify({ offerNumber: draft.offerNumber, partnerId, productId: shopify.productId, status: "DRAFT", approvalRequired: true, duplicateWarning, warning: duplicateWarning ? DUPLICATE_WARNING : null }),
       actorEmail: actor.email,
     });
