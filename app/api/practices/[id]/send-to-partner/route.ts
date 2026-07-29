@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../../../../db";
-import { auditLogs, leads, partners, promotions } from "../../../../../../db/schema";
-import { requireCeo, routeError } from "../../../../../lib/server/authz";
-import { ensurePracticeSchema } from "../../../../../lib/server/practice-schema";
-import { getRuntimeEnv } from "../../../../../lib/server/runtime";
+import { getDb } from "../../../../../db";
+import { auditLogs, leads, partners, promotions } from "../../../../../db/schema";
+import { requireCeo, routeError } from "../../../../lib/server/authz";
+import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
+import { getRuntimeEnv } from "../../../../lib/server/runtime";
 
 function clean(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
