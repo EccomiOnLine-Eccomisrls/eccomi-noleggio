@@ -71,6 +71,28 @@ function euro(cents: number) {
   }).format(cents / 100);
 }
 
+function cleanDisplayModel(model: string, version: string) {
+  const normalizedModel = model.replace(/\s+/g, " ").trim();
+  const normalizedVersion = version.replace(/\s+/g, " ").trim();
+  const trailingTechnicalNumber = normalizedModel.match(/^(.*\S)\s+([1-9])$/);
+
+  if (!trailingTechnicalNumber) return normalizedModel;
+
+  const baseModel = trailingTechnicalNumber[1].trim();
+  const comparableBase = baseModel.toLocaleLowerCase("it-IT");
+  const comparableVersion = normalizedVersion.toLocaleLowerCase("it-IT");
+  const lastBaseToken = comparableBase.split(" ").at(-1) || "";
+
+  if (
+    comparableVersion.startsWith(comparableBase) ||
+    (lastBaseToken.length >= 2 && comparableVersion.startsWith(lastBaseToken))
+  ) {
+    return baseModel;
+  }
+
+  return normalizedModel;
+}
+
 async function generateBrandedCover(input: {
   brand: string;
   model: string;
@@ -82,7 +104,8 @@ async function generateBrandedCover(input: {
   totalKm: number;
 }): Promise<VehicleCover> {
   const config = await getAiConfiguration();
-  const brandModel = `${input.brand} ${input.model}`.replace(/\s+/g, " ").trim();
+  const displayModel = cleanDisplayModel(input.model, input.version);
+  const brandModel = `${input.brand} ${displayModel}`.replace(/\s+/g, " ").trim();
   const vehicle = `${brandModel} ${input.version}`.replace(/\s+/g, " ").trim();
   const price = euro(input.monthlyGrossCents);
   const deposit = euro(input.depositGrossCents);
@@ -199,6 +222,8 @@ export async function retrieveVehicleCover(input: {
   durationMonths?: number;
   totalKm?: number;
 }): Promise<VehicleCover> {
+  const displayModel = cleanDisplayModel(input.model, input.version);
+
   if (
     Number.isFinite(input.monthlyGrossCents) &&
     Number.isFinite(input.depositGrossCents) &&
@@ -208,7 +233,7 @@ export async function retrieveVehicleCover(input: {
     try {
       return await generateBrandedCover({
         brand: input.brand,
-        model: input.model,
+        model: displayModel,
         version: input.version,
         color: input.color,
         monthlyGrossCents: input.monthlyGrossCents || 0,
@@ -221,7 +246,7 @@ export async function retrieveVehicleCover(input: {
     }
   }
 
-  const query = [input.brand, input.model, input.version]
+  const query = [input.brand, displayModel, input.version]
     .filter(Boolean)
     .join(" ")
     .replace(/\s+/g, " ")
@@ -230,7 +255,10 @@ export async function retrieveVehicleCover(input: {
   const retrieved = await commonsCover(query);
   if (retrieved) return retrieved;
 
-  const generated = await generateVehicleImage(input);
+  const generated = await generateVehicleImage({
+    ...input,
+    model: displayModel,
+  });
   return {
     bytes: generated.bytes,
     filename: generated.filename,
