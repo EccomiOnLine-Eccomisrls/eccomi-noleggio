@@ -1,8 +1,10 @@
 import { getDb } from "../../../db";
 import { partners, promotions, users } from "../../../db/schema";
+import { ensurePracticeSchema } from "./practice-schema";
 import { getRuntimeEnv } from "./runtime";
 
 export async function seedSystemData(actorEmail: string, actorName: string) {
+  await ensurePracticeSchema();
   const db = getDb();
   await db.insert(partners).values([
     { id: "eccomi-direct", name: "ECCOMI", legalName: "ECCOMI SRLS", status: "ACTIVE" },
