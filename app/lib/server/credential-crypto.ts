@@ -21,11 +21,35 @@ function base64UrlToBytes(value: string) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
+function hexToBytes(value: string) {
+  const bytes = new Uint8Array(value.length / 2);
+  for (let index = 0; index < value.length; index += 2) {
+    bytes[index / 2] = Number.parseInt(value.slice(index, index + 2), 16);
+  }
+  return bytes;
+}
+
+async function configuredKeyBytes(configured: string) {
+  // Mantiene compatibilità con chiavi base64url già usate.
+  try {
+    const decoded = base64UrlToBytes(configured);
+    if (decoded.byteLength === 32) return decoded;
+  } catch {
+    // La variabile può essere una normale password segreta Render.
+  }
+
+  // Accetta anche chiavi esadecimali da 64 caratteri.
+  if (/^[a-fA-F0-9]{64}$/.test(configured)) return hexToBytes(configured);
+
+  // Per qualsiasi segreto robusto deriva in modo deterministico una chiave AES-256.
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(configured));
+  return new Uint8Array(digest);
+}
+
 async function encryptionKey() {
   const configured = getRuntimeEnv().SHOPIFY_CREDENTIALS_ENCRYPTION_KEY?.trim();
   if (!configured) throw new Error("Protezione dei dati sensibili non ancora predisposta.");
-  const raw = base64UrlToBytes(configured);
-  if (raw.byteLength !== 32) throw new Error("Configurazione di sicurezza dei dati non valida.");
+  const raw = await configuredKeyBytes(configured);
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
