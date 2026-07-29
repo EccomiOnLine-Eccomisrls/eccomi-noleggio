@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../../../../db";
-import { auditLogs, leads } from "../../../../../../db/schema";
-import { requireActor, routeError } from "../../../../../lib/server/authz";
-import { ensurePracticeSchema } from "../../../../../lib/server/practice-schema";
+import { getDb } from "../../../../../db";
+import { auditLogs, leads } from "../../../../../db/schema";
+import { requireActor, routeError } from "../../../../lib/server/authz";
+import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
 
 const allowedTransitions: Record<string, string[]> = {
   NEW: ["ECCOMI_REVIEW", "NEEDS_INFO", "SENT_TO_PARTNER", "ARCHIVED"],
