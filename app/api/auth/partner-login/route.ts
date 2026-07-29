@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../../../db";
-import { partners, users } from "../../../../../db/schema";
-import { routeError } from "../../../../lib/server/authz";
-import { createPartnerSession, partnerSessionCookie } from "../../../../lib/server/partner-session";
-import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
-import { getRuntimeEnv } from "../../../../lib/server/runtime";
+import { getDb } from "../../../../db";
+import { partners, users } from "../../../../db/schema";
+import { routeError } from "../../../lib/server/authz";
+import { createPartnerSession, partnerSessionCookie } from "../../../lib/server/partner-session";
+import { ensurePracticeSchema } from "../../../lib/server/practice-schema";
+import { getRuntimeEnv } from "../../../lib/server/runtime";
 
 function requireSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
