@@ -1,8 +1,9 @@
 import { and, count, desc, eq, sum } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { commissions, hubEvents, leads, partners, promotions } from "../../../db/schema";
+import { commissions, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
 import { requireActor, routeError } from "../../lib/server/authz";
 import { getAiConnectionStatus } from "../../lib/server/ai";
+import { ensurePracticeSchema } from "../../lib/server/practice-schema";
 import { expireStalePromotions, listPromotionsForActor } from "../../lib/server/promotion-service";
 import { getShopifyConnectionStatus } from "../../lib/server/shopify";
 import { seedSystemData } from "../../lib/server/seed";
@@ -11,6 +12,7 @@ export async function GET(request: Request) {
   try {
     const actor = await requireActor(request);
     await seedSystemData(actor.email, actor.displayName);
+    await ensurePracticeSchema();
     await expireStalePromotions();
     const promotionRows = await listPromotionsForActor(actor);
     const shopify = await getShopifyConnectionStatus();
@@ -38,11 +40,16 @@ export async function GET(request: Request) {
         businessName: leads.businessName,
         status: leads.status,
         documentStatus: leads.documentStatus,
+        ibanLast4: leads.ibanLast4,
+        accountHolder: leads.accountHolder,
+        completedAt: leads.completedAt,
+        sentToPartnerAt: leads.sentToPartnerAt,
         createdAt: leads.createdAt,
         brand: promotions.brand,
         model: promotions.model,
         offerNumber: promotions.offerNumber,
         partnerName: partners.name,
+        partnerEmail: partners.contactEmail,
       })
       .from(leads)
       .innerJoin(promotions, eq(leads.promotionId, promotions.id))
@@ -50,6 +57,11 @@ export async function GET(request: Request) {
       .where(partnerFilter)
       .orderBy(desc(leads.createdAt))
       .limit(100);
+    const documentRows = leadRows.length
+      ? await db.select({ leadId: practiceDocuments.leadId }).from(practiceDocuments)
+      : [];
+    const documentCount = new Map<string, number>();
+    documentRows.forEach((row) => documentCount.set(row.leadId, (documentCount.get(row.leadId) || 0) + 1));
     const eventRows = actor.role === "CEO"
       ? await db.select().from(hubEvents).orderBy(desc(hubEvents.createdAt)).limit(20)
       : [];
@@ -69,10 +81,16 @@ export async function GET(request: Request) {
         businessName: lead.businessName,
         status: lead.status,
         documentStatus: lead.documentStatus,
+        documentCount: documentCount.get(lead.id) || 0,
+        ibanLast4: lead.ibanLast4,
+        accountHolder: lead.accountHolder,
+        completedAt: lead.completedAt,
+        sentToPartnerAt: lead.sentToPartnerAt,
         createdAt: lead.createdAt,
         vehicle: `${lead.brand} ${lead.model}`,
         offerNumber: lead.offerNumber,
         partnerName: lead.partnerName,
+        partnerEmail: lead.partnerEmail,
       })),
       integrations: { shopify, ai },
       hubEvents: eventRows,

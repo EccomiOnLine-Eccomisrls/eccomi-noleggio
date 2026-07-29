@@ -21,6 +21,7 @@ export type EccomiRuntimeEnv = {
   CEO_EMAIL?: string;
   CEO_ACCESS_PASSWORD?: string;
   CEO_SESSION_SECRET?: string;
+  PARTNER_ACCESS_PASSWORD?: string;
   SHOPIFY_SHOP_DOMAIN?: string;
   SHOPIFY_ADMIN_ACCESS_TOKEN?: string;
   SHOPIFY_ONLINE_STORE_PUBLICATION_ID?: string;
@@ -37,6 +38,9 @@ export type EccomiRuntimeEnv = {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   SUPABASE_STORAGE_BUCKET?: string;
+  RESEND_API_KEY?: string;
+  ECCOMI_FROM_EMAIL?: string;
+  ECCOMI_PARTNER_DASHBOARD_URL?: string;
   CRON_SECRET?: string;
   HUB_READ_SECRET?: string;
 };

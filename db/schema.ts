@@ -8,6 +8,7 @@ export const partners = pgTable("partners", {
   status: text("status").notNull().default("ACTIVE"),
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
+  additionalEmailsJson: text("additional_emails_json").notNull().default("[]"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -85,17 +86,22 @@ export const leads = pgTable("leads", {
   customerType: text("customer_type"),
   businessName: text("business_name"),
   vatNumber: text("vat_number"),
+  accountHolder: text("account_holder"),
+  ibanEncrypted: text("iban_encrypted"),
+  ibanLast4: text("iban_last4"),
   tradeIn: boolean("trade_in").notNull().default(false),
   contactWindow: text("contact_window"),
   status: text("status").notNull().default("NEW"),
-  documentStatus: text("document_status").notNull().default("PENDING_EMAIL_VERIFICATION"),
-  emailVerificationStatus: text("email_verification_status").notNull().default("PENDING"),
+  documentStatus: text("document_status").notNull().default("PENDING_UPLOAD"),
+  emailVerificationStatus: text("email_verification_status").notNull().default("NOT_REQUIRED"),
   privacyVersion: text("privacy_version").notNull(),
   privacyAcceptedAt: text("privacy_accepted_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   marketingConsent: boolean("marketing_consent").notNull().default(false),
   submissionKey: text("submission_key"),
-  source: text("source").notNull().default("SHOPIFY"),
+  source: text("source").notNull().default("ECCOMI_NOLEGGIO_WEB"),
   assignedAt: text("assigned_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  completedAt: text("completed_at"),
+  sentToPartnerAt: text("sent_to_partner_at"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
@@ -103,6 +109,24 @@ export const leads = pgTable("leads", {
   index("leads_partner_idx").on(table.partnerId),
   index("leads_promotion_idx").on(table.promotionId),
   index("leads_status_idx").on(table.status),
+]);
+
+export const practiceDocuments = pgTable("practice_documents", {
+  id: text("id").primaryKey(),
+  leadId: text("lead_id").notNull().references(() => leads.id),
+  documentType: text("document_type").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  storageBucket: text("storage_bucket").notNull(),
+  storageKey: text("storage_key").notNull(),
+  status: text("status").notNull().default("UPLOADED"),
+  uploadedBy: text("uploaded_by").notNull().default("CUSTOMER"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("practice_documents_lead_idx").on(table.leadId),
+  index("practice_documents_type_idx").on(table.documentType),
 ]);
 
 export const commissions = pgTable("commissions", {
