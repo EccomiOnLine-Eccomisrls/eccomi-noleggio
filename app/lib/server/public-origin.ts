@@ -1,23 +1,43 @@
 import { getShopifyConnectionStatus } from "./shopify";
 
+function normalizedOrigin(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
 export async function publicCorsOrigin(request: Request) {
-  const origin = request.headers.get("origin");
+  const origin = normalizedOrigin(request.headers.get("origin"));
   if (!origin) return null;
 
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const requestOrigin = normalizedOrigin(request.url);
+  const forwardedOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : null;
+
   const allowed = new Set<string>([
-    new URL(request.url).origin,
+    "https://eccomi-noleggio.onrender.com",
     "https://eccomionline.com",
     "https://www.eccomionline.com",
     "https://noleggio.eccomionline.com",
     "https://www.noleggio.eccomionline.com",
   ]);
 
+  if (requestOrigin) allowed.add(requestOrigin);
+  if (forwardedOrigin) allowed.add(forwardedOrigin);
+
   try {
     const shopify = await getShopifyConnectionStatus();
     if (shopify.shopDomain) allowed.add(`https://${shopify.shopDomain}`);
-    if (shopify.storefrontUrl) allowed.add(new URL(shopify.storefrontUrl).origin);
+    if (shopify.storefrontUrl) {
+      const storefrontOrigin = normalizedOrigin(shopify.storefrontUrl);
+      if (storefrontOrigin) allowed.add(storefrontOrigin);
+    }
   } catch {
-    // The fixed storefront origins remain available if the integration lookup is temporarily unavailable.
+    // Le origini pubbliche fisse restano disponibili se Shopify non risponde.
   }
 
   return allowed.has(origin) ? origin : null;
