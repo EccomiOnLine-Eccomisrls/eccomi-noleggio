@@ -13,6 +13,7 @@ import {
   LockKeyhole,
   MessageCircle,
   ShieldCheck,
+  UploadCloud,
   UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -40,6 +41,12 @@ type PublicPromotion = {
   imageUrl: string;
 };
 
+type DocumentRequirement = {
+  key: string;
+  field: string;
+  label: string;
+};
+
 const blankFields = {
   firstName: "",
   lastName: "",
@@ -48,6 +55,8 @@ const blankFields = {
   province: "",
   businessName: "",
   vatNumber: "",
+  accountHolder: "",
+  iban: "",
   website: "",
 };
 
@@ -67,21 +76,21 @@ function profileLabel(profile: CustomerProfile) {
   return "";
 }
 
-function documentsFor(profile: CustomerProfile) {
+function documentsFor(profile: CustomerProfile): DocumentRequirement[] {
   if (profile === "PRIVATE") return [
-    "Documento di identità",
-    "Tessera sanitaria / codice fiscale",
-    "Documentazione reddituale richiesta dal noleggiatore",
+    { key: "identity", field: "document_identity", label: "Documento di identità" },
+    { key: "tax_code", field: "document_tax_code", label: "Tessera sanitaria / codice fiscale" },
+    { key: "income", field: "document_income", label: "Documentazione reddituale richiesta dal noleggiatore" },
   ];
   if (profile === "PROFESSIONAL") return [
-    "Documento di identità",
-    "Attribuzione Partita IVA",
-    "Ultima dichiarazione dei redditi",
+    { key: "identity", field: "document_identity", label: "Documento di identità" },
+    { key: "vat", field: "document_vat", label: "Attribuzione Partita IVA" },
+    { key: "income", field: "document_income", label: "Ultima dichiarazione dei redditi" },
   ];
   return [
-    "Documento del legale rappresentante",
-    "Visura camerale aggiornata",
-    "Documentazione economica richiesta dal noleggiatore",
+    { key: "identity", field: "document_identity", label: "Documento del legale rappresentante" },
+    { key: "chamber", field: "document_chamber", label: "Visura camerale aggiornata" },
+    { key: "financial", field: "document_financial", label: "Documentazione economica richiesta dal noleggiatore" },
   ];
 }
 
@@ -90,9 +99,17 @@ function createSubmissionKey() {
   if (typeof browserCrypto?.randomUUID === "function") {
     return `ecn_${browserCrypto.randomUUID()}`;
   }
-
   const randomPart = Math.random().toString(36).slice(2);
   return `ecn_${Date.now().toString(36)}_${randomPart}`;
+}
+
+function normalizeIban(value: string) {
+  return value.toUpperCase().replace(/\s+/g, "");
+}
+
+function looksLikeIban(value: string) {
+  const iban = normalizeIban(value);
+  return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban);
 }
 
 export default function RequestClient({ promotionId }: { promotionId: string }) {
@@ -102,6 +119,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<CustomerProfile>("");
   const [fields, setFields] = useState(blankFields);
+  const [documents, setDocuments] = useState<Record<string, File | null>>({});
   const [privacy, setPrivacy] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -110,9 +128,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
   const submissionKey = useRef(createSubmissionKey());
 
   useEffect(() => {
-    if (!promotionId) {
-      return;
-    }
+    if (!promotionId) return;
     let mounted = true;
     fetch(`/api/public/promotions/${encodeURIComponent(promotionId)}`, { cache: "no-store" })
       .then(async (response) => {
@@ -126,6 +142,8 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
     return () => { mounted = false; };
   }, [promotionId]);
 
+  const documentRequirements = useMemo(() => documentsFor(profile), [profile]);
+
   const contactComplete = useMemo(() => {
     const base = fields.firstName.trim().length >= 2
       && fields.lastName.trim().length >= 2
@@ -135,29 +153,59 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
     return base && (profile === "PRIVATE" || (fields.businessName.trim().length >= 2 && fields.vatNumber.replace(/\D/g, "").length === 11));
   }, [fields, profile]);
 
-  const canContinue = step === 1 ? Boolean(profile) : step === 2 ? contactComplete : step === 3 ? true : privacy;
-  const documents = documentsFor(profile);
+  const documentsComplete = useMemo(
+    () => documentRequirements.every((document) => documents[document.key] instanceof File),
+    [documentRequirements, documents],
+  );
+
+  const financialComplete = fields.accountHolder.trim().length >= 3 && looksLikeIban(fields.iban);
+  const canContinue = step === 1
+    ? Boolean(profile)
+    : step === 2
+      ? contactComplete
+      : step === 3
+        ? documentsComplete && financialComplete
+        : privacy;
 
   const updateField = (name: keyof typeof fields, value: string) => {
     setFields((current) => ({ ...current, [name]: value }));
   };
 
+  const setProfileAndResetDocuments = (value: CustomerProfile) => {
+    setProfile(value);
+    setDocuments({});
+  };
+
+  const setDocument = (key: string, file: File | null) => {
+    if (file && file.size > 10 * 1024 * 1024) {
+      setSubmitError("Ogni documento può avere una dimensione massima di 10 MB.");
+      return;
+    }
+    setSubmitError("");
+    setDocuments((current) => ({ ...current, [key]: file }));
+  };
+
   const submit = async () => {
-    if (!promotion || !privacy) return;
+    if (!promotion || !privacy || !documentsComplete || !financialComplete) return;
     setSubmitting(true);
     setSubmitError("");
     try {
+      const body = new FormData();
+      body.set("promotionId", promotion.id);
+      body.set("customerType", profile);
+      Object.entries(fields).forEach(([name, value]) => body.set(name, name === "iban" ? normalizeIban(value) : value));
+      body.set("privacyAccepted", String(privacy));
+      body.set("marketingConsent", String(marketing));
+      body.set("submissionKey", submissionKey.current);
+      documentRequirements.forEach((document) => {
+        const file = documents[document.key];
+        if (file) body.set(document.field, file, file.name);
+      });
+
       const response = await fetch("/api/public/applications", {
         method: "POST",
-        headers: { "content-type": "application/json", "idempotency-key": submissionKey.current },
-        body: JSON.stringify({
-          promotionId: promotion.id,
-          customerType: profile,
-          ...fields,
-          privacyAccepted: privacy,
-          marketingConsent: marketing,
-          submissionKey: submissionKey.current,
-        }),
+        headers: { "idempotency-key": submissionKey.current },
+        body,
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Invio non riuscito.");
@@ -215,9 +263,9 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
               {step === 1 ? <div className="public-step">
                 <span>PASSAGGIO 1 DI 4</span><h3>Per chi stai richiedendo il noleggio?</h3><p>Il percorso si adatta automaticamente al profilo.</p>
                 <div className="public-profile-grid">
-                  <button className={profile === "PRIVATE" ? "public-profile public-profile--active" : "public-profile"} type="button" onClick={() => setProfile("PRIVATE")}><UserRound size={25} /><strong>Privato</strong><small>Persona fisica</small><Check size={17} /></button>
-                  <button className={profile === "PROFESSIONAL" ? "public-profile public-profile--active" : "public-profile"} type="button" onClick={() => setProfile("PROFESSIONAL")}><BriefcaseBusiness size={25} /><strong>Professionista</strong><small>P.IVA o ditta individuale</small><Check size={17} /></button>
-                  <button className={profile === "COMPANY" ? "public-profile public-profile--active" : "public-profile"} type="button" onClick={() => setProfile("COMPANY")}><Building2 size={25} /><strong>Azienda</strong><small>Società o ente</small><Check size={17} /></button>
+                  <button className={profile === "PRIVATE" ? "public-profile public-profile--active" : "public-profile"} type="button" onClick={() => setProfileAndResetDocuments("PRIVATE")}><UserRound size={25} /><strong>Privato</strong><small>Persona fisica</small><Check size={17} /></button>
+                  <button className={profile === "PROFESSIONAL" ? "public-profile public-profile--active" : "public-profile"} type="button" onClick={() => setProfileAndResetDocuments("PROFESSIONAL")}><BriefcaseBusiness size={25} /><strong>Professionista</strong><small>P.IVA o ditta individuale</small><Check size={17} /></button>
+                  <button className={profile === "COMPANY" ? "public-profile public-profile--active" : "public-profile"} type="button" onClick={() => setProfileAndResetDocuments("COMPANY")}><Building2 size={25} /><strong>Azienda</strong><small>Società o ente</small><Check size={17} /></button>
                 </div>
               </div> : null}
 
@@ -235,30 +283,45 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
               </div> : null}
 
               {step === 3 ? <div className="public-step">
-                <span>PASSAGGIO 3 DI 4 · DOCUMENTI</span><h3>Il sistema prepara solo ciò che serve</h3><p>I documenti verranno caricati dopo la verifica dell’email, nell’area privata della pratica.</p>
-                <div className="public-document-list">{documents.map((item) => <div key={item}><span><FileCheck2 size={19} /></span><p><strong>{item}</strong><small>PDF, JPG o PNG nell’area protetta</small></p><em>RICHIESTO</em></div>)}</div>
-                <div className="public-safety"><LockKeyhole size={20} /><p><strong>Nessun documento sensibile dentro Shopify o via email.</strong><small>ECCOMI mantiene file e autorizzazioni separati dalla pagina pubblica.</small></p></div>
+                <span>PASSAGGIO 3 DI 4 · DOCUMENTI E DATI BANCARI</span><h3>Completa la pratica</h3><p>Carica tutto ciò che viene richiesto. Potrai continuare solo quando la pratica sarà completa.</p>
+                <div className="public-bank-fields">
+                  <label><span>Intestatario del conto</span><input value={fields.accountHolder} onChange={(event) => updateField("accountHolder", event.target.value)} autoComplete="name" placeholder="Nome e cognome o ragione sociale" required /></label>
+                  <label><span>IBAN</span><input value={fields.iban} onChange={(event) => updateField("iban", event.target.value.toUpperCase())} autoComplete="off" placeholder="IT00 X000 0000 0000 0000 0000 000" required /></label>
+                </div>
+                <div className="public-document-list public-document-list--upload">{documentRequirements.map((item) => {
+                  const file = documents[item.key];
+                  return <div key={item.key} className={file ? "public-document--complete" : ""}>
+                    <span>{file ? <FileCheck2 size={19} /> : <UploadCloud size={19} />}</span>
+                    <p><strong>{item.label}</strong><small>{file ? file.name : "PDF, JPG o PNG · massimo 10 MB"}</small></p>
+                    <label className="public-upload-button">
+                      <input className="public-upload-input" type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event) => setDocument(item.key, event.target.files?.[0] || null)} />
+                      {file ? "Sostituisci" : "Carica"}
+                    </label>
+                  </div>;
+                })}</div>
+                <div className="public-safety"><LockKeyhole size={20} /><p><strong>Area protetta ECCOMI.</strong><small>I documenti e l’IBAN vengono conservati in modo riservato e resi disponibili soltanto agli operatori autorizzati.</small></p></div>
+                {submitError ? <div className="public-error"><AlertTriangle size={18} /> {submitError}</div> : null}
               </div> : null}
 
               {step === 4 ? <div className="public-step">
                 <span>PASSAGGIO 4 DI 4 · RIEPILOGO</span><h3>Controlla e invia</h3>
-                <div className="public-summary"><div><span>Offerta</span><strong>{promotion.brand} {promotion.model}</strong><small>{euro(promotion.monthlyGrossCents)}/mese · anticipo {euro(promotion.depositGrossCents)}</small></div><div><span>Richiedente</span><strong>{fields.firstName} {fields.lastName}</strong><small>{profileLabel(profile)} · {fields.email}</small></div><div><span>Gestione</span><strong>ECCOMI NOLEGGIO</strong><small>Assegnazione automatica al responsabile dell’offerta</small></div></div>
+                <div className="public-summary"><div><span>Offerta</span><strong>{promotion.brand} {promotion.model}</strong><small>{euro(promotion.monthlyGrossCents)}/mese · anticipo {euro(promotion.depositGrossCents)}</small></div><div><span>Richiedente</span><strong>{fields.firstName} {fields.lastName}</strong><small>{profileLabel(profile)} · {fields.email}</small></div><div><span>Pratica completa</span><strong>{documentRequirements.length} documenti caricati</strong><small>IBAN terminante con {normalizeIban(fields.iban).slice(-4)}</small></div></div>
                 <label className="public-consent"><input type="checkbox" checked={privacy} onChange={(event) => setPrivacy(event.target.checked)} /><span>Ho letto l’<a href="https://eccomionline.com/policies/privacy-policy" target="_blank" rel="noreferrer">informativa privacy</a> e autorizzo il trattamento dei dati necessario alla gestione della richiesta.</span></label>
                 <label className="public-consent public-consent--optional"><input type="checkbox" checked={marketing} onChange={(event) => setMarketing(event.target.checked)} /><span>Desidero ricevere aggiornamenti e proposte commerciali ECCOMI. Consenso facoltativo.</span></label>
-                <div className="public-safety"><ShieldCheck size={20} /><p><strong>ECCOMI governa la pratica.</strong><small>Il partner assegnato vede soltanto ciò che serve alla lavorazione.</small></p></div>
+                <div className="public-safety"><ShieldCheck size={20} /><p><strong>ECCOMI governa la pratica.</strong><small>Il partner assegnato accede soltanto alla pratica e ai documenti di propria competenza.</small></p></div>
                 {submitError ? <div className="public-error"><AlertTriangle size={18} /> {submitError}</div> : null}
               </div> : null}
             </div>
 
             <footer className="public-application-card__footer">
               <button className="public-button public-button--back" type="button" disabled={submitting} onClick={() => step === 1 ? history.back() : setStep((current) => current - 1)}><ArrowLeft size={17} /> {step === 1 ? "Torna all’offerta" : "Indietro"}</button>
-              <span>I dati vengono salvati solo all’invio finale.</span>
+              <span>{step === 3 && !canContinue ? "Completa IBAN e documenti per continuare." : "I dati vengono salvati solo all’invio finale."}</span>
               <button className="public-button public-button--primary" type="button" disabled={!canContinue || submitting} onClick={() => step < 4 ? setStep((current) => current + 1) : submit()}>{submitting ? <><Loader2 className="spin" size={18} /> Invio…</> : step < 4 ? <>Continua <ArrowRight size={17} /></> : <>Invia richiesta <Check size={17} /></>}</button>
             </footer>
           </> : <div className="public-success">
-            <span><Check size={38} /></span><small>RICHIESTA REGISTRATA</small><h2>La tua pratica è stata aperta</h2><p>Auto, offerta e responsabile sono stati associati automaticamente.</p>
+            <span><Check size={38} /></span><small>PRATICA COMPLETA REGISTRATA</small><h2>La tua richiesta è stata inviata</h2><p>Dati, IBAN e documenti sono stati collegati all’offerta e assegnati al responsabile competente.</p>
             <div><small>CODICE PRATICA</small><strong>{practiceCode}</strong></div>
-            <ul><li><Check size={16} /> ECCOMI verifica i dati</li><li><Check size={16} /> L’area documenti resta privata</li><li><Check size={16} /> Il partner competente vede solo la propria pratica</li></ul>
+            <ul><li><Check size={16} /> ECCOMI verifica la pratica</li><li><Check size={16} /> I documenti restano nell’area protetta</li><li><Check size={16} /> Il partner competente può iniziare la lavorazione</li></ul>
             <a className="public-button public-button--primary" href="https://eccomionline.com"><CarFront size={18} /> Torna su Eccomi Online</a>
           </div>}
         </section>
