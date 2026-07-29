@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { users } from "../../../db/schema";
 import { readCeoSession } from "./ceo-session";
+import { readPartnerSession } from "./partner-session";
 import { getRuntimeEnv } from "./runtime";
 
 export type Actor = {
@@ -11,247 +12,73 @@ export type Actor = {
   partnerId: string | null;
 };
 
-export async function getActorForIdentity(
-  emailValue: string,
-  displayName: string,
-): Promise<Actor | null> {
+export async function getActorForIdentity(emailValue: string, displayName: string): Promise<Actor | null> {
   const runtime = getRuntimeEnv();
   const email = emailValue.trim().toLowerCase();
-
-  if (!email) {
-    return null;
-  }
-
+  if (!email) return null;
   const configuredCeo = runtime.CEO_EMAIL?.trim().toLowerCase();
-
   if (configuredCeo && email === configuredCeo) {
-    return {
-      email,
-      displayName: displayName || "Salvatore Del Libano",
-      role: "CEO",
-      partnerId: null,
-    };
+    return { email, displayName: displayName || "Salvatore Del Libano", role: "CEO", partnerId: null };
   }
-
-  const [record] = await getDb()
-    .select()
-    .from(users)
-    .where(and(eq(users.email, email), eq(users.active, true)))
-    .limit(1);
-
-  if (
-    !record ||
-    (record.role !== "CEO" && record.role !== "PARTNER")
-  ) {
-    return null;
-  }
-
-  return {
-    email: record.email,
-    displayName: record.displayName,
-    role: record.role,
-    partnerId: record.partnerId,
-  };
+  const [record] = await getDb().select().from(users).where(and(eq(users.email, email), eq(users.active, true))).limit(1);
+  if (!record || (record.role !== "CEO" && record.role !== "PARTNER")) return null;
+  return { email: record.email, displayName: record.displayName, role: record.role, partnerId: record.partnerId };
 }
 
 function headerName(request: Request): string | null {
-  const encoded = request.headers.get(
-    "oai-authenticated-user-full-name",
-  );
-
-  const encoding = request.headers.get(
-    "oai-authenticated-user-full-name-encoding",
-  );
-
-  if (
-    !encoded ||
-    encoding !== "percent-encoded-utf-8"
-  ) {
-    return null;
-  }
-
-  try {
-    return decodeURIComponent(encoded);
-  } catch {
-    return null;
-  }
+  const encoded = request.headers.get("oai-authenticated-user-full-name");
+  const encoding = request.headers.get("oai-authenticated-user-full-name-encoding");
+  if (!encoded || encoding !== "percent-encoded-utf-8") return null;
+  try { return decodeURIComponent(encoded); } catch { return null; }
 }
 
-function isLocalRequest(request: Request): boolean {
+function isLocalRequest(request: Request) {
   const hostname = new URL(request.url).hostname;
-
-  return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "terminal.local"
-  );
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "terminal.local";
 }
 
-export async function getActor(
-  request: Request,
-): Promise<Actor | null> {
+export async function getActor(request: Request): Promise<Actor | null> {
   const runtime = getRuntimeEnv();
-
-  const headerEmail = request.headers
-    .get("oai-authenticated-user-email")
-    ?.trim()
-    .toLowerCase();
-
-  const sessionEmail = await readCeoSession(request);
-
-  const localEmail = isLocalRequest(request)
-    ? runtime.CEO_EMAIL || "ceo@eccomi.local"
-    : "";
-
-  const email =
-    headerEmail ||
-    sessionEmail ||
-    localEmail;
-
-  if (!email) {
-    return null;
+  const headerEmail = request.headers.get("oai-authenticated-user-email")?.trim().toLowerCase();
+  const ceoSessionEmail = await readCeoSession(request);
+  const partnerSession = await readPartnerSession(request);
+  if (partnerSession) {
+    const actor = await getActorForIdentity(partnerSession.email, "Partner ECCOMI");
+    if (actor?.role === "PARTNER" && actor.partnerId === partnerSession.partnerId) return actor;
   }
-
-  if (
-    !headerEmail &&
-    !sessionEmail &&
-    isLocalRequest(request) &&
-    !runtime.CEO_EMAIL
-  ) {
-    return {
-      email,
-      displayName:
-        headerName(request) ||
-        "Salvatore Del Libano",
-      role: "CEO",
-      partnerId: null,
-    };
+  const localEmail = isLocalRequest(request) ? runtime.CEO_EMAIL || "ceo@eccomi.local" : "";
+  const email = headerEmail || ceoSessionEmail || localEmail;
+  if (!email) return null;
+  if (!headerEmail && !ceoSessionEmail && isLocalRequest(request) && !runtime.CEO_EMAIL) {
+    return { email, displayName: headerName(request) || "Salvatore Del Libano", role: "CEO", partnerId: null };
   }
-
-  return getActorForIdentity(
-    email,
-    headerName(request) ||
-      (sessionEmail
-        ? "Salvatore Del Libano"
-        : "Utente ECCOMI"),
-  );
+  return getActorForIdentity(email, headerName(request) || (ceoSessionEmail ? "Salvatore Del Libano" : "Utente ECCOMI"));
 }
 
-export async function requireActor(
-  request: Request,
-): Promise<Actor> {
+export async function requireActor(request: Request): Promise<Actor> {
   const actor = await getActor(request);
-
-  if (!actor) {
-    throw new Response(
-      JSON.stringify({
-        error: "Accesso non autorizzato.",
-      }),
-      {
-        status: 401,
-        headers: {
-          "content-type":
-            "application/json; charset=utf-8",
-        },
-      },
-    );
-  }
-
+  if (!actor) throw new Response(JSON.stringify({ error: "Accesso non autorizzato." }), { status: 401, headers: { "content-type": "application/json; charset=utf-8" } });
   return actor;
 }
 
-export async function requireCeo(
-  request: Request,
-): Promise<Actor> {
+export async function requireCeo(request: Request): Promise<Actor> {
   const actor = await requireActor(request);
-
-  if (actor.role !== "CEO") {
-    throw new Response(
-      JSON.stringify({
-        error: "Azione riservata al CEO.",
-      }),
-      {
-        status: 403,
-        headers: {
-          "content-type":
-            "application/json; charset=utf-8",
-        },
-      },
-    );
-  }
-
+  if (actor.role !== "CEO") throw new Response(JSON.stringify({ error: "Azione riservata al CEO." }), { status: 403, headers: { "content-type": "application/json; charset=utf-8" } });
   return actor;
 }
 
-export function routeError(
-  error: unknown,
-): Response {
-  if (error instanceof Response) {
-    return error;
-  }
-
-  const errorRecord =
-    error && typeof error === "object"
-      ? error as {
-          message?: unknown;
-          cause?: unknown;
-          code?: unknown;
-        }
-      : null;
-
-  const causeRecord =
-    errorRecord?.cause &&
-    typeof errorRecord.cause === "object"
-      ? errorRecord.cause as {
-          message?: unknown;
-          code?: unknown;
-          detail?: unknown;
-          constraint_name?: unknown;
-          table_name?: unknown;
-          column_name?: unknown;
-        }
-      : null;
-
+export function routeError(error: unknown): Response {
+  if (error instanceof Response) return error;
+  const errorRecord = error && typeof error === "object" ? error as { message?: unknown; cause?: unknown; code?: unknown } : null;
+  const causeRecord = errorRecord?.cause && typeof errorRecord.cause === "object" ? errorRecord.cause as { message?: unknown; code?: unknown; detail?: unknown; constraint_name?: unknown; table_name?: unknown; column_name?: unknown } : null;
   console.error("ECCOMI_SERVER_ERROR", {
-    message:
-      typeof errorRecord?.message === "string"
-        ? errorRecord.message.split(" params:")[0]
-        : "Errore inatteso.",
-    code:
-      typeof causeRecord?.code === "string"
-        ? causeRecord.code
-        : typeof errorRecord?.code === "string"
-          ? errorRecord.code
-          : null,
-    cause:
-      typeof causeRecord?.message === "string"
-        ? causeRecord.message
-        : null,
-    detail:
-      typeof causeRecord?.detail === "string"
-        ? causeRecord.detail
-        : null,
-    constraint:
-      typeof causeRecord?.constraint_name === "string"
-        ? causeRecord.constraint_name
-        : null,
-    table:
-      typeof causeRecord?.table_name === "string"
-        ? causeRecord.table_name
-        : null,
-    column:
-      typeof causeRecord?.column_name === "string"
-        ? causeRecord.column_name
-        : null,
+    message: typeof errorRecord?.message === "string" ? errorRecord.message.split(" params:")[0] : "Errore inatteso.",
+    code: typeof causeRecord?.code === "string" ? causeRecord.code : typeof errorRecord?.code === "string" ? errorRecord.code : null,
+    cause: typeof causeRecord?.message === "string" ? causeRecord.message : null,
+    detail: typeof causeRecord?.detail === "string" ? causeRecord.detail : null,
+    constraint: typeof causeRecord?.constraint_name === "string" ? causeRecord.constraint_name : null,
+    table: typeof causeRecord?.table_name === "string" ? causeRecord.table_name : null,
+    column: typeof causeRecord?.column_name === "string" ? causeRecord.column_name : null,
   });
-
-  return Response.json(
-    {
-      error:
-        "Errore interno durante il salvataggio. Controlla i log del server.",
-    },
-    {
-      status: 500,
-    },
-  );
+  return Response.json({ error: "Errore interno durante il salvataggio. Controlla i log del server." }, { status: 500 });
 }
