@@ -122,7 +122,6 @@ export default function PromotionManagementControls() {
         marginBottom: "20px",
       });
       header.innerHTML = '<div><div style="font-size:11px;font-weight:900;letter-spacing:.12em;color:#0c5597">AREA OPERATIVA</div><h2 style="margin:5px 0 0;color:#102033;font-size:27px">Impostazioni</h2><p style="margin:6px 0 0;color:#677587">Stato del verticale e collegamenti tecnici.</p></div>';
-
       const closeButton = document.createElement("button");
       closeButton.type = "button";
       closeButton.textContent = "✕";
@@ -203,40 +202,52 @@ export default function PromotionManagementControls() {
       injectNavigation();
       injectSettingsDrawer();
       const footer = document.querySelector<HTMLElement>(".promotion-modal__footer");
-      if (!footer || footer.dataset.managementReady === "true") return;
-      await loadPromotions();
-      const offerText = document.querySelector<HTMLElement>(".promotion-check__title .offer-code")?.textContent || "";
-      const offerNumber = offerText.replace(/^Offerta\s+/i, "").trim();
-      const promotion = promotions.find((item) => item.offerNumber === offerNumber);
-      if (!promotion) return;
+      if (!footer || footer.dataset.managementReady === "true" || footer.dataset.managementLoading === "true") return;
 
-      footer.dataset.managementReady = "true";
-      const group = document.createElement("div");
-      group.setAttribute("aria-label", "Gestione offerta CEO");
-      group.style.display = "flex";
-      group.style.gap = "8px";
-      group.style.flexWrap = "wrap";
-      group.style.alignItems = "center";
-      group.style.width = "100%";
-      group.style.paddingTop = "10px";
-      group.style.borderTop = "1px solid #e5edf5";
+      // Blocca subito ulteriori esecuzioni del MutationObserver mentre i dati vengono caricati.
+      footer.dataset.managementLoading = "true";
 
-      const actions: Array<{ action: "REFRESH" | "SUSPEND" | "ARCHIVE" | "DELETE"; label: string; danger?: boolean }> = [
-        { action: "REFRESH", label: "Aggiorna Shopify" },
-        { action: "SUSPEND", label: "Sospendi" },
-        { action: "ARCHIVE", label: "Archivia" },
-        { action: "DELETE", label: "Sposta nel cestino", danger: true },
-      ];
+      try {
+        await loadPromotions();
+        const offerText = document.querySelector<HTMLElement>(".promotion-check__title .offer-code")?.textContent || "";
+        const offerNumber = offerText.replace(/^Offerta\s+/i, "").trim();
+        const promotion = promotions.find((item) => item.offerNumber === offerNumber);
+        if (!promotion) return;
 
-      for (const item of actions) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = item.label;
-        Object.assign(button.style, buttonStyle(Boolean(item.danger)));
-        button.addEventListener("click", () => void execute(promotion, item.action));
-        group.appendChild(button);
+        // Rimuove eventuali gruppi duplicati già creati da una versione precedente.
+        footer.querySelectorAll<HTMLElement>('[data-eccomi-management-group="true"]').forEach((element) => element.remove());
+
+        const group = document.createElement("div");
+        group.dataset.eccomiManagementGroup = "true";
+        group.setAttribute("aria-label", "Gestione offerta CEO");
+        group.style.display = "flex";
+        group.style.gap = "8px";
+        group.style.flexWrap = "wrap";
+        group.style.alignItems = "center";
+        group.style.width = "100%";
+        group.style.paddingTop = "10px";
+        group.style.borderTop = "1px solid #e5edf5";
+
+        const actions: Array<{ action: "REFRESH" | "SUSPEND" | "ARCHIVE" | "DELETE"; label: string; danger?: boolean }> = [
+          { action: "REFRESH", label: "Aggiorna Shopify" },
+          { action: "SUSPEND", label: "Sospendi" },
+          { action: "ARCHIVE", label: "Archivia" },
+          { action: "DELETE", label: "Sposta nel cestino", danger: true },
+        ];
+
+        for (const item of actions) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = item.label;
+          Object.assign(button.style, buttonStyle(Boolean(item.danger)));
+          button.addEventListener("click", () => void execute(promotion, item.action));
+          group.appendChild(button);
+        }
+        footer.appendChild(group);
+        footer.dataset.managementReady = "true";
+      } finally {
+        delete footer.dataset.managementLoading;
       }
-      footer.appendChild(group);
     };
 
     const observer = new MutationObserver(() => void enhance());
