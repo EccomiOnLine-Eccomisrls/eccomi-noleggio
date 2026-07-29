@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./request-upload.css";
 import RequestClient from "./request-client";
 
 export const metadata: Metadata = {
