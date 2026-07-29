@@ -1,3 +1,4 @@
+import { getRuntimeEnv } from "./runtime";
 import { shopifyAdminFetch } from "./shopify";
 
 type EditorialPromotion = {
@@ -46,50 +47,39 @@ function deliveryFor(value: string) {
   return match ? `${match[1]} ${match[2].toLowerCase()}` : normalized || "Da confermare";
 }
 
-function serviceGroups(services: string[]) {
-  const text = services.join(" ").toLowerCase();
-  const groups: string[] = [];
+function requestUrlFor(promotionId: string) {
+  const base = getRuntimeEnv().PUBLIC_REQUEST_BASE_URL?.trim();
+  if (!base) return "";
 
-  if (/rca|furto|incendio|kasko|assicur|infortuni|tutela legale/.test(text)) {
-    groups.push("🛡️ Coperture assicurative previste dall’offerta");
+  try {
+    const url = new URL(base);
+    url.searchParams.set("promozione", promotionId);
+    return url.toString();
+  } catch {
+    return "";
   }
-  if (/manutenzione|assistenza|soccorso|stradale/.test(text)) {
-    groups.push("🔧 Manutenzione e assistenza");
-  }
-  if (/pneumatic|gomme/.test(text)) {
-    groups.push("🛞 Pneumatici secondo contratto");
-  }
-  if (/sostitutiv|mobilità|veicolo sostitutivo/.test(text)) {
-    groups.push("🚘 Veicolo sostitutivo e servizi di mobilità");
-  }
+}
 
-  const defaults = [
-    "🛡️ Coperture assicurative previste dall’offerta",
-    "🔧 Manutenzione e assistenza",
-    "🛞 Pneumatici secondo contratto",
-    "🚘 Supporto durante la pratica di noleggio",
-  ];
+function commercialIntro(promotion: EditorialPromotion) {
+  const title = titleFor(promotion);
+  const modelText = `${clean(promotion.brand)} ${clean(promotion.model)}`.trim();
 
-  for (const item of defaults) {
-    if (groups.length >= 4) break;
-    if (!groups.includes(item)) groups.push(item);
-  }
-
-  return groups.slice(0, 4);
+  return [
+    `<p><strong>${escapeHtml(title)}</strong></p>`,
+    `<p>Una proposta pensata per chi cerca ${escapeHtml(modelText)} con canone definito, gestione guidata e assistenza ECCOMI NOLEGGIO fino alla consegna.</p>`,
+    `<p><small>Consegna indicativa: ${escapeHtml(deliveryFor(promotion.delivery))}. La richiesta non costituisce acquisto né approvazione del contratto di noleggio.</small></p>`,
+  ].join("");
 }
 
 function descriptionFor(promotion: EditorialPromotion) {
-  const title = titleFor(promotion);
-  const services = serviceGroups(promotion.services)
-    .map((service) => `<li>${escapeHtml(service)}</li>`)
-    .join("");
+  const requestUrl = requestUrlFor(promotion.id);
 
   return [
-    `<p><strong>${escapeHtml(title)}</strong> è disponibile con una proposta di noleggio a lungo termine gestita attraverso ECCOMI NOLEGGIO.</p>`,
-    `<h3>✅ Cosa comprende l’offerta</h3>`,
-    `<ul>${services}</ul>`,
-    `<p><small>Consegna indicativa: ${escapeHtml(deliveryFor(promotion.delivery))}. La richiesta non costituisce acquisto né approvazione del contratto di noleggio.</small></p>`,
-  ].join("");
+    commercialIntro(promotion),
+    requestUrl
+      ? `<p><a href="${escapeHtml(requestUrl)}" style="display:block;padding:16px 20px;border-radius:12px;background:#075392;color:#ffffff;font-weight:800;text-align:center;text-decoration:none;">AVVIA LA RICHIESTA DI NOLEGGIO →</a></p>`
+      : "",
+  ].filter(Boolean).join("");
 }
 
 export async function applyEccomiEditorialRules(input: {
@@ -128,7 +118,7 @@ export async function applyEccomiEditorialRules(input: {
         templateSuffix: "eccomi-noleggio",
         seo: {
           title: `${title} | ECCOMI NOLEGGIO`,
-          description: `${title}: offerta di noleggio a lungo termine. Anticipo, durata, chilometri e consegna sono riportati nella scheda.`,
+          description: `${title}: proposta di noleggio a lungo termine gestita da ECCOMI NOLEGGIO.`,
         },
       },
     },
@@ -139,7 +129,7 @@ export async function applyEccomiEditorialRules(input: {
   }
 
   if (!result.productUpdate.product) {
-    throw new Error("Shopify non ha confermato l’aggiornamento editoriale della bozza.");
+    throw new Error("Eccomi OnLine non ha confermato l’aggiornamento editoriale della bozza.");
   }
 
   return {
