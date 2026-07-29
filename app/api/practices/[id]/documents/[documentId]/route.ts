@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../../../../../../../db";
-import { leads, practiceDocuments } from "../../../../../../../db/schema";
-import { requireActor, routeError } from "../../../../../../lib/server/authz";
-import { ensurePracticeSchema } from "../../../../../../lib/server/practice-schema";
-import { createPracticeDocumentSignedUrl } from "../../../../../../lib/server/practice-storage";
+import { getDb } from "../../../../../../db";
+import { leads, practiceDocuments } from "../../../../../../db/schema";
+import { requireActor, routeError } from "../../../../../lib/server/authz";
+import { ensurePracticeSchema } from "../../../../../lib/server/practice-schema";
+import { createPracticeDocumentSignedUrl } from "../../../../../lib/server/practice-storage";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string; documentId: string }> }) {
   try {
