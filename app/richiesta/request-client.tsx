@@ -49,6 +49,13 @@ type DocumentRequirement = {
   maxFiles: number;
 };
 
+type ApplicationResponse = {
+  ok?: boolean;
+  error?: string;
+  practiceCode?: string;
+  status?: string;
+};
+
 const blankFields = {
   firstName: "",
   lastName: "",
@@ -108,6 +115,33 @@ function normalizeIban(value: string) {
 
 function looksLikeIban(value: string) {
   return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(normalizeIban(value));
+}
+
+function sendApplication(body: FormData): Promise<{ status: number; payload: ApplicationResponse }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const endpoint = new URL("/api/public/applications", window.location.origin).toString();
+
+    xhr.open("POST", endpoint, true);
+    xhr.timeout = 180_000;
+    xhr.responseType = "text";
+
+    xhr.onload = () => {
+      let payload: ApplicationResponse = {};
+      try {
+        payload = xhr.responseText ? JSON.parse(xhr.responseText) as ApplicationResponse : {};
+      } catch {
+        payload = { error: xhr.responseText || "Risposta del server non valida." };
+      }
+      resolve({ status: xhr.status, payload });
+    };
+
+    xhr.onerror = () => reject(new Error("Connessione al server non riuscita. Controlla la rete e riprova."));
+    xhr.ontimeout = () => reject(new Error("L’invio sta richiedendo troppo tempo. Riprova tra poco."));
+    xhr.onabort = () => reject(new Error("Invio interrotto prima del completamento."));
+
+    xhr.send(body);
+  });
 }
 
 export default function RequestClient({ promotionId }: { promotionId: string }) {
@@ -199,16 +233,14 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
       body.set("marketingConsent", String(marketing));
       body.set("submissionKey", submissionKey.current);
       documentRequirements.forEach((document) => {
-        (documents[document.key] || []).forEach((file) => body.append(document.field, file, file.name));
+        (documents[document.key] || []).forEach((file) => body.append(document.field, file));
       });
 
-      const response = await fetch("/api/public/applications", {
-        method: "POST",
-        headers: { "idempotency-key": submissionKey.current },
-        body,
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Invio non riuscito.");
+      const { status, payload } = await sendApplication(body);
+      if (status < 200 || status >= 300) {
+        throw new Error(payload.error || `Invio non riuscito (codice ${status || "rete"}).`);
+      }
+      if (!payload.practiceCode) throw new Error("La pratica è stata ricevuta, ma il codice non è disponibile.");
       setPracticeCode(payload.practiceCode);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Invio non riuscito. Riprova tra poco.");
