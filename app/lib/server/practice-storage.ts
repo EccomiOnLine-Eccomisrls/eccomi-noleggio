@@ -2,13 +2,45 @@ import { getRuntimeEnv } from "./runtime";
 
 const DEFAULT_BUCKET = "noleggio-documenti";
 
+function normalizeSupabaseUrl(value: string | undefined) {
+  const raw = value?.trim().replace(/^['"]|['"]$/g, "").replace(/\/$/, "");
+  if (!raw) return "";
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      if (!parsed.hostname.endsWith(".supabase.co")) return "";
+      return `${parsed.protocol}//${parsed.host}`;
+    } catch {
+      return "";
+    }
+  }
+
+  if (/^(postgres|postgresql):\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      const match = parsed.hostname.match(/^db\.([a-z0-9-]+)\.supabase\.co$/i);
+      return match ? `https://${match[1]}.supabase.co` : "";
+    } catch {
+      return "";
+    }
+  }
+
+  if (/^[a-z0-9-]{8,}$/i.test(raw)) return `https://${raw}.supabase.co`;
+  return "";
+}
+
 function storageConfig() {
   const env = getRuntimeEnv();
-  const url = env.SUPABASE_URL?.trim().replace(/\/$/, "");
-  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const url = normalizeSupabaseUrl(env.SUPABASE_URL);
+  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim().replace(/^['"]|['"]$/g, "");
   const bucket = env.SUPABASE_STORAGE_BUCKET?.trim() || DEFAULT_BUCKET;
-  if (!url || !serviceRoleKey) {
-    throw new Error("Archivio documentale protetto non configurato.");
+
+  if (!url) {
+    throw new Error("SUPABASE_URL non valida: inserisci l’URL progetto nel formato https://xxxxx.supabase.co.");
+  }
+  if (!serviceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY non configurata per l’archivio documentale.");
   }
   return { url, serviceRoleKey, bucket };
 }
@@ -22,19 +54,31 @@ function safePart(value: string) {
     .slice(0, 120) || "file";
 }
 
+async function storageFetch(url: string, init: RequestInit, context: string) {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "errore di rete";
+    throw new Error(`${context}: ${detail}`);
+  }
+}
+
 async function ensureBucket() {
   const { url, serviceRoleKey, bucket } = storageConfig();
-  const response = await fetch(`${url}/storage/v1/bucket/${encodeURIComponent(bucket)}`, {
+  const response = await storageFetch(`${url}/storage/v1/bucket/${encodeURIComponent(bucket)}`, {
     headers: {
       apikey: serviceRoleKey,
       authorization: `Bearer ${serviceRoleKey}`,
     },
-  });
+  }, "Verifica archivio documentale non riuscita");
+
   if (response.ok) return;
   if (response.status !== 404) {
-    throw new Error("Impossibile verificare l’archivio documentale.");
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Impossibile verificare l’archivio documentale${detail ? `: ${detail.slice(0, 180)}` : "."}`);
   }
-  const create = await fetch(`${url}/storage/v1/bucket`, {
+
+  const create = await storageFetch(`${url}/storage/v1/bucket`, {
     method: "POST",
     headers: {
       apikey: serviceRoleKey,
@@ -42,9 +86,11 @@ async function ensureBucket() {
       "content-type": "application/json",
     },
     body: JSON.stringify({ id: bucket, name: bucket, public: false, file_size_limit: 10_485_760 }),
-  });
+  }, "Creazione archivio documentale non riuscita");
+
   if (!create.ok && create.status !== 409) {
-    throw new Error("Impossibile predisporre l’archivio documentale.");
+    const detail = await create.text().catch(() => "");
+    throw new Error(`Impossibile predisporre l’archivio documentale${detail ? `: ${detail.slice(0, 180)}` : "."}`);
   }
 }
 
@@ -57,22 +103,24 @@ export async function uploadPracticeDocument(input: {
   const { url, serviceRoleKey, bucket } = storageConfig();
   const extension = safePart(input.file.name.split(".").pop() || "bin");
   const objectKey = `${safePart(input.practiceCode)}/${safePart(input.documentType)}/${crypto.randomUUID()}.${extension}`;
-  const response = await fetch(
-    `${url}/storage/v1/object/${encodeURIComponent(bucket)}/${objectKey.split("/").map(encodeURIComponent).join("/")}`,
-    {
-      method: "POST",
-      headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`,
-        "content-type": input.file.type || "application/octet-stream",
-        "x-upsert": "false",
-      },
-      body: await input.file.arrayBuffer(),
+  const uploadUrl = `${url}/storage/v1/object/${encodeURIComponent(bucket)}/${objectKey.split("/").map(encodeURIComponent).join("/")}`;
+
+  const response = await storageFetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+      "content-type": input.file.type || "application/octet-stream",
+      "x-upsert": "false",
     },
-  );
+    body: await input.file.arrayBuffer(),
+  }, `Caricamento non riuscito per ${input.file.name}`);
+
   if (!response.ok) {
-    throw new Error(`Caricamento non riuscito per ${input.file.name}.`);
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Caricamento non riuscito per ${input.file.name}${detail ? `: ${detail.slice(0, 180)}` : "."}`);
   }
+
   return {
     bucket,
     objectKey,
@@ -84,7 +132,7 @@ export async function uploadPracticeDocument(input: {
 
 export async function createPracticeDocumentSignedUrl(objectKey: string, expiresIn = 900) {
   const { url, serviceRoleKey, bucket } = storageConfig();
-  const response = await fetch(
+  const response = await storageFetch(
     `${url}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${objectKey.split("/").map(encodeURIComponent).join("/")}`,
     {
       method: "POST",
@@ -95,6 +143,7 @@ export async function createPracticeDocumentSignedUrl(objectKey: string, expires
       },
       body: JSON.stringify({ expiresIn }),
     },
+    "Generazione collegamento protetto non riuscita",
   );
   if (!response.ok) throw new Error("Impossibile generare il collegamento protetto al documento.");
   const payload = await response.json() as { signedURL?: string; signedUrl?: string };
