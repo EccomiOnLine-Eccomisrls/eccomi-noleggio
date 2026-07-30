@@ -49,13 +49,6 @@ type DocumentRequirement = {
   maxFiles: number;
 };
 
-type ApplicationResponse = {
-  ok?: boolean;
-  error?: string;
-  practiceCode?: string;
-  status?: string;
-};
-
 const blankFields = {
   firstName: "",
   lastName: "",
@@ -67,14 +60,6 @@ const blankFields = {
   accountHolder: "",
   iban: "",
   website: "",
-};
-
-const documentTypeByField: Record<string, string> = {
-  document_tax_code: "TAX_CODE",
-  document_income: "INCOME",
-  document_vat: "VAT_CERTIFICATE",
-  document_chamber: "CHAMBER_REPORT",
-  document_financial: "FINANCIAL",
 };
 
 function euro(cents: number) {
@@ -125,35 +110,6 @@ function looksLikeIban(value: string) {
   return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(normalizeIban(value));
 }
 
-async function readPayload(response: Response): Promise<ApplicationResponse> {
-  const text = await response.text();
-  if (!text) return {};
-  try {
-    return JSON.parse(text) as ApplicationResponse;
-  } catch {
-    return { error: text };
-  }
-}
-
-async function postWithRetry(
-  stage: string,
-  input: RequestInfo | URL,
-  init: RequestInit,
-  attempts = 2,
-): Promise<Response> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      return await fetch(input, init);
-    } catch (error) {
-      lastError = error;
-      if (attempt < attempts) await new Promise((resolve) => window.setTimeout(resolve, 800));
-    }
-  }
-  const detail = lastError instanceof Error && lastError.message ? `: ${lastError.message}` : "";
-  throw new Error(`${stage} non riuscito${detail}`);
-}
-
 export default function RequestClient({ promotionId }: { promotionId: string }) {
   const [promotion, setPromotion] = useState<PublicPromotion | null>(null);
   const [loading, setLoading] = useState(Boolean(promotionId));
@@ -166,7 +122,6 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
   const [marketing, setMarketing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [submitProgress, setSubmitProgress] = useState("");
   const [practiceCode, setPracticeCode] = useState("");
   const submissionKey = useRef(createSubmissionKey());
 
@@ -232,88 +187,31 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
   };
 
   const submit = async () => {
-    if (!promotion || !privacy || !documentsComplete || !financialComplete || submitting) return;
-
-    const uploads = documentRequirements.flatMap((requirement) =>
-      (documents[requirement.key] || []).map((file) => ({ requirement, file })),
-    );
-
+    if (!promotion || !privacy || !documentsComplete || !financialComplete) return;
     setSubmitting(true);
     setSubmitError("");
-    setSubmitProgress("Creazione pratica…");
-
     try {
-      const metadata = {
-        promotionId: promotion.id,
-        customerType: profile,
-        firstName: fields.firstName,
-        lastName: fields.lastName,
-        email: fields.email,
-        phone: fields.phone,
-        province: fields.province,
-        businessName: fields.businessName,
-        vatNumber: fields.vatNumber,
-        accountHolder: fields.accountHolder,
-        iban: normalizeIban(fields.iban),
-        website: fields.website,
-        privacyAccepted: privacy,
-        marketingConsent: marketing,
-        submissionKey: submissionKey.current,
-      };
-
-      const startResponse = await postWithRetry("Creazione pratica", "/api/public/applications/start", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(metadata),
+      const body = new FormData();
+      body.set("promotionId", promotion.id);
+      body.set("customerType", profile);
+      Object.entries(fields).forEach(([name, value]) => body.set(name, name === "iban" ? normalizeIban(value) : value));
+      body.set("privacyAccepted", String(privacy));
+      body.set("marketingConsent", String(marketing));
+      body.set("submissionKey", submissionKey.current);
+      documentRequirements.forEach((document) => {
+        (documents[document.key] || []).forEach((file) => body.append(document.field, file, file.name));
       });
-      const startPayload = await readPayload(startResponse);
-      if (!startResponse.ok || !startPayload.practiceCode) {
-        throw new Error(startPayload.error || `Creazione pratica non riuscita (HTTP ${startResponse.status}).`);
-      }
 
-      const code = startPayload.practiceCode;
-      if (startPayload.status !== "NEW") {
-        for (let index = 0; index < uploads.length; index += 1) {
-          const { requirement, file } = uploads[index];
-          setSubmitProgress(`Caricamento documento ${index + 1} di ${uploads.length}…`);
-
-          const documentType = requirement.field === "document_identity"
-            ? profile === "COMPANY" ? "LEGAL_REP_IDENTITY" : "IDENTITY"
-            : documentTypeByField[requirement.field];
-          if (!documentType) throw new Error(`Tipo documento non riconosciuto: ${requirement.field}.`);
-
-          const fileBody = new FormData();
-          fileBody.set("documentType", documentType);
-          fileBody.set("file", file, file.name);
-
-          const uploadResponse = await postWithRetry(
-            `Caricamento documento ${index + 1}`,
-            `/api/public/applications/${encodeURIComponent(code)}/document`,
-            { method: "POST", body: fileBody },
-          );
-          const uploadPayload = await readPayload(uploadResponse);
-          if (!uploadResponse.ok) {
-            throw new Error(uploadPayload.error || `Caricamento documento ${index + 1} non riuscito (HTTP ${uploadResponse.status}). Pratica ${code}.`);
-          }
-        }
-
-        setSubmitProgress("Completamento pratica…");
-        const completeResponse = await postWithRetry(
-          "Completamento pratica",
-          `/api/public/applications/${encodeURIComponent(code)}/complete`,
-          { method: "POST" },
-        );
-        const completePayload = await readPayload(completeResponse);
-        if (!completeResponse.ok) {
-          throw new Error(completePayload.error || `Completamento pratica non riuscito (HTTP ${completeResponse.status}).`);
-        }
-      }
-
-      setPracticeCode(code);
-      setSubmitProgress("");
+      const response = await fetch("/api/public/applications", {
+        method: "POST",
+        headers: { "idempotency-key": submissionKey.current },
+        body,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Invio non riuscito.");
+      setPracticeCode(payload.practiceCode);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Invio non riuscito. Riprova tra poco.");
-      setSubmitProgress("");
     } finally {
       setSubmitting(false);
     }
@@ -385,7 +283,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
               </div> : null}
             </div>
 
-            <footer className="public-application-card__footer"><button className="public-button public-button--back" type="button" disabled={submitting} onClick={() => step === 1 ? history.back() : setStep((current) => current - 1)}><ArrowLeft size={17} /> {step === 1 ? "Torna all’offerta" : "Indietro"}</button><span>{submitting && submitProgress ? submitProgress : step === 3 && !canContinue ? "Completa IBAN e documenti per continuare." : "I dati vengono salvati solo all’invio finale."}</span><button className="public-button public-button--primary" type="button" disabled={!canContinue || submitting} onClick={() => step < 4 ? setStep((current) => current + 1) : submit()}>{submitting ? <><Loader2 className="spin" size={18} /> {submitProgress || "Invio…"}</> : step < 4 ? <>Continua <ArrowRight size={17} /></> : <>Invia richiesta <Check size={17} /></>}</button></footer>
+            <footer className="public-application-card__footer"><button className="public-button public-button--back" type="button" disabled={submitting} onClick={() => step === 1 ? history.back() : setStep((current) => current - 1)}><ArrowLeft size={17} /> {step === 1 ? "Torna all’offerta" : "Indietro"}</button><span>{step === 3 && !canContinue ? "Completa IBAN e documenti per continuare." : "I dati vengono salvati solo all’invio finale."}</span><button className="public-button public-button--primary" type="button" disabled={!canContinue || submitting} onClick={() => step < 4 ? setStep((current) => current + 1) : submit()}>{submitting ? <><Loader2 className="spin" size={18} /> Invio…</> : step < 4 ? <>Continua <ArrowRight size={17} /></> : <>Invia richiesta <Check size={17} /></>}</button></footer>
           </> : <div className="public-success"><span><Check size={38} /></span><small>PRATICA COMPLETA REGISTRATA</small><h2>La tua richiesta è stata inviata</h2><p>Dati, IBAN e documenti sono stati collegati all’offerta e assegnati al responsabile competente.</p><div><small>CODICE PRATICA</small><strong>{practiceCode}</strong></div><ul><li><Check size={16} /> ECCOMI verifica la pratica</li><li><Check size={16} /> I documenti restano nell’area protetta</li><li><Check size={16} /> Il partner competente può iniziare la lavorazione</li></ul><a className="public-button public-button--primary" href="https://eccomionline.com"><CarFront size={18} /> Torna su Eccomi Online</a></div>}
         </section>
       </div>
