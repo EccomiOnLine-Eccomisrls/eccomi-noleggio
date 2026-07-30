@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import { getRuntimeEnv, installRuntimeEnv } from "../app/lib/server/runtime";
+import { installRuntimeEnv } from "../app/lib/server/runtime";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -27,38 +27,27 @@ const PUBLIC_STOREFRONT_HOSTS = new Set([
   "www.noleggio.eccomionline.com",
 ]);
 
-const PUBLIC_STOREFRONT_PATHS = new Set(["/", "/offerte", "/offerte/"]);
-
-function publicStorefrontRedirect(url: URL, env?: Partial<Env>) {
+function publicStorefrontRedirect(url: URL) {
   if (!PUBLIC_STOREFRONT_HOSTS.has(url.hostname.toLowerCase())) return null;
-  if (!PUBLIC_STOREFRONT_PATHS.has(url.pathname)) return null;
 
-  let configuredDestination = env?.PUBLIC_SHOWROOM_BASE_URL?.trim();
-
-  if (!configuredDestination) {
-    try {
-      configuredDestination = getRuntimeEnv().PUBLIC_SHOWROOM_BASE_URL?.trim();
-    } catch {
-      configuredDestination = undefined;
-    }
+  // La home del sottodominio deve aprire la vetrina interna.
+  // Non si usa PUBLIC_SHOWROOM_BASE_URL qui: se contiene lo stesso dominio
+  // genererebbe un ciclo infinito di redirect.
+  if (url.pathname === "/") {
+    return Response.redirect(new URL("/offerte", url.origin).toString(), 302);
   }
 
-  const destination = configuredDestination || "https://eccomionline.com/pages/eccomi-noleggio";
-  return Response.redirect(destination, 302);
+  return null;
 }
 
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
-// const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
-
 const worker = {
   async fetch(request: Request, env?: Env, ctx?: ExecutionContext): Promise<Response> {
     if (env) installRuntimeEnv(env);
     const url = new URL(request.url);
 
-    const storefrontRedirect = publicStorefrontRedirect(url, env);
+    const storefrontRedirect = publicStorefrontRedirect(url);
     if (storefrontRedirect) return storefrontRedirect;
 
     if (url.pathname === "/_vinext/image" && env?.ASSETS && env?.IMAGES) {
