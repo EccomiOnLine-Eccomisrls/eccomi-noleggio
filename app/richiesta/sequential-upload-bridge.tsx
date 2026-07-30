@@ -27,7 +27,7 @@ async function readPayload(response: Response): Promise<JsonPayload> {
   }
 }
 
-async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, attempts = 2): Promise<Response> {
+async function fetchWithRetry(stage: string, input: RequestInfo | URL, init: RequestInit, attempts = 2): Promise<Response> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
@@ -37,73 +37,95 @@ async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, attem
       if (attempt < attempts) await new Promise((resolve) => window.setTimeout(resolve, 700));
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("Connessione al server non riuscita.");
+  const detail = lastError instanceof Error && lastError.message ? `: ${lastError.message}` : "";
+  throw new Error(`${stage} non riuscito${detail}`);
 }
 
 async function submitSequentially(body: FormData): Promise<{ status: number; payload: JsonPayload }> {
-  const customerType = String(body.get("customerType") || "");
-  const metadata: Record<string, unknown> = {};
-  for (const key of [
-    "promotionId", "customerType", "firstName", "lastName", "email", "phone", "province",
-    "businessName", "vatNumber", "accountHolder", "iban", "submissionKey",
-  ]) {
-    metadata[key] = String(body.get(key) || "");
-  }
-  metadata.privacyAccepted = String(body.get("privacyAccepted")) === "true";
-  metadata.marketingConsent = String(body.get("marketingConsent")) === "true";
-
-  const startResponse = await fetchWithRetry("/api/public/applications/start", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(metadata),
-  });
-  const startPayload = await readPayload(startResponse);
-  if (!startResponse.ok || !startPayload.practiceCode) {
-    return { status: startResponse.status, payload: startPayload };
-  }
-
-  const practiceCode = startPayload.practiceCode;
-  if (startPayload.status === "NEW") {
-    return { status: 200, payload: { ok: true, practiceCode, status: "NEW" } };
-  }
-
-  const uploads: Array<{ field: string; file: File }> = [];
-  for (const [field, value] of body.entries()) {
-    if (value instanceof File && value.size > 0) uploads.push({ field, file: value });
-  }
-
-  for (let index = 0; index < uploads.length; index += 1) {
-    const upload = uploads[index];
-    const documentType = upload.field === "document_identity"
-      ? customerType === "COMPANY" ? "LEGAL_REP_IDENTITY" : "IDENTITY"
-      : documentTypeByField[upload.field];
-    if (!documentType) {
-      return { status: 422, payload: { error: `Tipo documento non riconosciuto: ${upload.field}.` } };
+  try {
+    const customerType = String(body.get("customerType") || "");
+    const metadata: Record<string, unknown> = {};
+    for (const key of [
+      "promotionId", "customerType", "firstName", "lastName", "email", "phone", "province",
+      "businessName", "vatNumber", "accountHolder", "iban", "submissionKey",
+    ]) {
+      metadata[key] = String(body.get(key) || "");
     }
+    metadata.privacyAccepted = String(body.get("privacyAccepted")) === "true";
+    metadata.marketingConsent = String(body.get("marketingConsent")) === "true";
 
-    const fileBody = new FormData();
-    fileBody.set("documentType", documentType);
-    fileBody.set("file", upload.file);
-    const uploadResponse = await fetchWithRetry(`/api/public/applications/${encodeURIComponent(practiceCode)}/document`, {
+    const startResponse = await fetchWithRetry("Creazione pratica", "/api/public/applications/start", {
       method: "POST",
-      body: fileBody,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(metadata),
     });
-    const uploadPayload = await readPayload(uploadResponse);
-    if (!uploadResponse.ok) {
+    const startPayload = await readPayload(startResponse);
+    if (!startResponse.ok || !startPayload.practiceCode) {
       return {
-        status: uploadResponse.status,
-        payload: {
-          error: uploadPayload.error || `Caricamento file ${index + 1} di ${uploads.length} non riuscito. Pratica ${practiceCode}.`,
-        },
+        status: startResponse.status || 500,
+        payload: { error: startPayload.error || `Creazione pratica non riuscita (HTTP ${startResponse.status}).` },
       };
     }
-  }
 
-  const completeResponse = await fetchWithRetry(`/api/public/applications/${encodeURIComponent(practiceCode)}/complete`, {
-    method: "POST",
-  });
-  const completePayload = await readPayload(completeResponse);
-  return { status: completeResponse.status, payload: completePayload };
+    const practiceCode = startPayload.practiceCode;
+    if (startPayload.status === "NEW") {
+      return { status: 200, payload: { ok: true, practiceCode, status: "NEW" } };
+    }
+
+    const uploads: Array<{ field: string; file: File }> = [];
+    for (const [field, value] of body.entries()) {
+      if (value instanceof File && value.size > 0) uploads.push({ field, file: value });
+    }
+
+    for (let index = 0; index < uploads.length; index += 1) {
+      const upload = uploads[index];
+      const documentType = upload.field === "document_identity"
+        ? customerType === "COMPANY" ? "LEGAL_REP_IDENTITY" : "IDENTITY"
+        : documentTypeByField[upload.field];
+      if (!documentType) {
+        return { status: 422, payload: { error: `Tipo documento non riconosciuto: ${upload.field}.` } };
+      }
+
+      const fileBody = new FormData();
+      fileBody.set("documentType", documentType);
+      fileBody.set("file", upload.file);
+      const label = `Caricamento documento ${index + 1} di ${uploads.length} (${upload.file.name})`;
+      const uploadResponse = await fetchWithRetry(label, `/api/public/applications/${encodeURIComponent(practiceCode)}/document`, {
+        method: "POST",
+        body: fileBody,
+      });
+      const uploadPayload = await readPayload(uploadResponse);
+      if (!uploadResponse.ok) {
+        return {
+          status: uploadResponse.status || 500,
+          payload: {
+            error: uploadPayload.error || `${label} non riuscito (HTTP ${uploadResponse.status}). Pratica ${practiceCode}.`,
+          },
+        };
+      }
+    }
+
+    const completeResponse = await fetchWithRetry(
+      "Completamento pratica",
+      `/api/public/applications/${encodeURIComponent(practiceCode)}/complete`,
+      { method: "POST" },
+    );
+    const completePayload = await readPayload(completeResponse);
+    if (!completeResponse.ok) {
+      return {
+        status: completeResponse.status || 500,
+        payload: { error: completePayload.error || `Completamento pratica non riuscito (HTTP ${completeResponse.status}).` },
+      };
+    }
+    return { status: completeResponse.status, payload: completePayload };
+  } catch (error) {
+    return {
+      status: 503,
+      payload: {
+        error: error instanceof Error ? error.message : "Errore di rete non identificato durante l’invio.",
+      },
+    };
+  }
 }
 
 export default function SequentialUploadBridge() {
@@ -188,7 +210,7 @@ export default function SequentialUploadBridge() {
             if (timeoutId !== null) window.clearTimeout(timeoutId);
             this.status = 503;
             this.responseText = JSON.stringify({
-              error: error instanceof Error ? error.message : "Connessione al server non riuscita.",
+              error: error instanceof Error ? error.message : "Errore di rete non identificato.",
             });
             this.onload?.call(this as unknown as XMLHttpRequest, new ProgressEvent("load"));
           });
