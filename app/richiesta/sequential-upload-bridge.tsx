@@ -9,6 +9,11 @@ type JsonPayload = {
   status?: string;
 };
 
+type PreparedUpload = {
+  field: string;
+  file: File;
+};
+
 const documentTypeByField: Record<string, string> = {
   document_tax_code: "TAX_CODE",
   document_income: "INCOME",
@@ -41,9 +46,38 @@ async function fetchWithRetry(stage: string, input: RequestInfo | URL, init: Req
   throw new Error(`${stage} non riuscito${detail}`);
 }
 
+async function prepareUploads(body: FormData): Promise<PreparedUpload[]> {
+  const uploads: PreparedUpload[] = [];
+
+  for (const [field, value] of body.entries()) {
+    if (!(value instanceof File) || value.size <= 0) continue;
+
+    // Safari/iPad può perdere l'accesso al file selezionato dopo la prima
+    // richiesta asincrona. Copiamo subito i byte in memoria prima di creare
+    // la pratica, così ogni upload usa un File stabile e indipendente.
+    const bytes = await value.arrayBuffer();
+    const stableFile = new File([bytes], value.name || "documento", {
+      type: value.type || "application/octet-stream",
+      lastModified: value.lastModified || Date.now(),
+    });
+
+    uploads.push({ field, file: stableFile });
+  }
+
+  return uploads;
+}
+
 async function submitSequentially(body: FormData): Promise<{ status: number; payload: JsonPayload }> {
   try {
     const customerType = String(body.get("customerType") || "");
+
+    // Va eseguito prima di qualsiasi await di rete: è il punto decisivo per
+    // mantenere validi i file provenienti dal selettore iOS/iPadOS.
+    const uploads = await prepareUploads(body);
+    if (!uploads.length) {
+      return { status: 422, payload: { error: "Non risultano documenti disponibili per l’invio." } };
+    }
+
     const metadata: Record<string, unknown> = {};
     for (const key of [
       "promotionId", "customerType", "firstName", "lastName", "email", "phone", "province",
@@ -72,11 +106,6 @@ async function submitSequentially(body: FormData): Promise<{ status: number; pay
       return { status: 200, payload: { ok: true, practiceCode, status: "NEW" } };
     }
 
-    const uploads: Array<{ field: string; file: File }> = [];
-    for (const [field, value] of body.entries()) {
-      if (value instanceof File && value.size > 0) uploads.push({ field, file: value });
-    }
-
     for (let index = 0; index < uploads.length; index += 1) {
       const upload = uploads[index];
       const documentType = upload.field === "document_identity"
@@ -88,12 +117,13 @@ async function submitSequentially(body: FormData): Promise<{ status: number; pay
 
       const fileBody = new FormData();
       fileBody.set("documentType", documentType);
-      fileBody.set("file", upload.file);
+      fileBody.set("file", upload.file, upload.file.name);
       const label = `Caricamento documento ${index + 1} di ${uploads.length} (${upload.file.name})`;
-      const uploadResponse = await fetchWithRetry(label, `/api/public/applications/${encodeURIComponent(practiceCode)}/document`, {
-        method: "POST",
-        body: fileBody,
-      });
+      const uploadResponse = await fetchWithRetry(
+        label,
+        `/api/public/applications/${encodeURIComponent(practiceCode)}/document`,
+        { method: "POST", body: fileBody },
+      );
       const uploadPayload = await readPayload(uploadResponse);
       if (!uploadResponse.ok) {
         return {
