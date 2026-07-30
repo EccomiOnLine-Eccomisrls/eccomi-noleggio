@@ -40,13 +40,16 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const origin = await publicCorsOrigin(request);
+  console.info("[PRACTICE_START] request_received", { origin: origin || "DENIED" });
   if (!origin) return jsonWithCors({ error: "Origine non autorizzata." }, 403, null);
 
   let body: Record<string, unknown>;
   try {
     body = await request.json() as Record<string, unknown>;
-  } catch {
+  } catch (error) {
+    console.error("[PRACTICE_START] invalid_json", error);
     return jsonWithCors({ error: "Dati della richiesta non validi." }, 400, origin);
   }
 
@@ -66,6 +69,8 @@ export async function POST(request: Request) {
   const privacyAccepted = body.privacyAccepted === true;
   const marketingConsent = body.marketingConsent === true;
 
+  console.info("[PRACTICE_START] payload_parsed", { promotionId, customerType, email, submissionKey });
+
   if (!promotionId) return jsonWithCors({ error: "Offerta non riconosciuta." }, 422, origin);
   if (!customerTypes.has(customerType)) return jsonWithCors({ error: "Seleziona il profilo del richiedente." }, 422, origin);
   if (firstName.length < 2 || lastName.length < 2) return jsonWithCors({ error: "Inserisci nome e cognome completi." }, 422, origin);
@@ -79,36 +84,49 @@ export async function POST(request: Request) {
   if (!privacyAccepted) return jsonWithCors({ error: "Il consenso privacy è necessario per gestire la richiesta." }, 422, origin);
   if (!/^[a-zA-Z0-9:_-]{8,100}$/.test(submissionKey)) return jsonWithCors({ error: "Identificativo di invio non valido." }, 422, origin);
 
-  await ensurePracticeSchema();
-  const db = getDb();
-  const [existing] = await db.select({ id: leads.id, status: leads.status }).from(leads).where(eq(leads.submissionKey, submissionKey)).limit(1);
-  if (existing) return jsonWithCors({ ok: true, practiceCode: existing.id, status: existing.status, duplicate: true }, 200, origin);
+  try {
+    await ensurePracticeSchema();
+    const db = getDb();
+    const [existing] = await db.select({ id: leads.id, status: leads.status }).from(leads).where(eq(leads.submissionKey, submissionKey)).limit(1);
+    if (existing) {
+      console.info("[PRACTICE_START] duplicate_submission", { practiceCode: existing.id, status: existing.status, durationMs: Date.now() - startedAt });
+      return jsonWithCors({ ok: true, practiceCode: existing.id, status: existing.status, duplicate: true }, 200, origin);
+    }
 
-  const [offer] = await db.select({ promotion: promotions, partnerStatus: partners.status })
-    .from(promotions)
-    .innerJoin(partners, eq(promotions.partnerId, partners.id))
-    .where(eq(promotions.id, promotionId))
-    .limit(1);
-  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
-  if (!offer || !["ONLINE", "ACTIVE", "EXPIRING"].includes(offer.promotion.status) || offer.promotion.validUntil < today) {
-    return jsonWithCors({ error: "Questa offerta non è più disponibile." }, 409, origin);
+    const [offer] = await db.select({ promotion: promotions, partnerStatus: partners.status })
+      .from(promotions)
+      .innerJoin(partners, eq(promotions.partnerId, partners.id))
+      .where(eq(promotions.id, promotionId))
+      .limit(1);
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
+    if (!offer || !["ONLINE", "ACTIVE", "EXPIRING"].includes(offer.promotion.status) || offer.promotion.validUntil < today) {
+      console.warn("[PRACTICE_START] offer_unavailable", { promotionId });
+      return jsonWithCors({ error: "Questa offerta non è più disponibile." }, 409, origin);
+    }
+    if (offer.partnerStatus !== "ACTIVE") return jsonWithCors({ error: "La richiesta non può essere assegnata in questo momento." }, 409, origin);
+
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+    const [recent] = await db.select({ id: leads.id, status: leads.status }).from(leads)
+      .where(and(eq(leads.promotionId, promotionId), eq(leads.email, email), gte(leads.createdAt, tenMinutesAgo))).limit(1);
+    if (recent) {
+      console.info("[PRACTICE_START] duplicate_recent", { practiceCode: recent.id, status: recent.status, durationMs: Date.now() - startedAt });
+      return jsonWithCors({ ok: true, practiceCode: recent.id, status: recent.status, duplicate: true }, 200, origin);
+    }
+
+    const id = practiceCode();
+    const now = new Date().toISOString();
+    const encryptedIban = await encryptSensitivePracticeData(iban);
+    await db.insert(leads).values({
+      id, promotionId, partnerId: offer.promotion.partnerId, firstName, lastName, phone, email, province, customerType,
+      businessName: businessName || null, vatNumber: vatNumber || null, accountHolder, ibanEncrypted: encryptedIban,
+      ibanLast4: iban.slice(-4), status: "UPLOAD_IN_PROGRESS", documentStatus: "UPLOADING", emailVerificationStatus: "NOT_REQUIRED",
+      privacyVersion: PRIVACY_VERSION, privacyAcceptedAt: now, marketingConsent, submissionKey, source: "ECCOMI_NOLEGGIO_WEB",
+      assignedAt: now, createdAt: now, updatedAt: now,
+    });
+    console.info("[PRACTICE_START] created", { practiceCode: id, promotionId, customerType, durationMs: Date.now() - startedAt });
+    return jsonWithCors({ ok: true, practiceCode: id, status: "UPLOAD_IN_PROGRESS" }, 201, origin);
+  } catch (error) {
+    console.error("[PRACTICE_START] fatal", { promotionId, email, submissionKey, durationMs: Date.now() - startedAt, error });
+    return jsonWithCors({ error: error instanceof Error ? error.message : "Creazione pratica non riuscita." }, 500, origin);
   }
-  if (offer.partnerStatus !== "ACTIVE") return jsonWithCors({ error: "La richiesta non può essere assegnata in questo momento." }, 409, origin);
-
-  const tenMinutesAgo = new Date(Date.now() - 10 * 60_000).toISOString();
-  const [recent] = await db.select({ id: leads.id, status: leads.status }).from(leads)
-    .where(and(eq(leads.promotionId, promotionId), eq(leads.email, email), gte(leads.createdAt, tenMinutesAgo))).limit(1);
-  if (recent) return jsonWithCors({ ok: true, practiceCode: recent.id, status: recent.status, duplicate: true }, 200, origin);
-
-  const id = practiceCode();
-  const now = new Date().toISOString();
-  const encryptedIban = await encryptSensitivePracticeData(iban);
-  await db.insert(leads).values({
-    id, promotionId, partnerId: offer.promotion.partnerId, firstName, lastName, phone, email, province, customerType,
-    businessName: businessName || null, vatNumber: vatNumber || null, accountHolder, ibanEncrypted: encryptedIban,
-    ibanLast4: iban.slice(-4), status: "UPLOAD_IN_PROGRESS", documentStatus: "UPLOADING", emailVerificationStatus: "NOT_REQUIRED",
-    privacyVersion: PRIVACY_VERSION, privacyAcceptedAt: now, marketingConsent, submissionKey, source: "ECCOMI_NOLEGGIO_WEB",
-    assignedAt: now, createdAt: now, updatedAt: now,
-  });
-  return jsonWithCors({ ok: true, practiceCode: id, status: "UPLOAD_IN_PROGRESS" }, 201, origin);
 }
