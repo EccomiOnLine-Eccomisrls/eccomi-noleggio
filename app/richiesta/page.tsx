@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./request-upload.css";
 import RequestClient from "./request-client";
+import SafariUploadGuard from "./safari-upload-guard";
 
 export const metadata: Metadata = {
   title: "Richiesta di noleggio | ECCOMI NOLEGGIO",
@@ -15,5 +16,5 @@ export default async function RequestPage({
 }) {
   const params = await searchParams;
   const promotionId = typeof params.promozione === "string" ? params.promozione : "";
-  return <RequestClient promotionId={promotionId} />;
+  return <><SafariUploadGuard /><RequestClient promotionId={promotionId} /></>;
 }
