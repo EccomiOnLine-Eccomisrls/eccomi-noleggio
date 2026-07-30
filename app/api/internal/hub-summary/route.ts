@@ -29,7 +29,11 @@ function authorize(request: Request) {
     ? authorization.slice("Bearer ".length).trim()
     : "";
 
-  if (!suppliedSecret || suppliedSecret.length !== configuredSecret.length || suppliedSecret !== configuredSecret) {
+  if (
+    !suppliedSecret ||
+    suppliedSecret.length !== configuredSecret.length ||
+    suppliedSecret !== configuredSecret
+  ) {
     return json({ error: "Accesso non autorizzato." }, 401);
   }
 
@@ -42,6 +46,7 @@ export async function GET(request: Request) {
 
   try {
     const db = getDb();
+
     const [
       [promotionTotal],
       [pendingApproval],
@@ -57,16 +62,53 @@ export async function GET(request: Request) {
       recentEvents,
     ] = await Promise.all([
       db.select({ total: count() }).from(promotions),
-      db.select({ total: count() }).from(promotions).where(eq(promotions.status, "PENDING_APPROVAL")),
-      db.select({ total: count() }).from(promotions).where(eq(promotions.status, "APPROVED")),
-      db.select({ total: count() }).from(promotions).where(inArray(promotions.status, ACTIVE_PROMOTION_STATES)),
-      db.select({ total: count() }).from(promotions).where(eq(promotions.status, "EXPIRING")),
-      db.select({ total: count() }).from(promotions).where(inArray(promotions.status, CLOSED_PROMOTION_STATES)),
+
+      db
+        .select({ total: count() })
+        .from(promotions)
+        .where(eq(promotions.status, "PENDING_APPROVAL")),
+
+      db
+        .select({ total: count() })
+        .from(promotions)
+        .where(eq(promotions.status, "APPROVED")),
+
+      db
+        .select({ total: count() })
+        .from(promotions)
+        .where(inArray(promotions.status, ACTIVE_PROMOTION_STATES)),
+
+      db
+        .select({ total: count() })
+        .from(promotions)
+        .where(eq(promotions.status, "EXPIRING")),
+
+      db
+        .select({ total: count() })
+        .from(promotions)
+        .where(inArray(promotions.status, CLOSED_PROMOTION_STATES)),
+
       db.select({ total: count() }).from(leads),
-      db.select({ total: count() }).from(leads).where(eq(leads.status, "NEW")),
-      db.select({ total: count() }).from(leads).where(inArray(leads.status, WORKING_LEAD_STATES)),
-      db.select({ total: count() }).from(leads).where(inArray(leads.status, CONTRACT_LEAD_STATES)),
-      db.select({ total: sum(commissions.amountCents) }).from(commissions),
+
+      db
+        .select({ total: count() })
+        .from(leads)
+        .where(eq(leads.status, "NEW")),
+
+      db
+        .select({ total: count() })
+        .from(leads)
+        .where(inArray(leads.status, WORKING_LEAD_STATES)),
+
+      db
+        .select({ total: count() })
+        .from(leads)
+        .where(inArray(leads.status, CONTRACT_LEAD_STATES)),
+
+      db
+        .select({ total: sum(commissions.amountCents) })
+        .from(commissions),
+
       db
         .select({
           id: hubEvents.id,
@@ -83,6 +125,7 @@ export async function GET(request: Request) {
       source: "eccomi-noleggio-d1",
       safe_read_only: true,
       generated_at: new Date().toISOString(),
+
       summary: {
         promotions_total: Number(promotionTotal?.total || 0),
         pending_approval: Number(pendingApproval?.total || 0),
@@ -96,6 +139,48 @@ export async function GET(request: Request) {
         contracts: Number(contracts?.total || 0),
         commission_cents: Number(commissionTotal?.total || 0),
       },
+
+      pipeline: {
+        quotations_new: Number(pendingApproval?.total || 0),
+        ai_review: 0,
+        pending_approval: Number(pendingApproval?.total || 0),
+        published: Number(active?.total || 0),
+        leads_new: Number(newLeads?.total || 0),
+        leads_working: Number(workingLeads?.total || 0),
+        contracts: Number(contracts?.total || 0),
+        deliveries: 0,
+        archived: Number(expired?.total || 0),
+      },
+
+      alerts: [
+        ...(Number(expiring?.total || 0) > 0
+          ? [
+              {
+                type: "warning",
+                title: `${Number(expiring?.total)} promozioni in scadenza`,
+              },
+            ]
+          : []),
+
+        ...(Number(pendingApproval?.total || 0) > 0
+          ? [
+              {
+                type: "info",
+                title: `${Number(pendingApproval?.total)} offerte da approvare`,
+              },
+            ]
+          : []),
+
+        ...(Number(newLeads?.total || 0) > 0
+          ? [
+              {
+                type: "success",
+                title: `${Number(newLeads?.total)} nuovi lead`,
+              },
+            ]
+          : []),
+      ],
+
       recent: recentEvents.map((event) => ({
         id: event.id,
         event_type: event.eventType,
@@ -104,6 +189,11 @@ export async function GET(request: Request) {
       })),
     });
   } catch {
-    return json({ error: "I KPI di Eccomi Noleggio non sono momentaneamente disponibili." }, 502);
+    return json(
+      {
+        error: "I KPI di Eccomi Noleggio non sono momentaneamente disponibili.",
+      },
+      502
+    );
   }
 }
