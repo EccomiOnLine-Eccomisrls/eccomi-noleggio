@@ -27,6 +27,19 @@ async function readPayload(response: Response): Promise<JsonPayload> {
   }
 }
 
+async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, attempts = 2): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetch(input, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await new Promise((resolve) => window.setTimeout(resolve, 700));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Connessione al server non riuscita.");
+}
+
 async function submitSequentially(body: FormData): Promise<{ status: number; payload: JsonPayload }> {
   const customerType = String(body.get("customerType") || "");
   const metadata: Record<string, unknown> = {};
@@ -39,7 +52,7 @@ async function submitSequentially(body: FormData): Promise<{ status: number; pay
   metadata.privacyAccepted = String(body.get("privacyAccepted")) === "true";
   metadata.marketingConsent = String(body.get("marketingConsent")) === "true";
 
-  const startResponse = await fetch("/api/public/applications/start", {
+  const startResponse = await fetchWithRetry("/api/public/applications/start", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(metadata),
@@ -50,6 +63,10 @@ async function submitSequentially(body: FormData): Promise<{ status: number; pay
   }
 
   const practiceCode = startPayload.practiceCode;
+  if (startPayload.status === "NEW") {
+    return { status: 200, payload: { ok: true, practiceCode, status: "NEW" } };
+  }
+
   const uploads: Array<{ field: string; file: File }> = [];
   for (const [field, value] of body.entries()) {
     if (value instanceof File && value.size > 0) uploads.push({ field, file: value });
@@ -67,7 +84,7 @@ async function submitSequentially(body: FormData): Promise<{ status: number; pay
     const fileBody = new FormData();
     fileBody.set("documentType", documentType);
     fileBody.set("file", upload.file);
-    const uploadResponse = await fetch(`/api/public/applications/${encodeURIComponent(practiceCode)}/document`, {
+    const uploadResponse = await fetchWithRetry(`/api/public/applications/${encodeURIComponent(practiceCode)}/document`, {
       method: "POST",
       body: fileBody,
     });
@@ -75,12 +92,16 @@ async function submitSequentially(body: FormData): Promise<{ status: number; pay
     if (!uploadResponse.ok) {
       return {
         status: uploadResponse.status,
-        payload: { error: uploadPayload.error || `Caricamento file ${index + 1} di ${uploads.length} non riuscito.` },
+        payload: {
+          error: uploadPayload.error || `Caricamento file ${index + 1} di ${uploads.length} non riuscito. Pratica ${practiceCode}.`,
+        },
       };
     }
   }
 
-  const completeResponse = await fetch(`/api/public/applications/${encodeURIComponent(practiceCode)}/complete`, { method: "POST" });
+  const completeResponse = await fetchWithRetry(`/api/public/applications/${encodeURIComponent(practiceCode)}/complete`, {
+    method: "POST",
+  });
   const completePayload = await readPayload(completeResponse);
   return { status: completeResponse.status, payload: completePayload };
 }
@@ -93,6 +114,7 @@ export default function SequentialUploadBridge() {
       private native: XMLHttpRequest | null = null;
       private method = "GET";
       private url = "";
+      private settled = false;
       timeout = 0;
       responseType: XMLHttpRequestResponseType = "";
       status = 0;
@@ -144,19 +166,31 @@ export default function SequentialUploadBridge() {
         }
 
         const timeoutId = this.timeout > 0
-          ? window.setTimeout(() => this.ontimeout?.call(this as unknown as XMLHttpRequest, new ProgressEvent("timeout")), this.timeout)
+          ? window.setTimeout(() => {
+            if (this.settled) return;
+            this.settled = true;
+            this.ontimeout?.call(this as unknown as XMLHttpRequest, new ProgressEvent("timeout"));
+          }, this.timeout)
           : null;
 
         submitSequentially(body)
           .then(({ status, payload }) => {
+            if (this.settled) return;
+            this.settled = true;
             if (timeoutId !== null) window.clearTimeout(timeoutId);
             this.status = status;
             this.responseText = JSON.stringify(payload);
             this.onload?.call(this as unknown as XMLHttpRequest, new ProgressEvent("load"));
           })
-          .catch(() => {
+          .catch((error) => {
+            if (this.settled) return;
+            this.settled = true;
             if (timeoutId !== null) window.clearTimeout(timeoutId);
-            this.onerror?.call(this as unknown as XMLHttpRequest, new ProgressEvent("error"));
+            this.status = 503;
+            this.responseText = JSON.stringify({
+              error: error instanceof Error ? error.message : "Connessione al server non riuscita.",
+            });
+            this.onload?.call(this as unknown as XMLHttpRequest, new ProgressEvent("load"));
           });
       }
 
@@ -165,6 +199,8 @@ export default function SequentialUploadBridge() {
       }
 
       abort() {
+        if (this.settled) return;
+        this.settled = true;
         this.native?.abort();
         this.onabort?.call(this as unknown as XMLHttpRequest, new ProgressEvent("abort"));
       }
