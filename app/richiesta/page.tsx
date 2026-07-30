@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./request-upload.css";
 import RequestClient from "./request-client";
-import SequentialUploadBridge from "./sequential-upload-bridge";
 
 export const metadata: Metadata = {
   title: "Richiesta di noleggio | ECCOMI NOLEGGIO",
@@ -16,5 +15,5 @@ export default async function RequestPage({
 }) {
   const params = await searchParams;
   const promotionId = typeof params.promozione === "string" ? params.promozione : "";
-  return <><SequentialUploadBridge /><RequestClient promotionId={promotionId} /></>;
+  return <RequestClient promotionId={promotionId} />;
 }
