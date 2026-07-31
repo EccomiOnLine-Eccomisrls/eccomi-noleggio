@@ -818,6 +818,7 @@ export default function Home() {
   const [busyPromotionId, setBusyPromotionId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [ecosystemMenuOpen, setEcosystemMenuOpen] = useState(false);
   const [expandedSidebarSection, setExpandedSidebarSection] = useState<
     "partner" | "shopify" | "ai" | null
   >(null);
@@ -1528,13 +1529,211 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="hub-link">
-          <span className="hub-link__icon">E</span>
-          <span>
-            <small>Ecosistema</small>
-            <strong>ECCOMI HUB</strong>
-          </span>
-          <ChevronRight size={17} />
+        <div className="ecosystem-switcher">
+          <button
+            type="button"
+            className={`hub-link hub-link--button ${
+              ecosystemMenuOpen ? "hub-link--open" : ""
+            }`}
+            aria-haspopup="menu"
+            aria-expanded={ecosystemMenuOpen}
+            onClick={() =>
+              setEcosystemMenuOpen((open) => !open)
+            }
+          >
+            <span className="hub-link__icon">E</span>
+
+            <span>
+              <small>Ecosistema</small>
+              <strong>ECCOMI HUB</strong>
+            </span>
+
+            <ChevronDown
+              className="ecosystem-switcher__chevron"
+              size={17}
+            />
+          </button>
+
+          {ecosystemMenuOpen ? (
+            <>
+              <button
+                type="button"
+                className="ecosystem-switcher__scrim"
+                aria-label="Chiudi selettore ecosistemi"
+                onClick={() => setEcosystemMenuOpen(false)}
+              />
+
+              <section
+                className="ecosystem-menu"
+                role="menu"
+                aria-label="Ecosistemi ECCOMI"
+              >
+                <header className="ecosystem-menu__header">
+                  <div>
+                    <span>ECCOMI ECOSYSTEM</span>
+                    <strong>Scegli un ecosistema</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label="Chiudi selettore"
+                    onClick={() => setEcosystemMenuOpen(false)}
+                  >
+                    <X size={17} />
+                  </button>
+                </header>
+
+                <div className="ecosystem-menu__summary">
+                  <div>
+                    <strong>6</strong>
+                    <span>Ecosistemi</span>
+                  </div>
+
+                  <div>
+                    <strong>3</strong>
+                    <span>Operativi</span>
+                  </div>
+
+                  <div>
+                    <strong>3</strong>
+                    <span>In sviluppo</span>
+                  </div>
+                </div>
+
+                <div className="ecosystem-menu__list">
+                  <a
+                    href="https://hub.eccomionline.com"
+                    className="ecosystem-menu__item"
+                    role="menuitem"
+                    onClick={() => setEcosystemMenuOpen(false)}
+                  >
+                    <span className="ecosystem-menu__icon ecosystem-menu__icon--hub">
+                      E
+                    </span>
+
+                    <span className="ecosystem-menu__copy">
+                      <strong>ECCOMI HUB</strong>
+                      <small>Regia dell'intero ecosistema</small>
+                    </span>
+
+                    <span className="ecosystem-menu__open">
+                      Apri
+                      <ArrowRight size={15} />
+                    </span>
+                  </a>
+
+                  <button
+                    type="button"
+                    className="ecosystem-menu__item ecosystem-menu__item--active"
+                    role="menuitem"
+                    onClick={() => setEcosystemMenuOpen(false)}
+                  >
+                    <span className="ecosystem-menu__icon ecosystem-menu__icon--noleggio">
+                      🚗
+                    </span>
+
+                    <span className="ecosystem-menu__copy">
+                      <strong>ECCOMI NOLEGGIO</strong>
+                      <small>Offerte, lead e pratiche NLT</small>
+                    </span>
+
+                    <span className="ecosystem-menu__badge ecosystem-menu__badge--active">
+                      Attivo
+                    </span>
+                  </button>
+
+                  <a
+                    href="https://eccomi-posta-backend.onrender.com/dashboard/pratiche"
+                    className="ecosystem-menu__item"
+                    role="menuitem"
+                    onClick={() => setEcosystemMenuOpen(false)}
+                  >
+                    <span className="ecosystem-menu__icon ecosystem-menu__icon--posta">
+                      📬
+                    </span>
+
+                    <span className="ecosystem-menu__copy">
+                      <strong>ECCOMI POSTA</strong>
+                      <small>Pratiche postali e lavorazioni</small>
+                    </span>
+
+                    <span className="ecosystem-menu__open">
+                      Apri
+                      <ArrowRight size={15} />
+                    </span>
+                  </a>
+
+                  <div
+                    className="ecosystem-menu__item ecosystem-menu__item--disabled"
+                    role="menuitem"
+                    aria-disabled="true"
+                  >
+                    <span className="ecosystem-menu__icon ecosystem-menu__icon--energia">
+                      ⚡
+                    </span>
+
+                    <span className="ecosystem-menu__copy">
+                      <strong>ECCOMI ENERGIA</strong>
+                      <small>Comparazione e gestione contratti</small>
+                    </span>
+
+                    <span className="ecosystem-menu__badge">
+                      In arrivo
+                    </span>
+                  </div>
+
+                  <div
+                    className="ecosystem-menu__item ecosystem-menu__item--disabled"
+                    role="menuitem"
+                    aria-disabled="true"
+                  >
+                    <span className="ecosystem-menu__icon ecosystem-menu__icon--spedizioni">
+                      📦
+                    </span>
+
+                    <span className="ecosystem-menu__copy">
+                      <strong>ECCOMI SPEDIZIONI</strong>
+                      <small>Ordini, ritiri e consegne</small>
+                    </span>
+
+                    <span className="ecosystem-menu__badge">
+                      In arrivo
+                    </span>
+                  </div>
+
+                  <div
+                    className="ecosystem-menu__item ecosystem-menu__item--disabled"
+                    role="menuitem"
+                    aria-disabled="true"
+                  >
+                    <span className="ecosystem-menu__icon ecosystem-menu__icon--book">
+                      📚
+                    </span>
+
+                    <span className="ecosystem-menu__copy">
+                      <strong>ECCOMI BOOK</strong>
+                      <small>Contenuti ed editoria digitale</small>
+                    </span>
+
+                    <span className="ecosystem-menu__badge">
+                      In arrivo
+                    </span>
+                  </div>
+                </div>
+
+                <footer className="ecosystem-menu__footer">
+                  <a
+                    href="https://hub.eccomionline.com"
+                    onClick={() => setEcosystemMenuOpen(false)}
+                  >
+                    <Plus size={16} />
+                    Nuovo ecosistema
+                    <span>Solo CEO</span>
+                  </a>
+                </footer>
+              </section>
+            </>
+          ) : null}
         </div>
 
         <nav
