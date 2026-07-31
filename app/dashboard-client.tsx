@@ -804,6 +804,7 @@ export default function Home() {
   });
   const [busyPromotionId, setBusyPromotionId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [authChecking, setAuthChecking] = useState(true);
   const [authRequired, setAuthRequired] = useState(false);
@@ -814,6 +815,17 @@ export default function Home() {
 
   const changeView = (view: ViewName) => { setActiveView(view); setMobileMenuOpen(false); };
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 4200); };
+
+  const handleCeoLogout = async () => {
+    try {
+      await fetch("/api/auth/ceo-logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } finally {
+      window.location.href = "/ceo";
+    }
+  };
   const openUploadWorkflow = () => {
     if (!ai.connected) {
       setAiOpen(true);
@@ -1287,6 +1299,70 @@ export default function Home() {
           })}
         </nav>
 
+        <nav
+          className="side-nav side-nav--tools"
+          aria-label="Strumenti"
+        >
+          <p className="side-nav__label">STRUMENTI</p>
+
+          <button
+            type="button"
+            className="side-nav__item"
+            onClick={() => {
+              setShopifyOpen(true);
+              setMobileMenuOpen(false);
+            }}
+          >
+            <Link2 size={19} />
+            <span>Shopify</span>
+            <i
+              className={`tool-status-dot ${
+                shopify.connected
+                  ? "tool-status-dot--online"
+                  : "tool-status-dot--warning"
+              }`}
+              aria-label={
+                shopify.connected
+                  ? "Shopify collegato"
+                  : "Shopify da configurare"
+              }
+            />
+          </button>
+
+          <button
+            type="button"
+            className="side-nav__item"
+            onClick={() => {
+              setAiOpen(true);
+              setMobileMenuOpen(false);
+            }}
+          >
+            <Sparkles size={19} />
+            <span>AI</span>
+            <i
+              className={`tool-status-dot ${
+                ai.connected
+                  ? "tool-status-dot--online"
+                  : "tool-status-dot--warning"
+              }`}
+              aria-label={
+                ai.connected
+                  ? "AI collegata"
+                  : "AI da configurare"
+              }
+            />
+          </button>
+
+          <a
+            href="/cestino"
+            className="side-nav__item side-nav__item--link"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <X size={19} />
+            <span>Cestino</span>
+          </a>
+        </nav>
+
         <div className="sidebar__governance">
           <ShieldCheck size={20} />
           <div>
@@ -1295,14 +1371,22 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="user-card">
+        <button
+          className="user-card user-card--button"
+          type="button"
+          onClick={() => {
+            setProfileMenuOpen(true);
+            setMobileMenuOpen(false);
+          }}
+          aria-label="Apri profilo e impostazioni"
+        >
           <span className="user-card__avatar">SD</span>
           <span className="user-card__copy">
             <strong>Salvatore Del Libano</strong>
             <small>CEO · Accesso completo</small>
           </span>
           <ChevronRight size={17} />
-        </div>
+        </button>
       </aside>
 
       {mobileMenuOpen && (
@@ -1336,26 +1420,133 @@ export default function Home() {
           </div>
 
           <div className="topbar__actions">
-            <a
-              className="site-editor-link"
-              href="https://chatgpt.com/sites"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Apri ChatGPT Sites per modificare ECCOMI NOLEGGIO"
-              title="Apri ChatGPT Sites"
-            >
-              <Pencil size={15} />
-              <span>Modifica sito</span>
-            </a>
-            <span className="live-pill"><i /> Sistema operativo</span>
+<span className="live-pill"><i /> Sistema operativo</span>
             <button className="icon-button notification-button" type="button" aria-label="Notifiche" onClick={() => setNotificationsOpen((open) => !open)}>
               <Bell size={20} />
               <i />
             </button>
-            <span className="topbar__avatar">SD</span>
+            <button
+              className="topbar__avatar topbar__avatar--button"
+              type="button"
+              aria-label="Apri profilo e impostazioni"
+              aria-expanded={profileMenuOpen}
+              onClick={() =>
+                setProfileMenuOpen((open) => !open)
+              }
+            >
+              SD
+            </button>
             {notificationsOpen ? <div className="notification-popover"><div><strong>Notifiche</strong><span>{pendingCount} da leggere</span></div><button type="button" onClick={() => { setNotificationsOpen(false); changeView("Promozioni"); }}><span className="notification-popover__icon"><Check size={15} /></span><p><strong>{pendingCount} offerte da approvare</strong><small>Pubblica soltanto il CEO</small></p></button><button type="button"><span className="notification-popover__icon notification-popover__icon--amber"><Clock3 size={15} /></span><p><strong>Controllo scadenze attivo</strong><small>Avviso automatico 24 ore prima</small></p></button></div> : null}
           </div>
         </header>
+
+        {profileMenuOpen ? (
+          <>
+            <button
+              className="profile-panel-scrim"
+              type="button"
+              aria-label="Chiudi profilo"
+              onClick={() => setProfileMenuOpen(false)}
+            />
+
+            <aside
+              className="profile-panel"
+              aria-label="Profilo e impostazioni"
+            >
+              <header className="profile-panel__header">
+                <div className="profile-panel__identity">
+                  <span className="profile-panel__avatar">SD</span>
+                  <div>
+                    <strong>Salvatore Del Libano</strong>
+                    <span>CEO · Accesso completo</span>
+                  </div>
+                </div>
+
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="Chiudi profilo"
+                  onClick={() => setProfileMenuOpen(false)}
+                >
+                  <X size={20} />
+                </button>
+              </header>
+
+              <div className="profile-panel__section">
+                <span className="profile-panel__label">
+                  ACCOUNT
+                </span>
+
+                <button
+                  type="button"
+                  className="profile-panel__item"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    notify(
+                      "Profilo CEO attivo: Salvatore Del Libano."
+                    );
+                  }}
+                >
+                  <UserRound size={19} />
+                  <span>
+                    <strong>Il mio profilo</strong>
+                    <small>Dati e ruolo del tuo account</small>
+                  </span>
+                  <ChevronRight size={17} />
+                </button>
+
+                <button
+                  type="button"
+                  className="profile-panel__item"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    notify(
+                      "Sessione CEO protetta tramite cookie HttpOnly."
+                    );
+                  }}
+                >
+                  <ShieldCheck size={19} />
+                  <span>
+                    <strong>Sicurezza</strong>
+                    <small>Governance e accesso protetto</small>
+                  </span>
+                  <ChevronRight size={17} />
+                </button>
+              </div>
+
+              <div className="profile-panel__section">
+                <span className="profile-panel__label">
+                  ECOSISTEMA
+                </span>
+
+                <a
+                  className="profile-panel__item"
+                  href="https://hub.eccomionline.com"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Building2 size={19} />
+                  <span>
+                    <strong>Vai a ECCOMI HUB</strong>
+                    <small>Torna alla cabina di regia</small>
+                  </span>
+                  <ChevronRight size={17} />
+                </a>
+              </div>
+
+              <div className="profile-panel__footer">
+                <button
+                  type="button"
+                  className="profile-panel__logout"
+                  onClick={handleCeoLogout}
+                >
+                  <KeyRound size={18} />
+                  Esci dal gestionale
+                </button>
+              </div>
+            </aside>
+          </>
+        ) : null}
 
         {activeView === "Dashboard" ? <div className="dashboard">
           <div className="page-heading">

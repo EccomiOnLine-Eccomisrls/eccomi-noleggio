@@ -2962,3 +2962,239 @@ button {
   .public-success > div { min-width: min(280px, 100%); }
   .public-request-footer { width: calc(100% - 20px); grid-template-columns: 1fr; padding-bottom: 20px; }
 }
+
+
+/* ECCOMI SIDEBAR TOOLS & PROFILE PANEL */
+
+.side-nav--tools {
+  margin-top: 14px;
+  padding-top: 17px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.side-nav__item--link {
+  text-decoration: none;
+}
+
+.tool-status-dot {
+  width: 9px;
+  height: 9px;
+  margin-left: auto;
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+.tool-status-dot--online {
+  background: #22c55e;
+}
+
+.tool-status-dot--warning {
+  background: #f59e0b;
+}
+
+.user-card--button {
+  width: 100%;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.user-card--button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.topbar__avatar--button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.topbar__avatar--button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(7, 63, 115, 0.16);
+}
+
+.profile-panel-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1090;
+  border: 0;
+  background: rgba(5, 18, 35, 0.38);
+  backdrop-filter: blur(3px);
+  cursor: default;
+}
+
+.profile-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  width: min(390px, calc(100vw - 18px));
+  height: 100vh;
+  padding: 22px;
+  overflow-y: auto;
+  background: #ffffff;
+  box-shadow: -24px 0 70px rgba(7, 31, 57, 0.22);
+  animation: eccomi-profile-enter 180ms ease-out;
+}
+
+@keyframes eccomi-profile-enter {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.profile-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #e5edf5;
+}
+
+.profile-panel__identity {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+
+.profile-panel__avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #073f73, #2563eb);
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.24);
+}
+
+.profile-panel__identity div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-panel__identity strong {
+  overflow: hidden;
+  color: #102033;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-panel__identity span {
+  color: #728095;
+  font-size: 13px;
+}
+
+.profile-panel__section {
+  display: grid;
+  gap: 8px;
+  padding: 22px 0;
+  border-bottom: 1px solid #e5edf5;
+}
+
+.profile-panel__label {
+  margin-bottom: 3px;
+  color: #8492a6;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.profile-panel__item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 65px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 11px 12px;
+  color: #073f73;
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.profile-panel__item:hover {
+  transform: translateY(-1px);
+  border-color: #dce6f1;
+  background: #f5f9fd;
+}
+
+.profile-panel__item > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.profile-panel__item strong {
+  color: #102033;
+  font-size: 14px;
+}
+
+.profile-panel__item small {
+  color: #77869a;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.profile-panel__footer {
+  margin-top: auto;
+  padding-top: 22px;
+}
+
+.profile-panel__logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 47px;
+  border: 1px solid #fecdd3;
+  border-radius: 13px;
+  padding: 11px 16px;
+  color: #b42318;
+  background: #fff1f2;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.profile-panel__logout:hover {
+  background: #ffe4e6;
+}
+
+@media (max-width: 760px) {
+  .profile-panel {
+    width: min(360px, calc(100vw - 10px));
+    padding: 18px;
+  }
+}
