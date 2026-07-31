@@ -420,6 +420,164 @@ export default function PracticeManagementControls() {
           white-space: pre-wrap;
         }
 
+        .practice-status-badge {
+          box-shadow: 0 5px 14px rgba(7, 90, 158, 0.12);
+        }
+
+        .practice-status-badge::before {
+          content: "";
+          width: 8px;
+          height: 8px;
+          margin-right: 8px;
+          border-radius: 50%;
+          background: currentColor;
+          box-shadow: 0 0 0 4px rgba(7, 90, 158, 0.09);
+        }
+
+        .practice-operational-meta > div {
+          transition:
+            transform 160ms ease,
+            box-shadow 160ms ease;
+        }
+
+        .practice-operational-meta > div:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(20, 65, 100, 0.09);
+        }
+
+        .practice-main-action {
+          box-shadow: 0 9px 20px rgba(8, 105, 174, 0.22);
+          transition:
+            transform 160ms ease,
+            box-shadow 160ms ease;
+        }
+
+        .practice-main-action:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 12px 25px rgba(8, 105, 174, 0.28);
+        }
+
+        .practice-partner-accordion {
+          margin-bottom: 18px;
+          overflow: hidden;
+          border: 1px solid #d9e5ef;
+          border-radius: 16px;
+          background: #ffffff;
+          box-shadow: 0 8px 24px rgba(18, 58, 92, 0.06);
+        }
+
+        .practice-partner-summary {
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          gap: 12px;
+          align-items: center;
+          min-height: 66px;
+          padding: 14px 16px;
+          color: #153b5c;
+          background: linear-gradient(135deg, #ffffff, #edf7ff);
+          cursor: pointer;
+          list-style: none;
+        }
+
+        .practice-partner-summary::-webkit-details-marker {
+          display: none;
+        }
+
+        .practice-partner-summary:hover {
+          background: #e9f5fe;
+        }
+
+        .practice-partner-icon {
+          display: grid;
+          place-items: center;
+          width: 38px;
+          height: 38px;
+          border-radius: 11px;
+          background: #dff1ff;
+          font-size: 17px;
+        }
+
+        .practice-partner-summary-copy {
+          font-size: 14px;
+          font-weight: 800;
+        }
+
+        .practice-partner-summary-copy::after {
+          content: "Email, messaggio e documentazione";
+          display: block;
+          margin-top: 3px;
+          color: #718398;
+          font-size: 10px;
+          font-weight: 500;
+        }
+
+        .practice-partner-arrow {
+          color: #247ab7;
+          font-size: 21px;
+          font-weight: 900;
+          transition: transform 160ms ease;
+        }
+
+        .practice-partner-accordion[open]
+        .practice-partner-arrow {
+          transform: rotate(180deg);
+        }
+
+        .practice-partner-accordion
+        .practice-forwarding {
+          margin: 0;
+          border: 0;
+          border-top: 1px solid #dfeaf3;
+          border-radius: 0;
+          box-shadow: none;
+        }
+
+        .practice-timeline > div {
+          padding-left: 46px;
+          transition:
+            transform 160ms ease,
+            box-shadow 160ms ease;
+        }
+
+        .practice-timeline > div:hover {
+          transform: translateX(2px);
+          box-shadow: 0 8px 20px rgba(20, 63, 98, 0.08);
+        }
+
+        .practice-timeline > div::before {
+          content: attr(data-timeline-icon);
+          left: -27px;
+          top: 10px;
+          display: grid;
+          place-items: center;
+          width: 30px;
+          height: 30px;
+          border: 0;
+          border-radius: 50%;
+          background: #eef7ff;
+          font-size: 14px;
+          box-shadow: 0 0 0 4px #ffffff;
+        }
+
+        .practice-timeline > div::after {
+          content: "";
+          position: absolute;
+          left: 13px;
+          top: 24px;
+          width: 20px;
+          height: 1px;
+          background: #d8e5ef;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .practice-main-action,
+          .practice-operational-meta > div,
+          .practice-timeline > div,
+          .practice-partner-arrow {
+            transition: none;
+          }
+        }
+
         @media (max-width: 540px) {
           .practice-operational-meta {
             grid-template-columns: 1fr;
@@ -907,8 +1065,37 @@ export default function PracticeManagementControls() {
       );
 
       if (payload.actor.role === "CEO") {
-        const forwarding = element("section", "practice-block practice-forwarding");
-        forwarding.append(element("h3", "", "Inoltra al partner da ECCOMI"));
+        const forwardingDetails = element(
+          "details",
+          "practice-partner-accordion",
+        ) as HTMLDetailsElement;
+
+        forwardingDetails.open = [
+          "ECCOMI_REVIEW",
+          "NEEDS_INFO",
+          "SENT_TO_PARTNER",
+          "PARTNER_REVIEW",
+        ].includes(practice.status);
+
+        const forwardingSummary = element(
+          "summary",
+          "practice-partner-summary",
+        );
+
+        forwardingSummary.append(
+          element("span", "practice-partner-icon", "📤"),
+          element(
+            "span",
+            "practice-partner-summary-copy",
+            "Inoltra al partner da ECCOMI",
+          ),
+          element("span", "practice-partner-arrow", "⌄"),
+        );
+
+        const forwarding = element(
+          "section",
+          "practice-block practice-forwarding",
+        );
         const email = element("input") as HTMLInputElement;
         email.type = "email";
         email.placeholder = "Email partner";
@@ -942,8 +1129,27 @@ export default function PracticeManagementControls() {
             send.removeAttribute("disabled");
           }
         }, true);
-        forwarding.append(email, subject, message, saveRow, send, feedback);
-        content.append(summary, offer, documents, actions, forwarding);
+        forwarding.append(
+          email,
+          subject,
+          message,
+          saveRow,
+          send,
+          feedback,
+        );
+
+        forwardingDetails.append(
+          forwardingSummary,
+          forwarding,
+        );
+
+        content.append(
+          summary,
+          offer,
+          documents,
+          actions,
+          forwardingDetails,
+        );
       } else {
         content.append(summary, offer, documents, actions);
       }
@@ -976,6 +1182,22 @@ export default function PracticeManagementControls() {
 
       practice.timeline.forEach((event) => {
         const item = element("div");
+
+        const timelineIcons: Record<string, string> = {
+          PRACTICE_CREATED_WITH_DOCUMENTS: "📥",
+          PRACTICE_NOTE: "💬",
+          PRACTICE_STATUS_ECCOMI_REVIEW: "🔵",
+          PRACTICE_STATUS_NEEDS_INFO: "⚠️",
+          PRACTICE_STATUS_SENT_TO_PARTNER: "📤",
+          PRACTICE_STATUS_PARTNER_REVIEW: "🤝",
+          PRACTICE_STATUS_QUOTE: "🧾",
+          PRACTICE_STATUS_CONTRACT: "✍️",
+          PRACTICE_STATUS_DELIVERED: "🚗",
+          PRACTICE_STATUS_ARCHIVED: "✅",
+        };
+
+        item.dataset.timelineIcon =
+          timelineIcons[event.action] || "•";
 
         let details: {
           note?: string;
