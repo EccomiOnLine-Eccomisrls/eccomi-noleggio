@@ -2909,6 +2909,277 @@ export default function Home() {
             </footer>
           </section>
 
+          <section
+            className="ceo-daily-plan"
+            aria-labelledby="ceo-daily-plan-title"
+          >
+            <div className="ceo-daily-plan__intro">
+              <span className="ceo-daily-plan__avatar">
+                <Sparkles size={24} />
+              </span>
+
+              <div>
+                <span className="section-kicker">
+                  ECCOMI ASSISTENTE OPERATIVO
+                </span>
+
+                <h2 id="ceo-daily-plan-title">
+                  Le priorità della giornata
+                </h2>
+
+                <p>
+                  Indicazioni generate automaticamente dalla
+                  situazione reale di offerte, pratiche e sistemi.
+                </p>
+              </div>
+
+              <span
+                className={`ceo-daily-plan__system ${
+                  shopify.connected && ai.connected
+                    ? "ceo-daily-plan__system--online"
+                    : "ceo-daily-plan__system--attention"
+                }`}
+              >
+                <i />
+                {shopify.connected && ai.connected
+                  ? "Sistemi operativi"
+                  : "Configurazione da verificare"}
+              </span>
+            </div>
+
+            <div className="ceo-daily-plan__items">
+              {promotionItems.filter(
+                (promotion) =>
+                  promotion.status === "PENDING_APPROVAL" ||
+                  promotion.status === "EXPIRING",
+              ).length > 0 ? (
+                <button
+                  type="button"
+                  className="ceo-daily-task ceo-daily-task--urgent"
+                  onClick={() => {
+                    setActiveView("Promozioni");
+                    setExpandedSidebarSection(null);
+                  }}
+                >
+                  <span className="ceo-daily-task__priority">
+                    1
+                  </span>
+
+                  <span className="ceo-daily-task__icon">
+                    <AlertTriangle size={20} />
+                  </span>
+
+                  <span className="ceo-daily-task__copy">
+                    <strong>
+                      Controlla{" "}
+                      {
+                        promotionItems.filter(
+                          (promotion) =>
+                            promotion.status ===
+                              "PENDING_APPROVAL" ||
+                            promotion.status === "EXPIRING",
+                        ).length
+                      }{" "}
+                      {promotionItems.filter(
+                        (promotion) =>
+                          promotion.status ===
+                            "PENDING_APPROVAL" ||
+                          promotion.status === "EXPIRING",
+                      ).length === 1
+                        ? "offerta"
+                        : "offerte"}
+                    </strong>
+
+                    <small>
+                      Approvazioni e scadenze richiedono una
+                      decisione del CEO.
+                    </small>
+                  </span>
+
+                  <span className="ceo-daily-task__action">
+                    Apri
+                    <ArrowRight size={17} />
+                  </span>
+                </button>
+              ) : null}
+
+              {leadItems.filter(
+                (lead) =>
+                  lead.status === "NEW" ||
+                  lead.status === "NEEDS_INFO" ||
+                  lead.status === "ECCOMI_REVIEW",
+              ).length > 0 ? (
+                <button
+                  type="button"
+                  className="ceo-daily-task ceo-daily-task--attention"
+                  onClick={() => {
+                    setActiveView("Lead e pratiche");
+                    setExpandedSidebarSection(null);
+                  }}
+                >
+                  <span className="ceo-daily-task__priority">
+                    2
+                  </span>
+
+                  <span className="ceo-daily-task__icon">
+                    <UsersRound size={20} />
+                  </span>
+
+                  <span className="ceo-daily-task__copy">
+                    <strong>
+                      Verifica{" "}
+                      {
+                        leadItems.filter(
+                          (lead) =>
+                            lead.status === "NEW" ||
+                            lead.status === "NEEDS_INFO" ||
+                            lead.status === "ECCOMI_REVIEW",
+                        ).length
+                      }{" "}
+                      {leadItems.filter(
+                        (lead) =>
+                          lead.status === "NEW" ||
+                          lead.status === "NEEDS_INFO" ||
+                          lead.status === "ECCOMI_REVIEW",
+                      ).length === 1
+                        ? "pratica"
+                        : "pratiche"}
+                    </strong>
+
+                    <small>
+                      Nuove richieste o integrazioni aspettano
+                      lavorazione.
+                    </small>
+                  </span>
+
+                  <span className="ceo-daily-task__action">
+                    Gestisci
+                    <ArrowRight size={17} />
+                  </span>
+                </button>
+              ) : null}
+
+              {!shopify.connected ? (
+                <button
+                  type="button"
+                  className="ceo-daily-task ceo-daily-task--system"
+                  onClick={() => {
+                    setExpandedSidebarSection("shopify");
+                    setShopifyOpen(true);
+                  }}
+                >
+                  <span className="ceo-daily-task__priority">
+                    !
+                  </span>
+
+                  <span className="ceo-daily-task__icon">
+                    <Link2 size={20} />
+                  </span>
+
+                  <span className="ceo-daily-task__copy">
+                    <strong>
+                      Completa il collegamento Shopify
+                    </strong>
+
+                    <small>
+                      Serve per preparare e pubblicare le offerte
+                      nella vetrina.
+                    </small>
+                  </span>
+
+                  <span className="ceo-daily-task__action">
+                    Configura
+                    <ArrowRight size={17} />
+                  </span>
+                </button>
+              ) : null}
+
+              {!ai.connected ? (
+                <button
+                  type="button"
+                  className="ceo-daily-task ceo-daily-task--ai"
+                  onClick={() => {
+                    setExpandedSidebarSection("ai");
+                    setAiOpen(true);
+                  }}
+                >
+                  <span className="ceo-daily-task__priority">
+                    !
+                  </span>
+
+                  <span className="ceo-daily-task__icon">
+                    <Sparkles size={20} />
+                  </span>
+
+                  <span className="ceo-daily-task__copy">
+                    <strong>
+                      Attiva il motore ECCOMI AI
+                    </strong>
+
+                    <small>
+                      Necessario per estrazione PDF e creazione
+                      automatica dei contenuti.
+                    </small>
+                  </span>
+
+                  <span className="ceo-daily-task__action">
+                    Configura
+                    <ArrowRight size={17} />
+                  </span>
+                </button>
+              ) : null}
+
+              {promotionItems.filter(
+                (promotion) =>
+                  promotion.status === "PENDING_APPROVAL" ||
+                  promotion.status === "EXPIRING",
+              ).length === 0 &&
+              leadItems.filter(
+                (lead) =>
+                  lead.status === "NEW" ||
+                  lead.status === "NEEDS_INFO" ||
+                  lead.status === "ECCOMI_REVIEW",
+              ).length === 0 &&
+              shopify.connected &&
+              ai.connected ? (
+                <div className="ceo-daily-plan__clear">
+                  <span>
+                    <Check size={22} />
+                  </span>
+
+                  <div>
+                    <strong>
+                      Nessuna criticità immediata
+                    </strong>
+
+                    <p>
+                      Le offerte, le pratiche e le integrazioni
+                      risultano sotto controllo.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <footer className="ceo-daily-plan__footer">
+              <span>
+                <ShieldCheck size={16} />
+                Analisi basata sui dati operativi correnti
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCommandQuery("");
+                  setCommandCenterOpen(true);
+                }}
+              >
+                Apri Command Center
+                <ArrowRight size={16} />
+              </button>
+            </footer>
+          </section>
+
           <section className="kpi-grid" aria-label="Indicatori principali">
             <article className="kpi-card">
               <span className="kpi-card__icon kpi-card__icon--blue"><CarFront size={20} /></span>
