@@ -104,7 +104,7 @@ export const leads = pgTable("leads", {
   deletedAt: text("deleted_at"),
   deletedBy: text("deleted_by"),
   deleteReason: text("delete_reason"),
-  assignedAt: text("assigned_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  assignedAt: text("assigned_at"),
   completedAt: text("completed_at"),
   sentToPartnerAt: text("sent_to_partner_at"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
