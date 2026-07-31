@@ -11,6 +11,7 @@ import {
   CalendarDays,
   CarFront,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleGauge,
   Clock3,
@@ -805,6 +806,9 @@ export default function Home() {
   const [busyPromotionId, setBusyPromotionId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [expandedSidebarSection, setExpandedSidebarSection] = useState<
+    "partner" | "shopify" | "ai" | null
+  >(null);
   const [toast, setToast] = useState("");
   const [authChecking, setAuthChecking] = useState(true);
   const [authRequired, setAuthRequired] = useState(false);
@@ -1280,20 +1284,163 @@ export default function Home() {
           <ChevronRight size={17} />
         </div>
 
-        <nav className="side-nav" aria-label="Navigazione principale">
+        <nav
+          className="side-nav"
+          aria-label="Navigazione principale"
+        >
           <p className="side-nav__label">AREA OPERATIVA</p>
+
           {navigation.map((item) => {
             const Icon = item.icon;
+            const isPartner = item.label === "Partner";
+            const isActive = activeView === item.label;
+            const isPartnerExpanded =
+              expandedSidebarSection === "partner";
+
+            if (isPartner) {
+              return (
+                <div
+                  className={`smart-nav-group ${
+                    isPartnerExpanded
+                      ? "smart-nav-group--open"
+                      : ""
+                  }`}
+                  key={item.label}
+                >
+                  <button
+                    type="button"
+                    className={`side-nav__item smart-nav-trigger ${
+                      isActive ? "side-nav__item--active" : ""
+                    }`}
+                    aria-expanded={isPartnerExpanded}
+                    onClick={() => {
+                      setExpandedSidebarSection(
+                        isPartnerExpanded ? null : "partner",
+                      );
+                    }}
+                  >
+                    <Icon size={19} />
+                    <span>{item.label}</span>
+
+                    {item.count ? (
+                      <small className="side-nav__count">
+                        {item.count}
+                      </small>
+                    ) : null}
+
+                    <ChevronDown
+                      className="smart-nav-trigger__chevron"
+                      size={16}
+                    />
+                  </button>
+
+                  {isPartnerExpanded ? (
+                    <div
+                      className="smart-subnav"
+                      aria-label="Navigazione Partner"
+                    >
+                      <button
+                        type="button"
+                        className={
+                          isActive
+                            ? "smart-subnav__item smart-subnav__item--active"
+                            : "smart-subnav__item"
+                        }
+                        onClick={() => {
+                          setActiveView("Partner");
+                          setMobileMenuOpen(false);
+                        }}
+                      >
+                        Dashboard Partner
+                      </button>
+
+                      <button
+                        type="button"
+                        className="smart-subnav__item"
+                        onClick={() => {
+                          setActiveView("Partner");
+                          setMobileMenuOpen(false);
+                        }}
+                      >
+                        Elenco partner
+                      </button>
+
+                      <button
+                        type="button"
+                        className="smart-subnav__item"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          notify(
+                            "La funzione Nuovo partner sarà collegata alla schermata Partner.",
+                          );
+                        }}
+                      >
+                        Nuovo partner
+                      </button>
+
+                      <button
+                        type="button"
+                        className="smart-subnav__item"
+                        onClick={() => {
+                          setActiveView("Commissioni");
+                          setMobileMenuOpen(false);
+                        }}
+                      >
+                        Commissioni
+                      </button>
+
+                      <button
+                        type="button"
+                        className="smart-subnav__item"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          notify(
+                            "L'archivio documenti Partner sarà disponibile nella sezione Partner.",
+                          );
+                        }}
+                      >
+                        Documenti
+                      </button>
+
+                      <button
+                        type="button"
+                        className="smart-subnav__item"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          notify(
+                            "Le impostazioni saranno gestite direttamente nella scheda Partner.",
+                          );
+                        }}
+                      >
+                        Impostazioni partner
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            }
+
             return (
               <button
                 key={item.label}
                 type="button"
-                className={`side-nav__item ${activeView === item.label ? "side-nav__item--active" : ""}`}
-                onClick={() => changeView(item.label)}
+                className={`side-nav__item ${
+                  isActive ? "side-nav__item--active" : ""
+                }`}
+                onClick={() => {
+                  setActiveView(item.label);
+                  setExpandedSidebarSection(null);
+                  setMobileMenuOpen(false);
+                }}
               >
                 <Icon size={19} />
                 <span>{item.label}</span>
-                {item.label === "Promozioni" ? <em>{promotionItems.length}</em> : item.label === "Lead e pratiche" && leadItems.length ? <em>{leadItems.length}</em> : item.count ? <em>{item.count}</em> : null}
+
+                {item.count ? (
+                  <small className="side-nav__count">
+                    {item.count}
+                  </small>
+                ) : null}
               </button>
             );
           })}
@@ -1305,53 +1452,227 @@ export default function Home() {
         >
           <p className="side-nav__label">STRUMENTI</p>
 
-          <button
-            type="button"
-            className="side-nav__item"
-            onClick={() => {
-              setShopifyOpen(true);
-              setMobileMenuOpen(false);
-            }}
+          <div
+            className={`smart-nav-group ${
+              expandedSidebarSection === "shopify"
+                ? "smart-nav-group--open"
+                : ""
+            }`}
           >
-            <Link2 size={19} />
-            <span>Shopify</span>
-            <i
-              className={`tool-status-dot ${
-                shopify.connected
-                  ? "tool-status-dot--online"
-                  : "tool-status-dot--warning"
-              }`}
-              aria-label={
-                shopify.connected
-                  ? "Shopify collegato"
-                  : "Shopify da configurare"
+            <button
+              type="button"
+              className="side-nav__item smart-nav-trigger"
+              aria-expanded={
+                expandedSidebarSection === "shopify"
               }
-            />
-          </button>
+              onClick={() => {
+                setExpandedSidebarSection(
+                  expandedSidebarSection === "shopify"
+                    ? null
+                    : "shopify",
+                );
+              }}
+            >
+              <Link2 size={19} />
+              <span>Shopify</span>
 
-          <button
-            type="button"
-            className="side-nav__item"
-            onClick={() => {
-              setAiOpen(true);
-              setMobileMenuOpen(false);
-            }}
+              <i
+                className={`tool-status-dot ${
+                  shopify.connected
+                    ? "tool-status-dot--online"
+                    : "tool-status-dot--warning"
+                }`}
+              />
+
+              <ChevronDown
+                className="smart-nav-trigger__chevron"
+                size={16}
+              />
+            </button>
+
+            {expandedSidebarSection === "shopify" ? (
+              <div
+                className="smart-subnav"
+                aria-label="Navigazione Shopify"
+              >
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setShopifyOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Dashboard Shopify
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setActiveView("Promozioni");
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Prodotti
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setActiveView("Promozioni");
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Pubblicazioni
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setShopifyOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Collezioni
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setShopifyOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Log e sincronizzazione
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setShopifyOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Configurazione
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div
+            className={`smart-nav-group ${
+              expandedSidebarSection === "ai"
+                ? "smart-nav-group--open"
+                : ""
+            }`}
           >
-            <Sparkles size={19} />
-            <span>AI</span>
-            <i
-              className={`tool-status-dot ${
-                ai.connected
-                  ? "tool-status-dot--online"
-                  : "tool-status-dot--warning"
-              }`}
-              aria-label={
-                ai.connected
-                  ? "AI collegata"
-                  : "AI da configurare"
-              }
-            />
-          </button>
+            <button
+              type="button"
+              className="side-nav__item smart-nav-trigger"
+              aria-expanded={expandedSidebarSection === "ai"}
+              onClick={() => {
+                setExpandedSidebarSection(
+                  expandedSidebarSection === "ai"
+                    ? null
+                    : "ai",
+                );
+              }}
+            >
+              <Sparkles size={19} />
+              <span>AI</span>
+
+              <i
+                className={`tool-status-dot ${
+                  ai.connected
+                    ? "tool-status-dot--online"
+                    : "tool-status-dot--warning"
+                }`}
+              />
+
+              <ChevronDown
+                className="smart-nav-trigger__chevron"
+                size={16}
+              />
+            </button>
+
+            {expandedSidebarSection === "ai" ? (
+              <div
+                className="smart-subnav"
+                aria-label="Navigazione AI"
+              >
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setAiOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Dashboard AI
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setAiOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Prompt
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setAiOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Cronologia
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setAiOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Utilizzo
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setAiOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Test AI
+                </button>
+
+                <button
+                  type="button"
+                  className="smart-subnav__item"
+                  onClick={() => {
+                    setAiOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Configurazione
+                </button>
+              </div>
+            ) : null}
+          </div>
 
           <a
             href="/cestino"
