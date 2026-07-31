@@ -49,6 +49,7 @@ export async function POST(
       status?: unknown;
       note?: unknown;
       priority?: unknown;
+      assignedTo?: unknown;
     };
 
     const nextStatus =
@@ -64,6 +65,14 @@ export async function POST(
     const requestedPriority =
       typeof body.priority === "string"
         ? body.priority.trim().toUpperCase()
+        : "";
+
+    const hasAssignmentRequest =
+      Object.prototype.hasOwnProperty.call(body, "assignedTo");
+
+    const requestedAssignedTo =
+      typeof body.assignedTo === "string"
+        ? body.assignedTo.trim().slice(0, 160)
         : "";
 
     const db = getDb();
@@ -89,6 +98,75 @@ export async function POST(
         { error: "Pratica non autorizzata." },
         { status: 403 },
       );
+    }
+
+    /*
+     * ASSEGNAZIONE RESPONSABILE
+     */
+    if (hasAssignmentRequest) {
+      if (actor.role !== "CEO") {
+        return Response.json(
+          { error: "Solo il CEO può assegnare una pratica." },
+          { status: 403 },
+        );
+      }
+
+      const previousAssignedTo =
+        practice.assignedTo || null;
+
+      const nextAssignedTo =
+        requestedAssignedTo || null;
+
+      const now = new Date().toISOString();
+
+      await db
+        .update(leads)
+        .set({
+          assignedTo: nextAssignedTo,
+          assignedAt: nextAssignedTo ? now : null,
+          updatedAt: now,
+        })
+        .where(eq(leads.id, id));
+
+      await db.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        actorEmail: actor.email,
+        action: nextAssignedTo
+          ? "PRACTICE_ASSIGNED"
+          : "PRACTICE_UNASSIGNED",
+        entityType: "lead",
+        entityId: id,
+        payloadJson: JSON.stringify({
+          from: previousAssignedTo,
+          to: nextAssignedTo,
+          actorRole: actor.role,
+        }),
+      });
+
+      await db.insert(hubEvents).values({
+        id: crypto.randomUUID(),
+        eventType: nextAssignedTo
+          ? "NOLEGGIO_PRACTICE_ASSIGNED"
+          : "NOLEGGIO_PRACTICE_UNASSIGNED",
+        ecosystem: "ECCOMI_NOLEGGIO",
+        entityType: "lead",
+        entityId: id,
+        title: nextAssignedTo
+          ? `${id} · assegnata a ${nextAssignedTo}`
+          : `${id} · assegnazione rimossa`,
+        payloadJson: JSON.stringify({
+          from: previousAssignedTo,
+          to: nextAssignedTo,
+          actorRole: actor.role,
+        }),
+        actorEmail: actor.email,
+      });
+
+      return Response.json({
+        ok: true,
+        assignedTo: nextAssignedTo,
+        assignedAt: nextAssignedTo ? now : null,
+      });
     }
 
     /*

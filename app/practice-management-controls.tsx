@@ -33,6 +33,7 @@ type PracticePayload = {
     createdAt: string;
     updatedAt: string;
     assignedAt: string | null;
+    assignedTo: string | null;
     completedAt: string | null;
     sentToPartnerAt: string | null;
     promotion: {
@@ -279,6 +280,93 @@ export default function PracticeManagementControls() {
           color: #526a7d;
           font-size: 12px;
           text-align: right;
+        }
+
+        .practice-assignment-control {
+          display: grid;
+          gap: 9px;
+          padding: 12px 14px;
+          border: 1px solid #d9e7f4;
+          border-radius: 13px;
+          background: rgba(255, 255, 255, 0.8);
+        }
+
+        .practice-assignment-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .practice-assignment-copy {
+          display: grid;
+          gap: 2px;
+        }
+
+        .practice-assignment-copy small {
+          color: #5f7183;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .practice-assignment-copy strong {
+          color: #18344c;
+          font-size: 14px;
+        }
+
+        .practice-assignment-form {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto auto;
+          gap: 8px;
+        }
+
+        .practice-assignment-input {
+          min-width: 0;
+          min-height: 40px;
+          padding: 8px 12px;
+          border: 1px solid #bed3e5;
+          border-radius: 10px;
+          background: #ffffff;
+          color: #17344c;
+          font: inherit;
+          font-size: 13px;
+        }
+
+        .practice-assignment-button {
+          min-height: 40px;
+          padding: 8px 14px;
+          border: 0;
+          border-radius: 10px;
+          background: #075a9e;
+          color: #ffffff;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .practice-assignment-button--remove {
+          color: #8f2424;
+          background: #feecec;
+        }
+
+        .practice-assignment-button:disabled {
+          cursor: wait;
+          opacity: 0.65;
+        }
+
+        .practice-assignment-feedback {
+          min-height: 18px;
+          color: #526a7d;
+          font-size: 12px;
+        }
+
+        @media (max-width: 640px) {
+          .practice-assignment-form {
+            grid-template-columns: 1fr;
+          }
         }
 
         .practice-operational-meta {
@@ -972,6 +1060,204 @@ export default function PracticeManagementControls() {
         prioritySide,
       );
 
+      const assignmentControl = element(
+        "div",
+        "practice-assignment-control",
+      );
+
+      const assignmentHeader = element(
+        "div",
+        "practice-assignment-header",
+      );
+
+      const assignmentCopy = element(
+        "div",
+        "practice-assignment-copy",
+      );
+
+      assignmentCopy.append(
+        element("small", "", "Responsabile pratica"),
+        element(
+          "strong",
+          "",
+          practice.assignedTo || "Non assegnata",
+        ),
+      );
+
+      assignmentHeader.append(
+        element("span", "", "👤"),
+        assignmentCopy,
+      );
+
+      assignmentControl.append(assignmentHeader);
+
+      if (payload.actor.role === "CEO") {
+        const assignmentForm = element(
+          "div",
+          "practice-assignment-form",
+        );
+
+        const assignmentInput = element(
+          "input",
+          "practice-assignment-input",
+        ) as HTMLInputElement;
+
+        assignmentInput.type = "text";
+        assignmentInput.maxLength = 160;
+        assignmentInput.placeholder =
+          "Nome o email del responsabile";
+        assignmentInput.value =
+          practice.assignedTo || "";
+
+        const assignmentFeedback = element(
+          "div",
+          "practice-assignment-feedback",
+        );
+
+        const saveAssignment = element(
+          "button",
+          "practice-assignment-button",
+          "Assegna",
+        ) as HTMLButtonElement;
+
+        saveAssignment.type = "button";
+
+        const removeAssignment = element(
+          "button",
+          "practice-assignment-button practice-assignment-button--remove",
+          "Rimuovi",
+        ) as HTMLButtonElement;
+
+        removeAssignment.type = "button";
+        removeAssignment.hidden = !practice.assignedTo;
+
+        const updateAssignment = async (
+          assignedTo: string,
+        ) => {
+          saveAssignment.disabled = true;
+          removeAssignment.disabled = true;
+          assignmentInput.disabled = true;
+          assignmentFeedback.textContent =
+            "Aggiornamento assegnazione…";
+
+          try {
+            const response = await fetch(
+              `/api/practices/${encodeURIComponent(practice.id)}/action`,
+              {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                  assignedTo,
+                }),
+              },
+            );
+
+            const result = await response
+              .json()
+              .catch(() => ({}));
+
+            if (!response.ok) {
+              throw new Error(
+                result.error
+                  || "Assegnazione non riuscita.",
+              );
+            }
+
+            practice.assignedTo =
+              result.assignedTo || null;
+            practice.assignedAt =
+              result.assignedAt || null;
+
+            assignmentInput.value =
+              practice.assignedTo || "";
+
+            const assignedLabel =
+              assignmentCopy.querySelector("strong");
+
+            if (assignedLabel) {
+              assignedLabel.textContent =
+                practice.assignedTo
+                  || "Non assegnata";
+            }
+
+            removeAssignment.hidden =
+              !practice.assignedTo;
+
+            assignmentFeedback.textContent =
+              practice.assignedTo
+                ? `Pratica assegnata a ${practice.assignedTo}`
+                : "Assegnazione rimossa";
+
+            window.setTimeout(() => {
+              assignmentFeedback.textContent = "";
+            }, 2200);
+          } catch (error) {
+            assignmentFeedback.textContent =
+              error instanceof Error
+                ? error.message
+                : "Assegnazione non riuscita.";
+          } finally {
+            saveAssignment.disabled = false;
+            removeAssignment.disabled = false;
+            assignmentInput.disabled = false;
+          }
+        };
+
+        saveAssignment.addEventListener(
+          "click",
+          async () => {
+            const assignedTo =
+              assignmentInput.value.trim();
+
+            if (!assignedTo) {
+              assignmentFeedback.textContent =
+                "Inserisci il responsabile.";
+              assignmentInput.focus();
+              return;
+            }
+
+            await updateAssignment(assignedTo);
+          },
+        );
+
+        assignmentInput.addEventListener(
+          "keydown",
+          async (event) => {
+            if (event.key !== "Enter") return;
+
+            event.preventDefault();
+            saveAssignment.click();
+          },
+        );
+
+        removeAssignment.addEventListener(
+          "click",
+          async () => {
+            const confirmed = window.confirm(
+              "Vuoi rimuovere il responsabile dalla pratica?",
+            );
+
+            if (!confirmed) return;
+
+            await updateAssignment("");
+          },
+        );
+
+        assignmentForm.append(
+          assignmentInput,
+          saveAssignment,
+          removeAssignment,
+        );
+
+        assignmentControl.append(
+          assignmentForm,
+          assignmentFeedback,
+        );
+      }
+
       const metaGrid = element(
         "div",
         "practice-operational-meta",
@@ -1047,6 +1333,7 @@ export default function PracticeManagementControls() {
       operationalHeader.append(
         statusRow,
         priorityControl,
+        assignmentControl,
         metaGrid,
         progress,
       );
