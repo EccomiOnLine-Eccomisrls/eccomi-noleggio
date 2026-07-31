@@ -2270,21 +2270,105 @@ export default function Home() {
         ) : null}
 
         {activeView === "Dashboard" ? <div className="dashboard">
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">ECCOMI HUB <span>/</span> NOLEGGIO</p>
-              <h1>Buongiorno Salvatore.</h1>
-              <p>Ecco cosa sta accadendo in ECCOMI NOLEGGIO.</p>
+          <section className="ceo-decision-hero">
+            <div className="ceo-decision-hero__glow" aria-hidden="true" />
+
+            <div className="ceo-decision-hero__main">
+              <div className="ceo-decision-hero__heading">
+                <div className="ceo-decision-hero__eyebrow">
+                  <span className="ceo-decision-hero__pulse" />
+                  ECCOMI DECISION CENTER
+                </div>
+
+                <h1>
+                  Buongiorno Salvatore
+                  <span aria-hidden="true"> 👋</span>
+                </h1>
+
+                <p>
+                  ECCOMI ha analizzato la situazione operativa.
+                  Ecco da dove conviene iniziare oggi.
+                </p>
+              </div>
+
+              <div className="ceo-decision-hero__actions">
+                <button
+                  className="button button--primary ceo-decision-hero__start"
+                  type="button"
+                  onClick={() => setActiveView("Promozioni")}
+                >
+                  Inizia la giornata
+                  <ArrowRight size={18} />
+                </button>
+
+                <button
+                  className="button button--secondary ceo-decision-hero__upload"
+                  type="button"
+                  onClick={openUploadWorkflow}
+                >
+                  <UploadCloud size={18} />
+                  Carica quotazione
+                </button>
+              </div>
             </div>
-            <div className="page-heading__actions">
-              <button className="button button--secondary" type="button" onClick={openUploadWorkflow}>
-                <FileText size={18} /> Carica quotazione
+
+            <div className="ceo-decision-hero__summary">
+              <button
+                className="ceo-decision-metric"
+                type="button"
+                onClick={() => setActiveView("Promozioni")}
+              >
+                <span className="ceo-decision-metric__icon ceo-decision-metric__icon--urgent">
+                  <AlertTriangle size={19} />
+                </span>
+                <span className="ceo-decision-metric__copy">
+                  <small>PRIORITÀ</small>
+                  <strong>
+                    {promotions.filter(
+                      (promotion) =>
+                        promotion.status === "PENDING_APPROVAL" ||
+                        promotion.status === "EXPIRING",
+                    ).length}
+                  </strong>
+                  <span>offerte da controllare</span>
+                </span>
+                <ChevronRight size={18} />
               </button>
-              <button className="button button--primary" type="button" onClick={() => changeView("Promozioni")}>
-                <Check size={18} /> Approva offerte <span>{pendingCount}</span>
+
+              <button
+                className="ceo-decision-metric"
+                type="button"
+                onClick={() => setActiveView("Lead e pratiche")}
+              >
+                <span className="ceo-decision-metric__icon ceo-decision-metric__icon--attention">
+                  <UsersRound size={19} />
+                </span>
+                <span className="ceo-decision-metric__copy">
+                  <small>LEAD E PRATICHE</small>
+                  <strong>{leads.length}</strong>
+                  <span>posizioni operative</span>
+                </span>
+                <ChevronRight size={18} />
               </button>
+
+              <div className="ceo-decision-metric ceo-decision-metric--status">
+                <span className="ceo-decision-metric__icon ceo-decision-metric__icon--online">
+                  <ShieldCheck size={19} />
+                </span>
+                <span className="ceo-decision-metric__copy">
+                  <small>STATO SISTEMA</small>
+                  <strong className="ceo-decision-metric__status">
+                    Operativo
+                  </strong>
+                  <span>
+                    {shopify.connected ? "Shopify collegato" : "Shopify da verificare"}
+                    {" · "}
+                    {ai.connected ? "AI collegata" : "AI da verificare"}
+                  </span>
+                </span>
+              </div>
             </div>
-          </div>
+          </section>
 
           <section className="kpi-grid" aria-label="Indicatori principali">
             <article className="kpi-card">

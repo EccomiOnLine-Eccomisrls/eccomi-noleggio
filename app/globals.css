@@ -3628,3 +3628,258 @@ button {
     gap: 11px;
   }
 }
+
+/* ECCOMI OS — CEO Decision Center Hero */
+.ceo-decision-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-bottom: 24px;
+  padding: 30px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 26px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(246, 249, 255, 0.98) 58%,
+      rgba(237, 244, 255, 0.98) 100%
+    );
+  box-shadow:
+    0 24px 70px rgba(15, 23, 42, 0.08),
+    0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.ceo-decision-hero__glow {
+  position: absolute;
+  z-index: -1;
+  top: -130px;
+  right: -90px;
+  width: 360px;
+  height: 360px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.11);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.ceo-decision-hero__main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.ceo-decision-hero__heading {
+  max-width: 700px;
+}
+
+.ceo-decision-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.ceo-decision-hero__pulse {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.12);
+}
+
+.ceo-decision-hero__heading h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(30px, 4vw, 47px);
+  font-weight: 780;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.ceo-decision-hero__heading p {
+  max-width: 610px;
+  margin: 15px 0 0;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.ceo-decision-hero__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.ceo-decision-hero__start,
+.ceo-decision-hero__upload {
+  min-height: 46px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.ceo-decision-hero__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.ceo-decision-metric {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.74);
+  color: inherit;
+  text-align: left;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+}
+
+button.ceo-decision-metric {
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+button.ceo-decision-metric:hover {
+  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.25);
+  background: #ffffff;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07);
+}
+
+button.ceo-decision-metric:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.2);
+  outline-offset: 2px;
+}
+
+.ceo-decision-metric > svg {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: #94a3b8;
+}
+
+.ceo-decision-metric__icon {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+}
+
+.ceo-decision-metric__icon--urgent {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.ceo-decision-metric__icon--attention {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.ceo-decision-metric__icon--online {
+  background: rgba(34, 197, 94, 0.11);
+  color: #16a34a;
+}
+
+.ceo-decision-metric__copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.ceo-decision-metric__copy small {
+  margin-bottom: 3px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+}
+
+.ceo-decision-metric__copy strong {
+  color: #0f172a;
+  font-size: 25px;
+  font-weight: 780;
+  line-height: 1.05;
+}
+
+.ceo-decision-metric__copy span {
+  overflow: hidden;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ceo-decision-metric__status {
+  color: #15803d !important;
+  font-size: 20px !important;
+}
+
+@media (max-width: 1050px) {
+  .ceo-decision-hero__main {
+    flex-direction: column;
+  }
+
+  .ceo-decision-hero__actions {
+    width: 100%;
+    flex-direction: row;
+  }
+
+  .ceo-decision-hero__actions .button {
+    flex: 1;
+  }
+
+  .ceo-decision-hero__summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .ceo-decision-hero {
+    padding: 22px 18px;
+    border-radius: 21px;
+  }
+
+  .ceo-decision-hero__heading h1 {
+    font-size: 32px;
+  }
+
+  .ceo-decision-hero__heading p {
+    font-size: 14px;
+  }
+
+  .ceo-decision-hero__actions {
+    flex-direction: column;
+  }
+
+  .ceo-decision-metric {
+    padding: 13px;
+  }
+}
+
