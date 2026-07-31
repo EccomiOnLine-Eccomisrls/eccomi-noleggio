@@ -2751,6 +2751,164 @@ export default function Home() {
             </div>
           </section>
 
+          <section
+            className="ceo-live-timeline"
+            aria-labelledby="ceo-live-timeline-title"
+          >
+            <div className="ceo-live-timeline__heading">
+              <div>
+                <span className="section-kicker">
+                  ATTIVITÀ LIVE
+                </span>
+
+                <h2 id="ceo-live-timeline-title">
+                  Timeline operativa
+                </h2>
+
+                <p>
+                  Le ultime operazioni registrate automaticamente
+                  da ECCOMI HUB.
+                </p>
+              </div>
+
+              <div className="ceo-live-timeline__status">
+                <span />
+                Aggiornata adesso
+              </div>
+            </div>
+
+            {hubEvents.length ? (
+              <div className="ceo-live-timeline__list">
+                {hubEvents.slice(0, 6).map((event, index) => {
+                  const eventType =
+                    event.eventType.toUpperCase();
+
+                  const isPromotion =
+                    eventType.includes("PROMOTION") ||
+                    eventType.includes("OFFER") ||
+                    eventType.includes("SHOPIFY");
+
+                  const isLead =
+                    eventType.includes("LEAD") ||
+                    eventType.includes("PRACTICE") ||
+                    eventType.includes("APPLICATION");
+
+                  const isAi =
+                    eventType.includes("AI") ||
+                    eventType.includes("EXTRACTION") ||
+                    eventType.includes("IMAGE");
+
+                  const iconClass = isAi
+                    ? "ceo-live-timeline__icon--ai"
+                    : isLead
+                      ? "ceo-live-timeline__icon--lead"
+                      : isPromotion
+                        ? "ceo-live-timeline__icon--promotion"
+                        : "ceo-live-timeline__icon--system";
+
+                  const EventIcon = isAi
+                    ? Sparkles
+                    : isLead
+                      ? UsersRound
+                      : isPromotion
+                        ? CarFront
+                        : Check;
+
+                  return (
+                    <button
+                      type="button"
+                      className="ceo-live-timeline__event"
+                      key={event.id}
+                      onClick={() => {
+                        if (isLead) {
+                          setActiveView("Lead e pratiche");
+                          setExpandedSidebarSection(null);
+                          return;
+                        }
+
+                        if (isPromotion) {
+                          setActiveView("Promozioni");
+                          setExpandedSidebarSection(null);
+                          return;
+                        }
+
+                        notify(event.title);
+                      }}
+                    >
+                      <span
+                        className={`ceo-live-timeline__icon ${iconClass}`}
+                      >
+                        <EventIcon size={18} />
+                      </span>
+
+                      <span className="ceo-live-timeline__line">
+                        {index <
+                        Math.min(hubEvents.length, 6) - 1 ? (
+                          <i />
+                        ) : null}
+                      </span>
+
+                      <span className="ceo-live-timeline__content">
+                        <strong>{event.title}</strong>
+
+                        <small>
+                          {event.actorEmail || "Sistema ECCOMI"}
+                        </small>
+                      </span>
+
+                      <time dateTime={event.createdAt}>
+                        {new Intl.DateTimeFormat("it-IT", {
+                          day: "2-digit",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "Europe/Rome",
+                        }).format(new Date(event.createdAt))}
+                      </time>
+
+                      <ChevronRight size={17} />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="ceo-live-timeline__empty">
+                <span>
+                  <Clock3 size={24} />
+                </span>
+
+                <div>
+                  <strong>
+                    In attesa del primo evento operativo
+                  </strong>
+
+                  <p>
+                    Caricamenti, approvazioni, pubblicazioni e
+                    nuove pratiche compariranno automaticamente qui.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <footer className="ceo-live-timeline__footer">
+              <span>
+                <ShieldCheck size={16} />
+                Registro protetto e ordinato cronologicamente
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCommandQuery("registro");
+                  setCommandCenterOpen(true);
+                }}
+              >
+                Cerca nel sistema
+                <ArrowRight size={16} />
+              </button>
+            </footer>
+          </section>
+
           <section className="kpi-grid" aria-label="Indicatori principali">
             <article className="kpi-card">
               <span className="kpi-card__icon kpi-card__icon--blue"><CarFront size={20} /></span>
