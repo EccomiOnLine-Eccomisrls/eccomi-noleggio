@@ -50,6 +50,8 @@ export async function POST(
       note?: unknown;
       priority?: unknown;
       assignedTo?: unknown;
+      trashAction?: unknown;
+      deleteReason?: unknown;
     };
 
     const nextStatus =
@@ -75,6 +77,16 @@ export async function POST(
         ? body.assignedTo.trim().slice(0, 160)
         : "";
 
+    const requestedTrashAction =
+      typeof body.trashAction === "string"
+        ? body.trashAction.trim().toUpperCase()
+        : "";
+
+    const deleteReason =
+      typeof body.deleteReason === "string"
+        ? body.deleteReason.trim().slice(0, 500)
+        : "";
+
     const db = getDb();
 
     const [practice] = await db
@@ -98,6 +110,94 @@ export async function POST(
         { error: "Pratica non autorizzata." },
         { status: 403 },
       );
+    }
+
+    /*
+     * SPOSTAMENTO NEL CESTINO
+     */
+    if (requestedTrashAction) {
+      if (actor.role !== "CEO") {
+        return Response.json(
+          {
+            error:
+              "Solo il CEO può eliminare una pratica.",
+          },
+          { status: 403 },
+        );
+      }
+
+      if (requestedTrashAction !== "TRASH") {
+        return Response.json(
+          { error: "Azione cestino non valida." },
+          { status: 422 },
+        );
+      }
+
+      if (practice.deletedAt) {
+        return Response.json(
+          {
+            error:
+              "La pratica è già presente nel cestino.",
+          },
+          { status: 409 },
+        );
+      }
+
+      if (deleteReason.length < 5) {
+        return Response.json(
+          {
+            error:
+              "Indica il motivo dell'eliminazione.",
+          },
+          { status: 422 },
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      await db
+        .update(leads)
+        .set({
+          deletedAt: now,
+          deletedBy: actor.email,
+          deleteReason,
+          updatedAt: now,
+        })
+        .where(eq(leads.id, id));
+
+      await db.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        actorEmail: actor.email,
+        action: "PRACTICE_TRASHED",
+        entityType: "lead",
+        entityId: id,
+        payloadJson: JSON.stringify({
+          reason: deleteReason,
+          previousStatus: practice.status,
+          actorRole: actor.role,
+        }),
+      });
+
+      await db.insert(hubEvents).values({
+        id: crypto.randomUUID(),
+        eventType: "NOLEGGIO_PRACTICE_TRASHED",
+        ecosystem: "ECCOMI_NOLEGGIO",
+        entityType: "lead",
+        entityId: id,
+        title: `${id} · pratica spostata nel cestino`,
+        payloadJson: JSON.stringify({
+          reason: deleteReason,
+          previousStatus: practice.status,
+          actorRole: actor.role,
+        }),
+        actorEmail: actor.email,
+      });
+
+      return Response.json({
+        ok: true,
+        trashed: true,
+        deletedAt: now,
+      });
     }
 
     /*

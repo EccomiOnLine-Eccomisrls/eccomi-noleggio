@@ -1,4 +1,4 @@
-import { and, count, desc, eq, sum } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sum } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { commissions, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
 import { requireActor, routeError } from "../../lib/server/authz";
@@ -18,11 +18,29 @@ export async function GET(request: Request) {
     const shopify = await getShopifyConnectionStatus();
     const ai = await getAiConnectionStatus();
     const db = getDb();
-    const partnerFilter = actor.role === "PARTNER" && actor.partnerId ? eq(leads.partnerId, actor.partnerId) : undefined;
-    const [leadStats] = await db.select({ total: count() }).from(leads).where(partnerFilter);
-    const [newLeadStats] = await db.select({ total: count() }).from(leads).where(
-      partnerFilter ? and(partnerFilter, eq(leads.status, "NEW")) : eq(leads.status, "NEW"),
-    );
+    const partnerFilter =
+      actor.role === "PARTNER" && actor.partnerId
+        ? eq(leads.partnerId, actor.partnerId)
+        : undefined;
+
+    const activePracticeFilter = partnerFilter
+      ? and(partnerFilter, isNull(leads.deletedAt))
+      : isNull(leads.deletedAt);
+
+    const [leadStats] = await db
+      .select({ total: count() })
+      .from(leads)
+      .where(activePracticeFilter);
+
+    const [newLeadStats] = await db
+      .select({ total: count() })
+      .from(leads)
+      .where(
+        and(
+          activePracticeFilter,
+          eq(leads.status, "NEW"),
+        ),
+      );
     const [commissionStats] = await db.select({ total: sum(commissions.amountCents) }).from(commissions).where(
       actor.role === "PARTNER" && actor.partnerId ? eq(commissions.partnerId, actor.partnerId) : undefined,
     );
@@ -54,7 +72,7 @@ export async function GET(request: Request) {
       .from(leads)
       .innerJoin(promotions, eq(leads.promotionId, promotions.id))
       .innerJoin(partners, eq(leads.partnerId, partners.id))
-      .where(partnerFilter)
+      .where(activePracticeFilter)
       .orderBy(desc(leads.createdAt))
       .limit(100);
     const documentRows = leadRows.length

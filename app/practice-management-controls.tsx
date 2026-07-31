@@ -501,6 +501,14 @@ export default function PracticeManagementControls() {
           font-weight: 900;
         }
 
+        .practice-trash-action {
+          grid-column: 1 / -1;
+          margin-top: 6px;
+          border-color: #fecaca !important;
+          background: #fff1f2 !important;
+          color: #b42318 !important;
+        }
+
         .practice-note-area {
           display: grid;
           grid-template-columns: 1fr auto;
@@ -1497,6 +1505,91 @@ export default function PracticeManagementControls() {
             "Nessuna ulteriore azione disponibile.",
           ),
         );
+      }
+
+      if (payload.actor.role === "CEO") {
+        const trashButton = actionButton(
+          "🗑️ Sposta pratica nel cestino",
+          async () => {
+            const reason = window.prompt(
+              "Indica il motivo dell’eliminazione della pratica:",
+              "",
+            );
+
+            if (reason === null) return;
+
+            const normalizedReason = reason.trim();
+
+            if (normalizedReason.length < 5) {
+              window.alert(
+                "Inserisci un motivo di almeno 5 caratteri.",
+              );
+              return;
+            }
+
+            if (
+              !window.confirm(
+                "Spostare questa pratica nel cestino? Potrà essere ripristinata.",
+              )
+            ) {
+              return;
+            }
+
+            trashButton.setAttribute(
+              "disabled",
+              "true",
+            );
+
+            try {
+              const response = await fetch(
+                `/api/practices/${encodeURIComponent(practice.id)}/action`,
+                {
+                  method: "POST",
+                  credentials: "same-origin",
+                  headers: {
+                    "content-type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    trashAction: "TRASH",
+                    deleteReason: normalizedReason,
+                  }),
+                },
+              );
+
+              const result =
+                await response.json().catch(() => ({}));
+
+              if (!response.ok) {
+                throw new Error(
+                  result.error
+                    || "Eliminazione non riuscita.",
+                );
+              }
+
+              window.alert(
+                "Pratica spostata nel cestino.",
+              );
+
+              refresh();
+            } catch (error) {
+              trashButton.removeAttribute(
+                "disabled",
+              );
+
+              window.alert(
+                error instanceof Error
+                  ? error.message
+                  : "Eliminazione non riuscita.",
+              );
+            }
+          },
+        );
+
+        trashButton.classList.add(
+          "practice-trash-action",
+        );
+
+        buttons.append(trashButton);
       }
 
       const noteTitle = element(
