@@ -2370,6 +2370,197 @@ export default function Home() {
             </div>
           </section>
 
+          <section
+            className="ceo-decision-cards"
+            aria-label="Decisioni operative"
+          >
+            <article className="ceo-decision-card ceo-decision-card--urgent">
+              <div className="ceo-decision-card__top">
+                <span className="ceo-decision-card__icon">
+                  <AlertTriangle size={21} />
+                </span>
+
+                <span className="ceo-decision-card__badge">
+                  PRIORITÀ
+                </span>
+              </div>
+
+              <div className="ceo-decision-card__content">
+                <strong>
+                  {
+                    promotions.filter(
+                      (promotion) =>
+                        promotion.status === "PENDING_APPROVAL" ||
+                        promotion.status === "EXPIRING",
+                    ).length
+                  }
+                </strong>
+
+                <h2>Offerte da controllare</h2>
+
+                <p>
+                  Promozioni da approvare o prossime alla
+                  scadenza.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="ceo-decision-card__action"
+                onClick={() => setActiveView("Promozioni")}
+              >
+                Apri priorità
+                <ArrowRight size={17} />
+              </button>
+            </article>
+
+            <article className="ceo-decision-card ceo-decision-card--lead">
+              <div className="ceo-decision-card__top">
+                <span className="ceo-decision-card__icon">
+                  <UsersRound size={21} />
+                </span>
+
+                <span className="ceo-decision-card__badge">
+                  CRM
+                </span>
+              </div>
+
+              <div className="ceo-decision-card__content">
+                <strong>
+                  {
+                    leads.filter(
+                      (lead) =>
+                        ![
+                          "DELIVERED",
+                          "ARCHIVED",
+                          "REJECTED",
+                        ].includes(lead.status),
+                    ).length
+                  }
+                </strong>
+
+                <h2>Pratiche operative</h2>
+
+                <p>
+                  Lead e richieste ancora aperte nel flusso
+                  commerciale.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="ceo-decision-card__action"
+                onClick={() =>
+                  setActiveView("Lead e pratiche")
+                }
+              >
+                Gestisci pratiche
+                <ArrowRight size={17} />
+              </button>
+            </article>
+
+            <article className="ceo-decision-card ceo-decision-card--shopify">
+              <div className="ceo-decision-card__top">
+                <span className="ceo-decision-card__icon">
+                  <Link2 size={21} />
+                </span>
+
+                <span className="ceo-decision-card__badge">
+                  SHOPIFY
+                </span>
+              </div>
+
+              <div className="ceo-decision-card__content">
+                <strong>
+                  {
+                    promotions.filter(
+                      (promotion) =>
+                        Boolean(promotion.shopifyProductId) &&
+                        ![
+                          "ONLINE",
+                          "ACTIVE",
+                          "EXPIRING",
+                        ].includes(promotion.status),
+                    ).length
+                  }
+                </strong>
+
+                <h2>Bozze da pubblicare</h2>
+
+                <p>
+                  {shopify.connected
+                    ? "Shopify collegato e pronto per la gestione delle offerte."
+                    : "Collegamento Shopify da verificare."}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="ceo-decision-card__action"
+                onClick={() => {
+                  setExpandedSidebarSection("shopify");
+
+                  if (shopify.connected) {
+                    setActiveView("Promozioni");
+                  } else {
+                    setShopifyOpen(true);
+                  }
+                }}
+              >
+                {shopify.connected
+                  ? "Gestisci pubblicazioni"
+                  : "Configura Shopify"}
+                <ArrowRight size={17} />
+              </button>
+            </article>
+
+            <article className="ceo-decision-card ceo-decision-card--ai">
+              <div className="ceo-decision-card__top">
+                <span className="ceo-decision-card__icon">
+                  <Sparkles size={21} />
+                </span>
+
+                <span className="ceo-decision-card__badge">
+                  ECCOMI AI
+                </span>
+              </div>
+
+              <div className="ceo-decision-card__content">
+                <strong>
+                  {
+                    promotions.filter(
+                      (promotion) =>
+                        promotion.automationStatus &&
+                        promotion.automationStatus !== "ONLINE",
+                    ).length
+                  }
+                </strong>
+
+                <h2>Automazioni attive</h2>
+
+                <p>
+                  {ai.connected
+                    ? `Motore ${ai.textModel} operativo.`
+                    : "Motore AI da collegare per automatizzare il flusso."}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="ceo-decision-card__action"
+                onClick={() => {
+                  setExpandedSidebarSection("ai");
+                  setAiOpen(true);
+                }}
+              >
+                {ai.connected
+                  ? "Apri controllo AI"
+                  : "Configura AI"}
+                <ArrowRight size={17} />
+              </button>
+            </article>
+          </section>
+
           <section className="kpi-grid" aria-label="Indicatori principali">
             <article className="kpi-card">
               <span className="kpi-card__icon kpi-card__icon--blue"><CarFront size={20} /></span>
