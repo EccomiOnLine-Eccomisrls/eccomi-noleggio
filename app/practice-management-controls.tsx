@@ -87,15 +87,54 @@ export default function PracticeManagementControls() {
       return button;
     };
 
-    const postStatus = async (practiceId: string, status: string) => {
-      const response = await fetch(`/api/practices/${encodeURIComponent(practiceId)}/action`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
+    const postStatus = async (
+      practiceId: string,
+      status: string,
+      note = "",
+    ) => {
+      const response = await fetch(
+        `/api/practices/${encodeURIComponent(practiceId)}/action`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status, note }),
+        },
+      );
+
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || "Aggiornamento non riuscito.");
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error || "Aggiornamento non riuscito.",
+        );
+      }
+
+      refresh();
+    };
+
+    const addPracticeNote = async (
+      practiceId: string,
+      note: string,
+    ) => {
+      const response = await fetch(
+        `/api/practices/${encodeURIComponent(practiceId)}/action`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ note }),
+        },
+      );
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error || "Salvataggio nota non riuscito.",
+        );
+      }
+
       refresh();
     };
 
@@ -171,18 +210,186 @@ export default function PracticeManagementControls() {
       documents.append(documentList);
 
       const actions = element("section", "practice-block");
-      actions.append(element("h3", "", "Pulsantiera back office"));
+      actions.append(element("h3", "", "Gestione operativa"));
+
+      const statusLabels: Record<string, string> = {
+        NEW: "Richiesta ricevuta",
+        ECCOMI_REVIEW: "Presa in carico da ECCOMI",
+        NEEDS_INFO: "In attesa di integrazione",
+        SENT_TO_PARTNER: "Inviata al partner",
+        PARTNER_REVIEW: "Presa in carico dal partner",
+        QUOTE: "Preventivo predisposto",
+        CONTRACT: "Contratto acquisito",
+        DELIVERED: "Veicolo consegnato",
+        ARCHIVED: "Pratica archiviata",
+      };
+
+      const currentStatus = element(
+        "div",
+        "practice-forward-feedback",
+        `Stato attuale: ${statusLabels[practice.status] || practice.status}`,
+      );
+
+      const transitions: Record<
+        string,
+        Array<[string, string, boolean]>
+      > = {
+        NEW: [
+          ["Prendi in carico ECCOMI", "ECCOMI_REVIEW", true],
+          ["Richiedi integrazione", "NEEDS_INFO", false],
+          ["Archivia", "ARCHIVED", false],
+        ],
+        ECCOMI_REVIEW: [
+          ["Richiedi integrazione", "NEEDS_INFO", false],
+          ["Archivia", "ARCHIVED", false],
+        ],
+        NEEDS_INFO: [
+          ["Riprendi lavorazione", "ECCOMI_REVIEW", true],
+          ["Archivia", "ARCHIVED", false],
+        ],
+        SENT_TO_PARTNER: [
+          ["Prendi in carico partner", "PARTNER_REVIEW", true],
+          ["Richiedi integrazione", "NEEDS_INFO", false],
+          ["Archivia", "ARCHIVED", false],
+        ],
+        PARTNER_REVIEW: [
+          ["Preventivo predisposto", "QUOTE", true],
+          ["Richiedi integrazione", "NEEDS_INFO", false],
+          ["Archivia", "ARCHIVED", false],
+        ],
+        QUOTE: [
+          ["Contratto acquisito", "CONTRACT", true],
+          ["Richiedi integrazione", "NEEDS_INFO", false],
+          ["Archivia", "ARCHIVED", false],
+        ],
+        CONTRACT: [
+          ["Veicolo consegnato", "DELIVERED", true],
+          ["Archivia", "ARCHIVED", false],
+        ],
+        DELIVERED: [
+          ["Chiudi e archivia", "ARCHIVED", true],
+        ],
+        ARCHIVED: [],
+      };
+
       const buttons = element("div", "practice-action-grid");
-      const statusActions: Array<[string, string]> = [
-        ["Prendi in carico", "ECCOMI_REVIEW"],
-        ["Richiedi integrazione", "NEEDS_INFO"],
-        ["Segna preventivo", "QUOTE"],
-        ["Segna contratto", "CONTRACT"],
-        ["Segna consegnata", "DELIVERED"],
-        ["Archivia", "ARCHIVED"],
-      ];
-      statusActions.forEach(([label, status]) => buttons.append(actionButton(label, () => void postStatus(practice.id, status), status === "ECCOMI_REVIEW")));
-      actions.append(buttons);
+
+      const availableActions = transitions[practice.status] || [];
+
+      availableActions.forEach(([label, status, primary]) => {
+        if (
+          payload.actor.role === "PARTNER"
+          && ![
+            "PARTNER_REVIEW",
+            "NEEDS_INFO",
+            "QUOTE",
+            "CONTRACT",
+            "DELIVERED",
+          ].includes(status)
+        ) {
+          return;
+        }
+
+        buttons.append(
+          actionButton(
+            label,
+            async () => {
+              const requiresNote = status === "NEEDS_INFO";
+
+              const note = window.prompt(
+                requiresNote
+                  ? "Indica cosa deve integrare il cliente:"
+                  : "Aggiungi una nota a questo avanzamento (facoltativa):",
+                "",
+              );
+
+              if (note === null) return;
+
+              try {
+                await postStatus(
+                  practice.id,
+                  status,
+                  note.trim(),
+                );
+              } catch (error) {
+                window.alert(
+                  error instanceof Error
+                    ? error.message
+                    : "Aggiornamento non riuscito.",
+                );
+              }
+            },
+            primary,
+          ),
+        );
+      });
+
+      if (!availableActions.length) {
+        buttons.append(
+          element(
+            "div",
+            "practice-forward-feedback",
+            "Nessuna ulteriore azione disponibile.",
+          ),
+        );
+      }
+
+      const noteTitle = element(
+        "h3",
+        "",
+        "Nota operativa",
+      );
+
+      const noteField = element(
+        "textarea",
+      ) as HTMLTextAreaElement;
+
+      noteField.placeholder =
+        "Scrivi una nota interna sulla pratica…";
+      noteField.maxLength = 2000;
+
+      const noteFeedback = element(
+        "div",
+        "practice-forward-feedback",
+      );
+
+      const noteButton = actionButton(
+        "Salva nota",
+        async () => {
+          const note = noteField.value.trim();
+
+          if (!note) {
+            noteFeedback.textContent =
+              "Inserisci prima una nota.";
+            return;
+          }
+
+          noteButton.setAttribute("disabled", "true");
+          noteFeedback.textContent =
+            "Salvataggio in corso…";
+
+          try {
+            await addPracticeNote(practice.id, note);
+          } catch (error) {
+            noteFeedback.textContent =
+              error instanceof Error
+                ? error.message
+                : "Salvataggio non riuscito.";
+
+            noteButton.removeAttribute("disabled");
+          }
+        },
+        false,
+      );
+
+      actions.append(
+        currentStatus,
+        buttons,
+        noteTitle,
+        noteField,
+        noteButton,
+        noteFeedback,
+      );
 
       if (payload.actor.role === "CEO") {
         const forwarding = element("section", "practice-block practice-forwarding");
@@ -229,9 +436,72 @@ export default function PracticeManagementControls() {
       const timeline = element("section", "practice-block");
       timeline.append(element("h3", "", "Timeline"));
       const timelineList = element("div", "practice-timeline");
+      const timelineLabels: Record<string, string> = {
+        PRACTICE_CREATED_WITH_DOCUMENTS:
+          "Richiesta ricevuta con documenti",
+        PRACTICE_NOTE:
+          "Nota operativa",
+        PRACTICE_STATUS_ECCOMI_REVIEW:
+          "Presa in carico da ECCOMI",
+        PRACTICE_STATUS_NEEDS_INFO:
+          "Integrazione richiesta",
+        PRACTICE_STATUS_SENT_TO_PARTNER:
+          "Pratica inviata al partner",
+        PRACTICE_STATUS_PARTNER_REVIEW:
+          "Presa in carico dal partner",
+        PRACTICE_STATUS_QUOTE:
+          "Preventivo predisposto",
+        PRACTICE_STATUS_CONTRACT:
+          "Contratto acquisito",
+        PRACTICE_STATUS_DELIVERED:
+          "Veicolo consegnato",
+        PRACTICE_STATUS_ARCHIVED:
+          "Pratica archiviata",
+      };
+
       practice.timeline.forEach((event) => {
         const item = element("div");
-        item.append(element("strong", "", event.action.replaceAll("_", " ")), element("small", "", `${event.actorEmail} · ${new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Rome" }).format(new Date(event.createdAt))}`));
+
+        let details: {
+          note?: string;
+          from?: string;
+          to?: string;
+        } = {};
+
+        try {
+          details = JSON.parse(event.payloadJson || "{}");
+        } catch {
+          details = {};
+        }
+
+        const title =
+          timelineLabels[event.action]
+          || event.action.replaceAll("_", " ");
+
+        const dateText = new Intl.DateTimeFormat(
+          "it-IT",
+          {
+            dateStyle: "short",
+            timeStyle: "short",
+            timeZone: "Europe/Rome",
+          },
+        ).format(new Date(event.createdAt));
+
+        item.append(
+          element("strong", "", title),
+          element(
+            "small",
+            "",
+            `${event.actorEmail} · ${dateText}`,
+          ),
+        );
+
+        if (details.note) {
+          item.append(
+            element("p", "", details.note),
+          );
+        }
+
         timelineList.append(item);
       });
       timeline.append(timelineList);
