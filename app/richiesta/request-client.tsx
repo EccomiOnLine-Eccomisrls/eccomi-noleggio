@@ -188,30 +188,154 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
 
   const submit = async () => {
     if (!promotion || !privacy || !documentsComplete || !financialComplete) return;
+
     setSubmitting(true);
     setSubmitError("");
+
+    const readPayload = async (response: Response) => {
+      const contentType = response.headers.get("content-type") || "";
+
+      if (contentType.includes("application/json")) {
+        return await response.json() as {
+          ok?: boolean;
+          error?: string;
+          practiceCode?: string;
+          status?: string;
+        };
+      }
+
+      const text = await response.text();
+
+      throw new Error(
+        response.ok
+          ? "Il server ha restituito una risposta non valida."
+          : `Il server non ha completato la richiesta (${response.status}).`,
+      );
+    };
+
+    const documentTypeByKey: Record<string, string> = {
+      identity: profile === "COMPANY" ? "LEGAL_REP_IDENTITY" : "IDENTITY",
+      tax_code: "TAX_CODE",
+      income: "INCOME",
+      vat: "VAT_CERTIFICATE",
+      chamber: "CHAMBER_REPORT",
+      financial: "FINANCIAL",
+    };
+
     try {
-      const body = new FormData();
-      body.set("promotionId", promotion.id);
-      body.set("customerType", profile);
-      Object.entries(fields).forEach(([name, value]) => body.set(name, name === "iban" ? normalizeIban(value) : value));
-      body.set("privacyAccepted", String(privacy));
-      body.set("marketingConsent", String(marketing));
-      body.set("submissionKey", submissionKey.current);
-      documentRequirements.forEach((document) => {
-        (documents[document.key] || []).forEach((file) => body.append(document.field, file, file.name));
+      /*
+       * FASE 1
+       * Crea la pratica senza allegati.
+       */
+      const startResponse = await fetch("/api/public/applications/start", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": submissionKey.current,
+        },
+        body: JSON.stringify({
+          promotionId: promotion.id,
+          customerType: profile,
+          firstName: fields.firstName,
+          lastName: fields.lastName,
+          email: fields.email,
+          phone: fields.phone,
+          province: fields.province,
+          businessName: fields.businessName,
+          vatNumber: fields.vatNumber,
+          accountHolder: fields.accountHolder,
+          iban: normalizeIban(fields.iban),
+          privacyAccepted: privacy,
+          marketingConsent: marketing,
+          submissionKey: submissionKey.current,
+        }),
       });
 
-      const response = await fetch("/api/public/applications", {
-        method: "POST",
-        headers: { "idempotency-key": submissionKey.current },
-        body,
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Invio non riuscito.");
-      setPracticeCode(payload.practiceCode);
+      const startPayload = await readPayload(startResponse);
+
+      if (!startResponse.ok || !startPayload.practiceCode) {
+        throw new Error(
+          startPayload.error || "Non è stato possibile creare la pratica.",
+        );
+      }
+
+      const newPracticeCode = startPayload.practiceCode;
+
+      /*
+       * Se la chiave di invio corrisponde a una pratica già completata,
+       * non ricarichiamo inutilmente gli allegati.
+       */
+      if (startPayload.status === "NEW") {
+        setPracticeCode(newPracticeCode);
+        return;
+      }
+
+      /*
+       * FASE 2
+       * Carica ogni documento con una richiesta separata.
+       */
+      for (const requirement of documentRequirements) {
+        const documentType = documentTypeByKey[requirement.key];
+
+        if (!documentType) {
+          throw new Error(
+            `Tipo documento non riconosciuto: ${requirement.label}.`,
+          );
+        }
+
+        const selectedFiles = documents[requirement.key] || [];
+
+        for (const file of selectedFiles) {
+          const uploadBody = new FormData();
+          uploadBody.set("documentType", documentType);
+          uploadBody.set("file", file, file.name);
+
+          const uploadResponse = await fetch(
+            `/api/public/applications/${encodeURIComponent(newPracticeCode)}/document`,
+            {
+              method: "POST",
+              body: uploadBody,
+            },
+          );
+
+          const uploadPayload = await readPayload(uploadResponse);
+
+          if (!uploadResponse.ok) {
+            throw new Error(
+              uploadPayload.error
+                || `Caricamento non riuscito: ${file.name}.`,
+            );
+          }
+        }
+      }
+
+      /*
+       * FASE 3
+       * Finalizza soltanto dopo il caricamento di tutti i documenti.
+       */
+      const completeResponse = await fetch(
+        `/api/public/applications/${encodeURIComponent(newPracticeCode)}/complete`,
+        {
+          method: "POST",
+        },
+      );
+
+      const completePayload = await readPayload(completeResponse);
+
+      if (!completeResponse.ok) {
+        throw new Error(
+          completePayload.error
+            || "Non è stato possibile completare la pratica.",
+        );
+      }
+
+      setPracticeCode(newPracticeCode);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Invio non riuscito. Riprova tra poco.");
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Invio non riuscito. Riprova tra poco.",
+      );
     } finally {
       setSubmitting(false);
     }
