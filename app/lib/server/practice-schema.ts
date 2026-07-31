@@ -15,6 +15,8 @@ export function ensurePracticeSchema() {
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS sent_to_partner_at text`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'NORMAL'`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_to text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_at text`);
+      await db.execute(sql`ALTER TABLE leads ALTER COLUMN assigned_at DROP NOT NULL`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS deleted_at text`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS deleted_by text`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS delete_reason text`);
