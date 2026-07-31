@@ -13,6 +13,11 @@ export function ensurePracticeSchema() {
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS iban_last4 text`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS completed_at text`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS sent_to_partner_at text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'NORMAL'`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_to text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS deleted_at text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS deleted_by text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS delete_reason text`);
       await db.execute(sql`CREATE TABLE IF NOT EXISTS practice_documents (
         id text PRIMARY KEY,
         lead_id text NOT NULL REFERENCES leads(id) ON DELETE CASCADE,

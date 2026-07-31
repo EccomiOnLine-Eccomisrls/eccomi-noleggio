@@ -28,6 +28,7 @@ type PracticePayload = {
     iban: string | null;
     ibanLast4: string | null;
     status: string;
+    priority: string;
     documentStatus: string;
     createdAt: string;
     updatedAt: string;
@@ -210,6 +211,74 @@ export default function PracticeManagementControls() {
         .practice-sla--red {
           color: #a11c1c;
           background: #feeaea;
+        }
+
+        .practice-priority-control {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 14px;
+          border: 1px solid #d9e7f4;
+          border-radius: 13px;
+          background: rgba(255, 255, 255, 0.8);
+        }
+
+        .practice-priority-copy {
+          display: grid;
+          gap: 2px;
+        }
+
+        .practice-priority-copy small {
+          color: #5f7183;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .practice-priority-copy strong {
+          font-size: 14px;
+          color: #18344c;
+        }
+
+        .practice-priority-select {
+          min-width: 150px;
+          min-height: 40px;
+          padding: 8px 34px 8px 12px;
+          border: 1px solid #bed3e5;
+          border-radius: 10px;
+          background: #ffffff;
+          color: #17344c;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .practice-priority-select[data-priority="LOW"] {
+          color: #146c37;
+          border-color: #9dd5af;
+          background: #edf9f1;
+        }
+
+        .practice-priority-select[data-priority="NORMAL"] {
+          color: #765c00;
+          border-color: #e2ce74;
+          background: #fff9dc;
+        }
+
+        .practice-priority-select[data-priority="HIGH"] {
+          color: #a11c1c;
+          border-color: #e8abab;
+          background: #fff0f0;
+        }
+
+        .practice-priority-feedback {
+          min-height: 18px;
+          color: #526a7d;
+          font-size: 12px;
+          text-align: right;
         }
 
         .practice-operational-meta {
@@ -762,6 +831,147 @@ export default function PracticeManagementControls() {
         element("span", slaClass, slaText),
       );
 
+      const priorityControl = element(
+        "div",
+        "practice-priority-control",
+      );
+
+      const priorityCopy = element(
+        "div",
+        "practice-priority-copy",
+      );
+
+      const priorityLabels: Record<string, string> = {
+        LOW: "Bassa",
+        NORMAL: "Media",
+        HIGH: "Alta",
+      };
+
+      priorityCopy.append(
+        element("small", "", "Priorità operativa"),
+        element(
+          "strong",
+          "",
+          priorityLabels[practice.priority || "NORMAL"]
+            || practice.priority
+            || "Media",
+        ),
+      );
+
+      const prioritySide = element("div");
+      const priorityFeedback = element(
+        "div",
+        "practice-priority-feedback",
+      );
+
+      if (payload.actor.role === "CEO") {
+        const prioritySelect = element(
+          "select",
+          "practice-priority-select",
+        ) as HTMLSelectElement;
+
+        [
+          ["LOW", "🟢 Bassa"],
+          ["NORMAL", "🟡 Media"],
+          ["HIGH", "🔴 Alta"],
+        ].forEach(([value, label]) => {
+          const option = element("option") as HTMLOptionElement;
+          option.value = value;
+          option.textContent = label;
+          prioritySelect.append(option);
+        });
+
+        prioritySelect.value = practice.priority || "NORMAL";
+        prioritySelect.dataset.priority =
+          practice.priority || "NORMAL";
+
+        prioritySelect.addEventListener("change", async () => {
+          const previousPriority =
+            practice.priority || "NORMAL";
+          const nextPriority = prioritySelect.value;
+
+          prioritySelect.disabled = true;
+          priorityFeedback.textContent =
+            "Aggiornamento…";
+
+          try {
+            const response = await fetch(
+              `/api/practices/${encodeURIComponent(practice.id)}/action`,
+              {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                  priority: nextPriority,
+                }),
+              },
+            );
+
+            const result = await response
+              .json()
+              .catch(() => ({}));
+
+            if (!response.ok) {
+              throw new Error(
+                result.error
+                  || "Aggiornamento priorità non riuscito.",
+              );
+            }
+
+            practice.priority = nextPriority;
+            prioritySelect.dataset.priority = nextPriority;
+
+            const strong =
+              priorityCopy.querySelector("strong");
+
+            if (strong) {
+              strong.textContent =
+                priorityLabels[nextPriority]
+                || nextPriority;
+            }
+
+            priorityFeedback.textContent =
+              "Priorità aggiornata";
+
+            window.setTimeout(() => {
+              priorityFeedback.textContent = "";
+            }, 1800);
+          } catch (error) {
+            prioritySelect.value = previousPriority;
+            prioritySelect.dataset.priority =
+              previousPriority;
+
+            priorityFeedback.textContent =
+              error instanceof Error
+                ? error.message
+                : "Aggiornamento non riuscito.";
+          } finally {
+            prioritySelect.disabled = false;
+          }
+        });
+
+        prioritySide.append(
+          prioritySelect,
+          priorityFeedback,
+        );
+      } else {
+        prioritySide.append(
+          element(
+            "strong",
+            "",
+            priorityLabels[practice.priority || "NORMAL"]
+              || "Media",
+          ),
+        );
+      }
+
+      priorityControl.append(
+        priorityCopy,
+        prioritySide,
+      );
+
       const metaGrid = element(
         "div",
         "practice-operational-meta",
@@ -836,6 +1046,7 @@ export default function PracticeManagementControls() {
 
       operationalHeader.append(
         statusRow,
+        priorityControl,
         metaGrid,
         progress,
       );

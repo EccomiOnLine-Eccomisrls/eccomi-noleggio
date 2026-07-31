@@ -48,6 +48,7 @@ export async function POST(
     const body = await request.json() as {
       status?: unknown;
       note?: unknown;
+      priority?: unknown;
     };
 
     const nextStatus =
@@ -58,6 +59,11 @@ export async function POST(
     const note =
       typeof body.note === "string"
         ? body.note.trim().slice(0, 2000)
+        : "";
+
+    const requestedPriority =
+      typeof body.priority === "string"
+        ? body.priority.trim().toUpperCase()
         : "";
 
     const db = getDb();
@@ -83,6 +89,74 @@ export async function POST(
         { error: "Pratica non autorizzata." },
         { status: 403 },
       );
+    }
+
+    /*
+     * MODIFICA PRIORITÀ
+     */
+    if (requestedPriority) {
+      if (actor.role !== "CEO") {
+        return Response.json(
+          { error: "Solo il CEO può modificare la priorità." },
+          { status: 403 },
+        );
+      }
+
+      const allowedPriorities = new Set([
+        "LOW",
+        "NORMAL",
+        "HIGH",
+      ]);
+
+      if (!allowedPriorities.has(requestedPriority)) {
+        return Response.json(
+          { error: "Priorità non valida." },
+          { status: 422 },
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      await db
+        .update(leads)
+        .set({
+          priority: requestedPriority,
+          updatedAt: now,
+        })
+        .where(eq(leads.id, id));
+
+      await db.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        actorEmail: actor.email,
+        action: "PRACTICE_PRIORITY_CHANGED",
+        entityType: "lead",
+        entityId: id,
+        payloadJson: JSON.stringify({
+          from: practice.priority || "NORMAL",
+          to: requestedPriority,
+          actorRole: actor.role,
+        }),
+      });
+
+      await db.insert(hubEvents).values({
+        id: crypto.randomUUID(),
+        eventType: "NOLEGGIO_PRACTICE_PRIORITY_CHANGED",
+        ecosystem: "ECCOMI_NOLEGGIO",
+        entityType: "lead",
+        entityId: id,
+        title: `Priorità aggiornata · ${id}`,
+        payloadJson: JSON.stringify({
+          from: practice.priority || "NORMAL",
+          to: requestedPriority,
+          actorRole: actor.role,
+        }),
+        actorEmail: actor.email,
+      });
+
+      return Response.json({
+        ok: true,
+        priority: requestedPriority,
+      });
     }
 
     /*
