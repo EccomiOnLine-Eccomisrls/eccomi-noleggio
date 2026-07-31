@@ -323,21 +323,50 @@ export default function TrashPage() {
           margin: "0 auto",
         }}
       >
-        <a
-          href="/"
+        <nav
+          aria-label="Percorso di navigazione"
           style={{
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
             gap: 8,
-            color: "#073f73",
-            textDecoration: "none",
-            fontWeight: 800,
             marginBottom: 24,
+            flexWrap: "wrap",
           }}
         >
-          <ArrowLeft size={18} />
-          Torna alla dashboard
-        </a>
+          <a
+            href="/ceo"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              color: "#073f73",
+              textDecoration: "none",
+              fontWeight: 800,
+            }}
+          >
+            <ArrowLeft size={18} />
+            Dashboard CRM
+          </a>
+
+          <span
+            aria-hidden="true"
+            style={{
+              color: "#94a3b8",
+              fontWeight: 700,
+            }}
+          >
+            /
+          </span>
+
+          <span
+            style={{
+              color: "#5b6778",
+              fontWeight: 700,
+            }}
+          >
+            Cestino intelligente
+          </span>
+        </nav>
 
         <div
           style={{
