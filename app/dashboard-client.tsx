@@ -2324,7 +2324,7 @@ export default function Home() {
                 <span className="ceo-decision-metric__copy">
                   <small>PRIORITÀ</small>
                   <strong>
-                    {promotions.filter(
+                    {promotionItems.filter(
                       (promotion) =>
                         promotion.status === "PENDING_APPROVAL" ||
                         promotion.status === "EXPIRING",
@@ -2345,7 +2345,7 @@ export default function Home() {
                 </span>
                 <span className="ceo-decision-metric__copy">
                   <small>LEAD E PRATICHE</small>
-                  <strong>{leads.length}</strong>
+                  <strong>{leadItems.length}</strong>
                   <span>posizioni operative</span>
                 </span>
                 <ChevronRight size={18} />
@@ -2388,7 +2388,7 @@ export default function Home() {
               <div className="ceo-decision-card__content">
                 <strong>
                   {
-                    promotions.filter(
+                    promotionItems.filter(
                       (promotion) =>
                         promotion.status === "PENDING_APPROVAL" ||
                         promotion.status === "EXPIRING",
@@ -2428,7 +2428,7 @@ export default function Home() {
               <div className="ceo-decision-card__content">
                 <strong>
                   {
-                    leads.filter(
+                    leadItems.filter(
                       (lead) =>
                         ![
                           "DELIVERED",
@@ -2473,7 +2473,7 @@ export default function Home() {
               <div className="ceo-decision-card__content">
                 <strong>
                   {
-                    promotions.filter(
+                    promotionItems.filter(
                       (promotion) =>
                         Boolean(promotion.shopifyProductId) &&
                         ![
@@ -2528,7 +2528,7 @@ export default function Home() {
               <div className="ceo-decision-card__content">
                 <strong>
                   {
-                    promotions.filter(
+                    promotionItems.filter(
                       (promotion) =>
                         promotion.automationStatus &&
                         promotion.automationStatus !== "ONLINE",
@@ -2624,7 +2624,7 @@ export default function Home() {
                 <span className="ceo-quick-action__copy">
                   <strong>Apri pratiche</strong>
                   <small>
-                    {leads.length} posizioni presenti nel CRM
+                    {leadItems.length} posizioni presenti nel CRM
                   </small>
                 </span>
 
@@ -2646,7 +2646,7 @@ export default function Home() {
                 <span className="ceo-quick-action__copy">
                   <strong>Gestisci promozioni</strong>
                   <small>
-                    {promotions.length} offerte nel catalogo
+                    {promotionItems.length} offerte nel catalogo
                   </small>
                 </span>
 
