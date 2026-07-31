@@ -2561,6 +2561,196 @@ export default function Home() {
             </article>
           </section>
 
+          <section
+            className="ceo-quick-actions"
+            aria-labelledby="ceo-quick-actions-title"
+          >
+            <div className="ceo-quick-actions__heading">
+              <div>
+                <span className="section-kicker">
+                  COMANDI RAPIDI
+                </span>
+                <h2 id="ceo-quick-actions-title">
+                  Cosa vuoi fare?
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="ceo-quick-actions__command"
+                onClick={() => {
+                  setCommandQuery("");
+                  setCommandCenterOpen(true);
+                }}
+              >
+                <Search size={16} />
+                Tutti i comandi
+                <kbd>⌘ K</kbd>
+              </button>
+            </div>
+
+            <div className="ceo-quick-actions__grid">
+              <button
+                type="button"
+                className="ceo-quick-action ceo-quick-action--primary"
+                onClick={openUploadWorkflow}
+              >
+                <span className="ceo-quick-action__icon">
+                  <UploadCloud size={22} />
+                </span>
+
+                <span className="ceo-quick-action__copy">
+                  <strong>Nuova quotazione</strong>
+                  <small>
+                    Carica il PDF e avvia il flusso automatico
+                  </small>
+                </span>
+
+                <ArrowRight size={18} />
+              </button>
+
+              <button
+                type="button"
+                className="ceo-quick-action"
+                onClick={() => {
+                  setActiveView("Lead e pratiche");
+                  setExpandedSidebarSection(null);
+                }}
+              >
+                <span className="ceo-quick-action__icon ceo-quick-action__icon--crm">
+                  <UsersRound size={22} />
+                </span>
+
+                <span className="ceo-quick-action__copy">
+                  <strong>Apri pratiche</strong>
+                  <small>
+                    {leads.length} posizioni presenti nel CRM
+                  </small>
+                </span>
+
+                <ArrowRight size={18} />
+              </button>
+
+              <button
+                type="button"
+                className="ceo-quick-action"
+                onClick={() => {
+                  setActiveView("Promozioni");
+                  setExpandedSidebarSection(null);
+                }}
+              >
+                <span className="ceo-quick-action__icon ceo-quick-action__icon--offers">
+                  <CarFront size={22} />
+                </span>
+
+                <span className="ceo-quick-action__copy">
+                  <strong>Gestisci promozioni</strong>
+                  <small>
+                    {promotions.length} offerte nel catalogo
+                  </small>
+                </span>
+
+                <ArrowRight size={18} />
+              </button>
+
+              <button
+                type="button"
+                className="ceo-quick-action"
+                onClick={() => {
+                  setExpandedSidebarSection("shopify");
+
+                  if (shopify.connected) {
+                    setActiveView("Promozioni");
+                  } else {
+                    setShopifyOpen(true);
+                  }
+                }}
+              >
+                <span className="ceo-quick-action__icon ceo-quick-action__icon--shopify">
+                  <Link2 size={22} />
+                </span>
+
+                <span className="ceo-quick-action__copy">
+                  <strong>Shopify</strong>
+                  <small>
+                    {shopify.connected
+                      ? "Collegato e operativo"
+                      : "Collegamento da completare"}
+                  </small>
+                </span>
+
+                <span
+                  className={`ceo-quick-action__status ${
+                    shopify.connected
+                      ? "ceo-quick-action__status--online"
+                      : "ceo-quick-action__status--warning"
+                  }`}
+                  aria-label={
+                    shopify.connected
+                      ? "Shopify collegato"
+                      : "Shopify da configurare"
+                  }
+                />
+              </button>
+
+              <button
+                type="button"
+                className="ceo-quick-action"
+                onClick={() => {
+                  setExpandedSidebarSection("ai");
+                  setAiOpen(true);
+                }}
+              >
+                <span className="ceo-quick-action__icon ceo-quick-action__icon--ai">
+                  <Sparkles size={22} />
+                </span>
+
+                <span className="ceo-quick-action__copy">
+                  <strong>ECCOMI AI</strong>
+                  <small>
+                    {ai.connected
+                      ? `${ai.textModel} operativo`
+                      : "Motore AI da configurare"}
+                  </small>
+                </span>
+
+                <span
+                  className={`ceo-quick-action__status ${
+                    ai.connected
+                      ? "ceo-quick-action__status--online"
+                      : "ceo-quick-action__status--warning"
+                  }`}
+                  aria-label={
+                    ai.connected
+                      ? "AI collegata"
+                      : "AI da configurare"
+                  }
+                />
+              </button>
+
+              <button
+                type="button"
+                className="ceo-quick-action"
+                onClick={() => {
+                  window.location.href = "/cestino";
+                }}
+              >
+                <span className="ceo-quick-action__icon ceo-quick-action__icon--trash">
+                  <X size={22} />
+                </span>
+
+                <span className="ceo-quick-action__copy">
+                  <strong>Cestino intelligente</strong>
+                  <small>
+                    Ripristina o elimina gli elementi rimossi
+                  </small>
+                </span>
+
+                <ArrowRight size={18} />
+              </button>
+            </div>
+          </section>
+
           <section className="kpi-grid" aria-label="Indicatori principali">
             <article className="kpi-card">
               <span className="kpi-card__icon kpi-card__icon--blue"><CarFront size={20} /></span>
