@@ -220,6 +220,16 @@ const initialPromotions: Promotion[] = [
 
 type ViewName = (typeof navigation)[number]["label"];
 
+type CommandCenterItem = {
+  id: string;
+  label: string;
+  description: string;
+  group: "Azioni" | "Navigazione" | "Promozioni" | "Clienti e pratiche";
+  keywords: string;
+  icon: React.ReactNode;
+  action: () => void;
+};
+
 function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`brand-mark ${compact ? "brand-mark--compact" : ""}`}>
@@ -787,6 +797,8 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState<ViewName>("Dashboard");
   const [searchQuery, setSearchQuery] = useState("");
+  const [commandCenterOpen, setCommandCenterOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
   const [customerPreview, setCustomerPreview] = useState<Promotion | null>(null);
@@ -817,8 +829,25 @@ export default function Home() {
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState("");
 
-  const changeView = (view: ViewName) => { setActiveView(view); setMobileMenuOpen(false); };
-  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 4200); };
+  const changeView = (view: ViewName) => {
+    setActiveView(view);
+    setMobileMenuOpen(false);
+  };
+
+  const closeCommandCenter = () => {
+    setCommandCenterOpen(false);
+    setCommandQuery("");
+  };
+
+  const runCommand = (action: () => void) => {
+    closeCommandCenter();
+    action();
+  };
+
+  const notify = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 4200);
+  };
 
   const handleCeoLogout = async () => {
     try {
@@ -845,7 +874,231 @@ export default function Home() {
   };
   const pendingCount = promotionItems.filter((promotion) => promotion.status === "PENDING_APPROVAL").length;
   const activeCount = promotionItems.filter((promotion) => promotion.status === "ONLINE" || promotion.status === "ACTIVE" || promotion.status === "EXPIRING").length;
-  const newLeadCount = leadItems.filter((lead) => lead.status === "NEW").length;
+  const newLeadCount = leadItems.filter(
+    (lead) => lead.status === "NEW",
+  ).length;
+
+  const commandItems: CommandCenterItem[] = [
+    {
+      id: "action-upload-quote",
+      label: "Carica nuova quotazione",
+      description: "Avvia estrazione AI e preparazione Shopify",
+      group: "Azioni",
+      keywords:
+        "nuova promozione offerta pdf quotazione carica upload",
+      icon: <UploadCloud size={19} />,
+      action: openUploadWorkflow,
+    },
+    {
+      id: "nav-dashboard",
+      label: "Apri Dashboard CEO",
+      description: "Torna alla panoramica generale",
+      group: "Navigazione",
+      keywords: "dashboard home ceo panoramica",
+      icon: <LayoutDashboard size={19} />,
+      action: () => {
+        setActiveView("Dashboard");
+        setExpandedSidebarSection(null);
+      },
+    },
+    {
+      id: "nav-promotions",
+      label: "Apri Promozioni",
+      description: `${promotionItems.length} promozioni presenti`,
+      group: "Navigazione",
+      keywords:
+        "promozioni offerte auto veicoli noleggio prodotti",
+      icon: <CarFront size={19} />,
+      action: () => {
+        setActiveView("Promozioni");
+        setExpandedSidebarSection(null);
+      },
+    },
+    {
+      id: "nav-leads",
+      label: "Apri Lead e pratiche",
+      description: `${leadItems.length} clienti e pratiche presenti`,
+      group: "Navigazione",
+      keywords:
+        "lead clienti pratiche richieste contatti crm",
+      icon: <UsersRound size={19} />,
+      action: () => {
+        setActiveView("Lead e pratiche");
+        setExpandedSidebarSection(null);
+      },
+    },
+    {
+      id: "nav-partners",
+      label: "Apri Partner",
+      description: "Gestione della rete commerciale",
+      group: "Navigazione",
+      keywords:
+        "partner rete fornitori noleggiatori società",
+      icon: <Handshake size={19} />,
+      action: () => {
+        setActiveView("Partner");
+        setExpandedSidebarSection("partner");
+      },
+    },
+    {
+      id: "nav-commissions",
+      label: "Apri Commissioni",
+      description: "Compensi e maturato della rete",
+      group: "Navigazione",
+      keywords:
+        "commissioni compensi pagamenti maturato",
+      icon: <BadgeEuro size={19} />,
+      action: () => {
+        setActiveView("Commissioni");
+        setExpandedSidebarSection(null);
+      },
+    },
+    {
+      id: "tool-shopify",
+      label: "Apri configurazione Shopify",
+      description: shopify.connected
+        ? `Collegato a ${shopify.shopDomain || "Shopify"}`
+        : "Shopify non ancora collegato",
+      group: "Azioni",
+      keywords:
+        "shopify prodotti pubblicazione collezione store",
+      icon: <Link2 size={19} />,
+      action: () => {
+        setExpandedSidebarSection("shopify");
+        setShopifyOpen(true);
+      },
+    },
+    {
+      id: "tool-ai",
+      label: "Apri configurazione AI",
+      description: ai.connected
+        ? `Modello attivo: ${ai.textModel}`
+        : "Motore AI non ancora collegato",
+      group: "Azioni",
+      keywords:
+        "ai intelligenza artificiale openai prompt modello",
+      icon: <Sparkles size={19} />,
+      action: () => {
+        setExpandedSidebarSection("ai");
+        setAiOpen(true);
+      },
+    },
+    {
+      id: "tool-trash",
+      label: "Apri Cestino",
+      description: "Elementi eliminati e ripristino",
+      group: "Navigazione",
+      keywords:
+        "cestino eliminati archiviati ripristina",
+      icon: <X size={19} />,
+      action: () => {
+        window.location.href = "/cestino";
+      },
+    },
+
+    ...promotionItems.map(
+      (promotion): CommandCenterItem => ({
+        id: `promotion-${promotion.id}`,
+        label: `${promotion.brand} ${promotion.model}`,
+        description: `${promotion.offerNumber} · ${promotion.price}/mese · ${promotion.statusLabel}`,
+        group: "Promozioni",
+        keywords: [
+          promotion.brand,
+          promotion.model,
+          promotion.offerNumber,
+          promotion.owner,
+          promotion.rental,
+          promotion.statusLabel,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        icon: <CarFront size={19} />,
+        action: () => {
+          setActiveView("Promozioni");
+          setExpandedSidebarSection(null);
+          setSelectedPromotion(promotion);
+        },
+      }),
+    ),
+
+    ...leadItems.map(
+      (lead): CommandCenterItem => ({
+        id: `lead-${lead.id}`,
+        label: lead.customerName,
+        description: `${lead.vehicle} · ${lead.partnerName} · ${lead.status}`,
+        group: "Clienti e pratiche",
+        keywords: [
+          lead.customerName,
+          lead.email,
+          lead.phone,
+          lead.province,
+          lead.vehicle,
+          lead.offerNumber,
+          lead.partnerName,
+          lead.status,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        icon: <UserRound size={19} />,
+        action: () => {
+          setActiveView("Lead e pratiche");
+          setExpandedSidebarSection(null);
+          setSearchQuery(lead.customerName);
+        },
+      }),
+    ),
+  ];
+
+  const normalizedCommandQuery = commandQuery
+    .trim()
+    .toLocaleLowerCase("it");
+
+  const filteredCommandItems = commandItems
+    .filter((item) => {
+      if (!normalizedCommandQuery) return true;
+
+      return [
+        item.label,
+        item.description,
+        item.keywords,
+        item.group,
+      ]
+        .join(" ")
+        .toLocaleLowerCase("it")
+        .includes(normalizedCommandQuery);
+    })
+    .slice(0, 18);
+
+  useEffect(() => {
+    const handleCommandCenterKeyboard = (event: KeyboardEvent) => {
+      const commandShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k";
+
+      if (commandShortcut) {
+        event.preventDefault();
+        setCommandCenterOpen((open) => !open);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setCommandCenterOpen(false);
+        setCommandQuery("");
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handleCommandCenterKeyboard,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handleCommandCenterKeyboard,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -1734,11 +1987,19 @@ export default function Home() {
             <strong>ECCOMI NOLEGGIO</strong>
           </div>
 
-          <div className="search-box">
+          <button
+            className="search-box search-box--command"
+            type="button"
+            aria-label="Apri ricerca globale"
+            onClick={() => {
+              setCommandCenterOpen(true);
+              setCommandQuery("");
+            }}
+          >
             <Search size={18} />
-            <input aria-label="Cerca" placeholder="Cerca promozioni, lead o partner..." value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); if (event.target.value) setActiveView("Promozioni"); }} />
+            <span>Cerca promozioni, clienti, partner o comandi...</span>
             <kbd>⌘ K</kbd>
-          </div>
+          </button>
 
           <div className="topbar__actions">
 <span className="live-pill"><i /> Sistema operativo</span>
@@ -1760,6 +2021,145 @@ export default function Home() {
             {notificationsOpen ? <div className="notification-popover"><div><strong>Notifiche</strong><span>{pendingCount} da leggere</span></div><button type="button" onClick={() => { setNotificationsOpen(false); changeView("Promozioni"); }}><span className="notification-popover__icon"><Check size={15} /></span><p><strong>{pendingCount} offerte da approvare</strong><small>Pubblica soltanto il CEO</small></p></button><button type="button"><span className="notification-popover__icon notification-popover__icon--amber"><Clock3 size={15} /></span><p><strong>Controllo scadenze attivo</strong><small>Avviso automatico 24 ore prima</small></p></button></div> : null}
           </div>
         </header>
+
+        {commandCenterOpen ? (
+          <div
+            className="command-center-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closeCommandCenter();
+              }
+            }}
+          >
+            <section
+              className="command-center"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="command-center-title"
+            >
+              <header className="command-center__header">
+                <Search size={21} />
+
+                <input
+                  autoFocus
+                  aria-label="Cerca nel Command Center"
+                  placeholder="Cosa vuoi fare?"
+                  value={commandQuery}
+                  onChange={(event) =>
+                    setCommandQuery(event.target.value)
+                  }
+                />
+
+                <button
+                  type="button"
+                  className="command-center__escape"
+                  onClick={closeCommandCenter}
+                  aria-label="Chiudi centro comandi"
+                >
+                  ESC
+                </button>
+              </header>
+
+              <div className="command-center__body">
+                <div className="command-center__intro">
+                  <span className="command-center__brand">
+                    E
+                  </span>
+
+                  <div>
+                    <strong id="command-center-title">
+                      ECCOMI Command Center
+                    </strong>
+                    <small>
+                      Cerca ovunque o esegui un'azione
+                    </small>
+                  </div>
+                </div>
+
+                {filteredCommandItems.length ? (
+                  <div className="command-center__results">
+                    {[
+                      "Azioni",
+                      "Navigazione",
+                      "Promozioni",
+                      "Clienti e pratiche",
+                    ].map((group) => {
+                      const groupItems =
+                        filteredCommandItems.filter(
+                          (item) => item.group === group,
+                        );
+
+                      if (!groupItems.length) return null;
+
+                      return (
+                        <section
+                          className="command-center__group"
+                          key={group}
+                        >
+                          <span className="command-center__label">
+                            {group}
+                          </span>
+
+                          <div>
+                            {groupItems.map((item) => (
+                              <button
+                                className="command-center__item"
+                                type="button"
+                                key={item.id}
+                                onClick={() =>
+                                  runCommand(item.action)
+                                }
+                              >
+                                <span className="command-center__icon">
+                                  {item.icon}
+                                </span>
+
+                                <span className="command-center__copy">
+                                  <strong>{item.label}</strong>
+                                  <small>
+                                    {item.description}
+                                  </small>
+                                </span>
+
+                                <ArrowRight size={17} />
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="command-center__empty">
+                    <Search size={29} />
+                    <strong>Nessun risultato</strong>
+                    <span>
+                      Prova con un cliente, un veicolo,
+                      un partner o un comando.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <footer className="command-center__footer">
+                <span>
+                  <kbd>⌘ K</kbd>
+                  Apri
+                </span>
+
+                <span>
+                  <kbd>ESC</kbd>
+                  Chiudi
+                </span>
+
+                <small>
+                  {filteredCommandItems.length} risultati
+                </small>
+              </footer>
+            </section>
+          </div>
+        ) : null}
 
         {profileMenuOpen ? (
           <>
