@@ -1374,49 +1374,6 @@ export default function Home() {
             </div>
           </div>
 
-          <section className="control-banner">
-            <div className="control-banner__status">
-              <span className="control-banner__icon"><ShieldCheck size={24} /></span>
-              <div>
-                <p>STATO DEL VERTICALE</p>
-                <h2>Controllo CEO attivo</h2>
-                <span>Tutte le pubblicazioni richiedono la tua approvazione.</span>
-              </div>
-            </div>
-            <div className="control-banner__rule">
-              <LockKeyhole size={18} />
-              <span>ECCOMI resta proprietaria di dati, offerte e rapporto cliente</span>
-            </div>
-          </section>
-
-          <section className={`shopify-connection-banner ${shopify.connected ? "shopify-connection-banner--connected" : ""}`}>
-            <span className="shopify-connection-banner__icon">S</span>
-            <div>
-              <span className="section-kicker">COLLEGAMENTO SHOPIFY</span>
-              <h2>{shopify.connected ? "Shopify collegato in sicurezza" : "Completa il collegamento Shopify"}</h2>
-              <p>{shopify.connected
-                ? `${shopify.shopName || "Eccomi OnLine"} · ${shopify.shopDomain}. Le bozze possono essere preparate; la pubblicazione resta sotto il comando esclusivo del CEO.`
-                : "L’app è installata. Inserisci le credenziali nella schermata protetta per verificare il negozio, senza pubblicare alcuna offerta."}</p>
-            </div>
-            <button className={shopify.connected ? "button button--secondary" : "button button--primary"} type="button" onClick={() => setShopifyOpen(true)}>
-              <Link2 size={17} /> {shopify.connected ? "Controlla collegamento" : "Collega ora"}
-            </button>
-          </section>
-
-          <section className={`shopify-connection-banner ai-connection-banner ${ai.connected ? "shopify-connection-banner--connected" : ""}`}>
-            <span className="shopify-connection-banner__icon ai-connection-banner__icon"><Sparkles size={19} /></span>
-            <div>
-              <span className="section-kicker">MOTORE AI</span>
-              <h2>{ai.connected ? "Estrazione e immagini automatiche operative" : "Completa il collegamento OpenAI"}</h2>
-              <p>{ai.connected
-                ? `${ai.textModel} legge la quotazione; il sistema cerca la foto reale e usa ${ai.imageModel} soltanto come alternativa illustrativa.`
-                : "Serve una configurazione iniziale protetta. Da quel momento basta caricare il PDF: dati, foto e bozza Shopify vengono preparati senza passaggi manuali."}</p>
-            </div>
-            <button className={ai.connected ? "button button--secondary" : "button button--primary"} type="button" onClick={() => setAiOpen(true)}>
-              <Sparkles size={17} /> {ai.connected ? "Controlla AI" : "Collega AI"}
-            </button>
-          </section>
-
           <section className="kpi-grid" aria-label="Indicatori principali">
             <article className="kpi-card">
               <span className="kpi-card__icon kpi-card__icon--blue"><CarFront size={20} /></span>
