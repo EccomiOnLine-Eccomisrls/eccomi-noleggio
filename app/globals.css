@@ -5176,3 +5176,229 @@ button.ceo-decision-metric:focus-visible {
   }
 }
 
+/* ECCOMI OS — Ecosystem Switcher Motion */
+
+@keyframes ecosystemScrimIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+
+  to {
+    opacity: 1;
+    backdrop-filter: blur(5px);
+  }
+}
+
+@keyframes ecosystemPanelIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-18px, 8px, 0) scale(0.975);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes ecosystemItemIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-11px, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes ecosystemStatusPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(34, 197, 94, 0);
+  }
+}
+
+.ecosystem-switcher__scrim {
+  animation: ecosystemScrimIn 180ms ease-out both;
+  background: rgba(8, 22, 39, 0.24);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.ecosystem-menu {
+  transform-origin: top left;
+  animation:
+    ecosystemPanelIn 210ms
+    cubic-bezier(0.2, 0.85, 0.28, 1) both;
+  will-change: transform, opacity;
+}
+
+.ecosystem-menu__item {
+  opacity: 0;
+  animation:
+    ecosystemItemIn 190ms
+    cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+  transition:
+    transform 145ms ease,
+    border-color 145ms ease,
+    background-color 145ms ease,
+    box-shadow 145ms ease;
+}
+
+.ecosystem-menu__item--1 {
+  animation-delay: 35ms;
+}
+
+.ecosystem-menu__item--2 {
+  animation-delay: 60ms;
+}
+
+.ecosystem-menu__item--3 {
+  animation-delay: 85ms;
+}
+
+.ecosystem-menu__item--4 {
+  animation-delay: 110ms;
+}
+
+.ecosystem-menu__item--5 {
+  animation-delay: 135ms;
+}
+
+.ecosystem-menu__item--6 {
+  animation-delay: 160ms;
+}
+
+a.ecosystem-menu__item:hover,
+button.ecosystem-menu__item:hover {
+  transform: translate3d(3px, 0, 0);
+  border-color: #b9d4f4;
+  background: #f7fbff;
+  box-shadow:
+    0 9px 22px rgba(7, 63, 115, 0.07);
+}
+
+a.ecosystem-menu__item:active,
+button.ecosystem-menu__item:active {
+  transform: translate3d(1px, 0, 0) scale(0.992);
+}
+
+.ecosystem-menu__item--active:hover {
+  border-color: #8fc0fa;
+  background: #edf6ff;
+}
+
+.ecosystem-menu__item--disabled:hover {
+  transform: none;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ecosystem-menu__icon {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+a.ecosystem-menu__item:hover .ecosystem-menu__icon,
+button.ecosystem-menu__item:hover .ecosystem-menu__icon {
+  transform: scale(1.055);
+}
+
+.ecosystem-menu__open {
+  gap: 7px;
+}
+
+.ecosystem-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.ecosystem-status-dot--online {
+  background: #22c55e;
+  animation: ecosystemStatusPulse 2.3s ease-in-out infinite;
+}
+
+.ecosystem-menu__badge--development {
+  border: 1px solid #dbe5f0;
+  color: #758397;
+  background: #f8fafc;
+}
+
+.ecosystem-menu__badge--active {
+  position: relative;
+  overflow: hidden;
+}
+
+.ecosystem-menu__badge--active::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
+}
+
+.hub-link--button {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.hub-link--button:hover {
+  transform: translateY(-1px);
+}
+
+.ecosystem-switcher__chevron {
+  transition: transform 180ms ease;
+}
+
+.hub-link--open .ecosystem-switcher__chevron {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 760px) {
+  .ecosystem-menu {
+    animation-name: ecosystemPanelIn;
+    transform-origin: bottom center;
+  }
+
+  a.ecosystem-menu__item:hover,
+  button.ecosystem-menu__item:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ecosystem-switcher__scrim,
+  .ecosystem-menu,
+  .ecosystem-menu__item,
+  .ecosystem-status-dot--online {
+    animation: none !important;
+  }
+
+  .ecosystem-menu__item {
+    opacity: 1;
+  }
+
+  .ecosystem-menu__item,
+  .ecosystem-menu__icon,
+  .hub-link--button,
+  .ecosystem-switcher__chevron {
+    transition: none !important;
+  }
+}
+

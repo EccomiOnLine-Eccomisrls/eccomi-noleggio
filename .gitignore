@@ -54,3 +54,4 @@ next-env.d.ts
 
 # temporary database test
 /test-db.mjs
+.dev.vars

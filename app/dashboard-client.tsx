@@ -1603,7 +1603,7 @@ export default function Home() {
                 <div className="ecosystem-menu__list">
                   <a
                     href="https://hub.eccomionline.com"
-                    className="ecosystem-menu__item"
+                    className="ecosystem-menu__item ecosystem-menu__item--1"
                     role="menuitem"
                     onClick={() => setEcosystemMenuOpen(false)}
                   >
@@ -1617,6 +1617,7 @@ export default function Home() {
                     </span>
 
                     <span className="ecosystem-menu__open">
+                      <i className="ecosystem-status-dot ecosystem-status-dot--online" />
                       Apri
                       <ArrowRight size={15} />
                     </span>
@@ -1624,7 +1625,7 @@ export default function Home() {
 
                   <button
                     type="button"
-                    className="ecosystem-menu__item ecosystem-menu__item--active"
+                    className="ecosystem-menu__item ecosystem-menu__item--active ecosystem-menu__item--2"
                     role="menuitem"
                     onClick={() => setEcosystemMenuOpen(false)}
                   >
@@ -1644,7 +1645,7 @@ export default function Home() {
 
                   <a
                     href="https://eccomi-posta-backend.onrender.com/dashboard/pratiche"
-                    className="ecosystem-menu__item"
+                    className="ecosystem-menu__item ecosystem-menu__item--3"
                     role="menuitem"
                     onClick={() => setEcosystemMenuOpen(false)}
                   >
@@ -1658,13 +1659,14 @@ export default function Home() {
                     </span>
 
                     <span className="ecosystem-menu__open">
+                      <i className="ecosystem-status-dot ecosystem-status-dot--online" />
                       Apri
                       <ArrowRight size={15} />
                     </span>
                   </a>
 
                   <div
-                    className="ecosystem-menu__item ecosystem-menu__item--disabled"
+                    className="ecosystem-menu__item ecosystem-menu__item--disabled ecosystem-menu__item--4"
                     role="menuitem"
                     aria-disabled="true"
                   >
@@ -1677,13 +1679,13 @@ export default function Home() {
                       <small>Comparazione e gestione contratti</small>
                     </span>
 
-                    <span className="ecosystem-menu__badge">
-                      In arrivo
+                    <span className="ecosystem-menu__badge ecosystem-menu__badge--development">
+                      In sviluppo
                     </span>
                   </div>
 
                   <div
-                    className="ecosystem-menu__item ecosystem-menu__item--disabled"
+                    className="ecosystem-menu__item ecosystem-menu__item--disabled ecosystem-menu__item--5"
                     role="menuitem"
                     aria-disabled="true"
                   >
@@ -1696,13 +1698,13 @@ export default function Home() {
                       <small>Ordini, ritiri e consegne</small>
                     </span>
 
-                    <span className="ecosystem-menu__badge">
-                      In arrivo
+                    <span className="ecosystem-menu__badge ecosystem-menu__badge--development">
+                      In sviluppo
                     </span>
                   </div>
 
                   <div
-                    className="ecosystem-menu__item ecosystem-menu__item--disabled"
+                    className="ecosystem-menu__item ecosystem-menu__item--disabled ecosystem-menu__item--6"
                     role="menuitem"
                     aria-disabled="true"
                   >
@@ -1715,8 +1717,8 @@ export default function Home() {
                       <small>Contenuti ed editoria digitale</small>
                     </span>
 
-                    <span className="ecosystem-menu__badge">
-                      In arrivo
+                    <span className="ecosystem-menu__badge ecosystem-menu__badge--development">
+                      In sviluppo
                     </span>
                   </div>
                 </div>
