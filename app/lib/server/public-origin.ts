@@ -10,7 +10,16 @@ function normalizedOrigin(value: string | null | undefined) {
 }
 
 export async function publicCorsOrigin(request: Request) {
-  const origin = normalizedOrigin(request.headers.get("origin"));
+  const rawOrigin = request.headers.get("origin");
+  const origin = normalizedOrigin(rawOrigin);
+
+  console.info("[PUBLIC_CORS]", {
+    rawOrigin,
+    origin,
+    requestUrl: request.url,
+    forwardedHost: request.headers.get("x-forwarded-host"),
+  });
+
   if (!origin) return null;
 
   const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
@@ -40,7 +49,13 @@ export async function publicCorsOrigin(request: Request) {
     // Le origini pubbliche fisse restano disponibili se Shopify non risponde.
   }
 
-  return allowed.has(origin) ? origin : null;
+  const isCodespacesPreview =
+    origin.endsWith(".app.github.dev")
+    || origin.endsWith(".githubpreview.dev");
+
+  return allowed.has(origin) || isCodespacesPreview
+    ? origin
+    : null;
 }
 
 export function corsHeaders(origin: string | null) {

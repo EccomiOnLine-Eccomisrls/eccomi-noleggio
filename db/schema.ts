@@ -74,6 +74,41 @@ export const promotions = pgTable("promotions", {
   index("promotions_valid_until_idx").on(table.validUntil),
 ]);
 
+export const customVehicleRequests = pgTable("custom_vehicle_requests", {
+  id: text("id").primaryKey(),
+  customerType: text("customer_type").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  province: text("province"),
+  businessName: text("business_name"),
+  vatNumber: text("vat_number"),
+  brand: text("brand"),
+  modelOrSegment: text("model_or_segment"),
+  monthlyBudgetCents: integer("monthly_budget_cents"),
+  maxDepositCents: integer("max_deposit_cents"),
+  durationMonths: integer("duration_months"),
+  annualKm: integer("annual_km"),
+  fuel: text("fuel"),
+  transmission: text("transmission"),
+  deliveryTiming: text("delivery_timing"),
+  notes: text("notes"),
+  status: text("status").notNull().default("NEW"),
+  assignedTo: text("assigned_to"),
+  privacyVersion: text("privacy_version").notNull(),
+  privacyAcceptedAt: text("privacy_accepted_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  marketingConsent: boolean("marketing_consent").notNull().default(false),
+  submissionKey: text("submission_key"),
+  source: text("source").notNull().default("ECCOMI_NOLEGGIO_CUSTOM_REQUEST"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("custom_vehicle_requests_submission_key_idx").on(table.submissionKey),
+  index("custom_vehicle_requests_status_idx").on(table.status),
+  index("custom_vehicle_requests_created_idx").on(table.createdAt),
+]);
+
 export const leads = pgTable("leads", {
   id: text("id").primaryKey(),
   promotionId: text("promotion_id").notNull().references(() => promotions.id),
