@@ -43,6 +43,7 @@ export type EccomiRuntimeEnv = {
   ECCOMI_PARTNER_DASHBOARD_URL?: string;
   CRON_SECRET?: string;
   HUB_READ_SECRET?: string;
+  HUB_SSO_SECRET?: string;
 };
 
 const runtimeGlobal = globalThis as typeof globalThis & { __ECCOMI_RUNTIME_ENV__?: EccomiRuntimeEnv };
