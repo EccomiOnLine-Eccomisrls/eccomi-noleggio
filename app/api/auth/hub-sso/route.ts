@@ -101,10 +101,15 @@ export async function GET(request: Request) {
 
     const session = await createCeoSession(email);
     const redirectUrl = new URL(safeNext(handoff.next), url.origin);
-    const response = Response.redirect(redirectUrl, 302);
-    response.headers.set("set-cookie", ceoSessionCookie(session));
-    response.headers.set("cache-control", "no-store");
-    return response;
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: redirectUrl.toString(),
+        "set-cookie": ceoSessionCookie(session),
+        "cache-control": "no-store",
+      },
+    });
   } catch (error) {
     console.error("HUB_SSO_ERROR", error);
     return Response.json({ error: "Accesso diretto HUB → Noleggio non disponibile." }, { status: 500 });
