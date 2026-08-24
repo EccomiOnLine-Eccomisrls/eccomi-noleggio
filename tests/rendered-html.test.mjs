@@ -81,6 +81,8 @@ test("renders a clientless PR demo with real dashboard, promotion and editor lin
   assert.match(editor, /data-eccomi-preview-editor-runtime="true"/);
   assert.match(editor, /id="ec-preview-brand"/);
   assert.match(editor, /id="ec-preview-valid-until"/);
+  assert.match(editor, /id="ec-preview-km"[^>]*step="1"/);
+  assert.doesNotMatch(editor, /id="ec-preview-km"[^>]*step="1000"/);
   assert.match(editor, /SIMULA SALVATAGGIO/);
 });
 
