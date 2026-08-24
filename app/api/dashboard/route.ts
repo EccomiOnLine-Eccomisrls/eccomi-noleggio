@@ -13,8 +13,8 @@ import { seedSystemData } from "../../lib/server/seed";
 export async function GET(request: Request) {
   try {
     // Render PR previews must never wait for or touch production data sources.
-    // Detection uses both Render's PR flag and the generated -pr- service/host name.
-    if (isRenderPullRequestPreview()) {
+    // Detection uses both Render's environment and the actual request hostname.
+    if (isRenderPullRequestPreview(request)) {
       return Response.json(previewDashboardPayload());
     }
 
