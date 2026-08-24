@@ -37,97 +37,62 @@ type PreviewDemoProps = {
   payload: PreviewDashboardPayload;
   view: "dashboard" | "promotions";
   editId?: string | null;
+  query?: PreviewQuery;
 };
 
-const editorRuntime = `(()=>{
-  const form=document.getElementById("ec-preview-editor-form");
-  if(!form||form.dataset.bound==="true")return;
-  form.dataset.bound="true";
-  const byId=(id)=>document.getElementById(id);
-  const runtime=byId("ec-preview-runtime-state");
-  if(runtime){runtime.textContent="COMANDI ATTIVI";runtime.dataset.ready="true";}
-  const dateInput=byId("ec-preview-valid-until");
-  const reactivateInput=byId("ec-preview-reactivate");
-  const addDays=(amount)=>{
-    if(!dateInput)return;
-    const raw=dateInput.value||new Date().toISOString().slice(0,10);
-    const date=new Date(raw+"T12:00:00Z");
-    date.setUTCDate(date.getUTCDate()+amount);
-    dateInput.value=date.toISOString().slice(0,10);
-    dateInput.dispatchEvent(new Event("input",{bubbles:true}));
-  };
-  document.querySelectorAll("[data-preview-add-days]").forEach((button)=>{
-    button.addEventListener("click",()=>addDays(Number(button.dataset.previewAddDays||0)));
-  });
-  const reactivate=byId("ec-preview-reactivate-button");
-  if(reactivate)reactivate.addEventListener("click",()=>{
-    if(reactivateInput)reactivateInput.value="true";
-    addDays(30);
-    reactivate.textContent="RIATTIVAZIONE IMPOSTATA";
-    reactivate.dataset.selected="true";
-  });
-  const normalized=(value)=>value.trim().toUpperCase().replace(/[^A-Z0-9]+/g," ").trim().replace(/\\s+/g," ");
-  const stripPrefix=(value,prefix)=>{
-    const source=normalized(value);
-    const target=normalized(prefix);
-    if(!source||!target||!source.startsWith(target))return value.trim();
-    return value.trim().split(/\\s+/).slice(prefix.trim().split(/\\s+/).length).join(" ").replace(/^[\\s\\-–—:|]+/,"").trim();
-  };
-  const refreshTitle=()=>{
-    const brand=String(byId("ec-preview-brand")?.value||"").trim().toUpperCase();
-    const model=String(byId("ec-preview-model")?.value||"").trim();
-    let version=String(byId("ec-preview-version")?.value||"").trim();
-    version=stripPrefix(version,brand+" "+model);
-    version=stripPrefix(version,model);
-    version=stripPrefix(version,model);
-    version=stripPrefix(version,brand);
-    const title=[brand,model,version].filter(Boolean).join(" ").replace(/\\s+/g," ").trim();
-    const target=byId("ec-preview-title-output");
-    if(target)target.textContent=title||"Titolo da completare";
-  };
-  ["ec-preview-brand","ec-preview-model","ec-preview-version"].forEach((id)=>byId(id)?.addEventListener("input",refreshTitle));
-  refreshTitle();
-  form.addEventListener("submit",async(event)=>{
-    event.preventDefault();
-    const submit=byId("ec-preview-submit");
-    const result=byId("ec-preview-result");
-    if(submit){submit.disabled=true;submit.textContent="SIMULAZIONE…";}
-    if(result){result.hidden=false;result.dataset.kind="loading";result.textContent="Verifica della simulazione in corso…";}
-    const lines=(id)=>String(byId(id)?.value||"").split(/\\n+/).map((item)=>item.trim()).filter(Boolean);
-    const cents=(id)=>Math.round(Number(String(byId(id)?.value||"0").replace(",","."))*100);
-    const body={
-      brand:String(byId("ec-preview-brand")?.value||""),
-      model:String(byId("ec-preview-model")?.value||""),
-      version:String(byId("ec-preview-version")?.value||""),
-      provider:String(byId("ec-preview-provider")?.value||""),
-      monthlyGrossCents:cents("ec-preview-monthly"),
-      depositGrossCents:cents("ec-preview-deposit"),
-      durationMonths:Number(byId("ec-preview-duration")?.value||0),
-      totalKm:Number(byId("ec-preview-km")?.value||0),
-      validUntil:String(dateInput?.value||""),
-      delivery:String(byId("ec-preview-delivery")?.value||""),
-      fuel:String(byId("ec-preview-fuel")?.value||""),
-      transmission:String(byId("ec-preview-transmission")?.value||""),
-      color:String(byId("ec-preview-color")?.value||""),
-      services:lines("ec-preview-services"),
-      warnings:lines("ec-preview-warnings"),
-      syncShopify:true,
-      reactivate:reactivateInput?.value==="true"
-    };
-    try{
-      const response=await fetch(form.dataset.endpoint,{method:"PATCH",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
-      const payload=await response.json().catch(()=>({}));
-      if(!response.ok||payload.preview!==true||payload.simulated!==true)throw new Error(payload.error||"La risposta non è una simulazione preview valida.");
-      if(result){result.dataset.kind="success";result.innerHTML="<strong>SIMULAZIONE COMPLETATA</strong><span>Nessuna modifica salvata su Supabase o Shopify. Lo stesso shopifyProductId è rimasto invariato.</span>";}
-      const status=byId("ec-preview-editor-status");
-      if(status)status.textContent=payload.promotion?.status==="EXPIRING"?"DA ATTENZIONARE":payload.promotion?.status||"SIMULATA";
-    }catch(error){
-      if(result){result.dataset.kind="error";result.textContent=error instanceof Error?error.message:"Simulazione non riuscita.";}
-    }finally{
-      if(submit){submit.disabled=false;submit.textContent="SIMULA SALVATAGGIO";}
-    }
-  });
-})();`;
+type PreviewQuery = Record<string, string | string[] | undefined>;
+
+function queryValue(query: PreviewQuery | undefined, key: string) {
+  const value = query?.[key];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function formValue(query: PreviewQuery | undefined, key: string, fallback: string) {
+  const value = queryValue(query, key);
+  return value === undefined ? fallback : value;
+}
+
+function addUtcDays(value: string, amount: number, fallback: string) {
+  const source = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
+  const date = new Date(`${source}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return fallback;
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+}
+
+function stripLeadingWords(value: string, prefix: string) {
+  const sourceWords = value.trim().split(/\s+/).filter(Boolean);
+  const prefixWords = prefix.trim().split(/\s+/).filter(Boolean);
+  const normalize = (word: string) => word.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const matches = prefixWords.length > 0 && prefixWords.every(
+    (word, index) => normalize(sourceWords[index] || "") === normalize(word),
+  );
+  return matches
+    ? sourceWords.slice(prefixWords.length).join(" ").replace(/^[\s\-–—:|]+/, "").trim()
+    : value.trim();
+}
+
+function publicTitle(brand: string, model: string, rawVersion: string) {
+  const normalizedBrand = brand.trim().toUpperCase();
+  const normalizedModel = model.trim();
+  let version = rawVersion.trim();
+  version = stripLeadingWords(version, `${normalizedBrand} ${normalizedModel}`);
+  version = stripLeadingWords(version, normalizedModel);
+  version = stripLeadingWords(version, normalizedModel);
+  version = stripLeadingWords(version, normalizedBrand);
+  return [normalizedBrand, normalizedModel, version].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+}
+
+function italianDate(value: string) {
+  const date = new Date(`${value}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
 
 function Brand() {
   return (
@@ -222,37 +187,73 @@ function PromotionsView({ promotion }: { promotion: PreviewDashboardPayload["pro
   );
 }
 
-function Editor({ promotion }: { promotion: PreviewDashboardPayload["promotions"][number] }) {
-  const monthly = promotion.price.replace(/[^0-9,]/g, "").replace(",", ".");
-  const deposit = promotion.deposit.replace(/[^0-9,]/g, "").replace(",", ".");
-  const duration = promotion.term.replace(/\D/g, "");
-  const totalKm = promotion.mileage.replace(/\D/g, "");
+function Editor({ promotion, query }: {
+  promotion: PreviewDashboardPayload["promotions"][number];
+  query?: PreviewQuery;
+}) {
+  const action = queryValue(query, "previewAction");
+  const values = {
+    brand: formValue(query, "brand", promotion.brand),
+    model: formValue(query, "model", promotion.model),
+    version: formValue(query, "version", promotion.version),
+    fuel: formValue(query, "fuel", promotion.fuel),
+    transmission: formValue(query, "transmission", promotion.transmission),
+    color: formValue(query, "color", promotion.color),
+    provider: formValue(query, "provider", promotion.rental),
+    monthly: formValue(query, "monthly", promotion.price.replace(/[^0-9,]/g, "").replace(",", ".")),
+    deposit: formValue(query, "deposit", promotion.deposit.replace(/[^0-9,]/g, "").replace(",", ".")),
+    duration: formValue(query, "duration", promotion.term.replace(/\D/g, "")),
+    totalKm: formValue(query, "totalKm", promotion.mileage.replace(/\D/g, "")),
+    delivery: formValue(query, "delivery", promotion.delivery),
+    services: formValue(query, "services", promotion.services.join("\n")),
+    warnings: formValue(query, "warnings", promotion.warnings.join("\n")),
+  };
+  let validUntil = formValue(query, "validUntil", promotion.validUntil);
+  let dateCommand: string | null = null;
+  if (action === "add7") {
+    validUntil = addUtcDays(validUntil, 7, promotion.validUntil);
+    dateCommand = "+7 giorni";
+  } else if (action === "add15") {
+    validUntil = addUtcDays(validUntil, 15, promotion.validUntil);
+    dateCommand = "+15 giorni";
+  } else if (action === "add30") {
+    validUntil = addUtcDays(validUntil, 30, promotion.validUntil);
+    dateCommand = "+30 giorni";
+  } else if (action === "reactivate30") {
+    validUntil = addUtcDays(validUntil, 30, promotion.validUntil);
+    dateCommand = "Riattivazione +30 giorni";
+  }
+  const reactivated = action === "reactivate30" || formValue(query, "reactivate", "false") === "true";
+  const saved = action === "save";
+  const title = publicTitle(values.brand, values.model, values.version);
+  const editorStatus = saved ? "SIMULATA" : reactivated ? "RIATTIVAZIONE IMPOSTATA" : "DA ATTENZIONARE";
 
   return (
     <div className="ec-preview-editor" role="presentation">
       <a className="ec-preview-editor-scrim" href="/?view=promotions" aria-label="Chiudi modifica offerta" />
       <aside role="dialog" aria-modal="true" aria-labelledby="ec-preview-editor-title">
         <header><div><span>ECCOMI NOLEGGIO · PREVIEW SICURA</span><h2 id="ec-preview-editor-title">Modifica offerta</h2><p>Prova tutti i campi. Il salvataggio finale è una simulazione senza scritture esterne.</p></div><a href="/?view=promotions" aria-label="Chiudi">×</a></header>
-        <form id="ec-preview-editor-form" data-endpoint={`/api/promotions/${encodeURIComponent(promotion.id)}/edit`}>
+        <form id="ec-preview-editor-form" method="get" action="/" data-eccomi-preview-native-form="true">
+          <input type="hidden" name="view" value="promotions" />
+          <input type="hidden" name="edit" value={promotion.id} />
           <div className="ec-preview-editor-body">
-            <div className="ec-preview-editor-banner"><strong>PREVIEW SICURA</strong><span id="ec-preview-runtime-state">DEMO SERVER ATTIVA</span><small>Nessun dato reale coinvolto</small></div>
-            <section className="ec-preview-editor-summary"><div><small>OFFERTA {promotion.offerNumber}</small><strong id="ec-preview-title-output">{promotion.brand} {promotion.model} {promotion.version}</strong><span>Il titolo rimuove automaticamente duplicati come “3008 3008”.</span></div><em id="ec-preview-editor-status">DA ATTENZIONARE</em></section>
-            <fieldset><legend><span>01</span><div><strong>Veicolo</strong><small>Dati della scheda pubblica</small></div></legend><div className="ec-preview-fields"><label><span>Marca</span><input id="ec-preview-brand" name="brand" defaultValue={promotion.brand} required /></label><label><span>Modello</span><input id="ec-preview-model" name="model" defaultValue={promotion.model} required /></label><label className="wide"><span>Versione</span><input id="ec-preview-version" name="version" defaultValue={promotion.version} /></label><label><span>Alimentazione</span><input id="ec-preview-fuel" name="fuel" defaultValue={promotion.fuel} /></label><label><span>Cambio</span><input id="ec-preview-transmission" name="transmission" defaultValue={promotion.transmission} /></label><label><span>Colore</span><input id="ec-preview-color" name="color" defaultValue={promotion.color} /></label><label><span>Noleggiatore</span><input id="ec-preview-provider" name="provider" defaultValue={promotion.rental} required /></label></div></fieldset>
-            <fieldset><legend><span>02</span><div><strong>Condizioni economiche</strong><small>Canone, anticipo, durata e chilometri</small></div></legend><div className="ec-preview-fields four"><label><span>Canone €/mese</span><input id="ec-preview-monthly" name="monthly" type="number" min="0.01" step="0.01" defaultValue={monthly} required /></label><label><span>Anticipo €</span><input id="ec-preview-deposit" name="deposit" type="number" min="0" step="0.01" defaultValue={deposit} required /></label><label><span>Durata mesi</span><input id="ec-preview-duration" name="duration" type="number" min="1" defaultValue={duration} required /></label><label><span>Km totali</span><input id="ec-preview-km" name="totalKm" type="number" min="1" step="1" defaultValue={totalKm} required /></label><label className="wide"><span>Consegna</span><input id="ec-preview-delivery" name="delivery" defaultValue={promotion.delivery} /></label></div></fieldset>
-            <fieldset><legend><span>03</span><div><strong>Durata promozione</strong><small>Allunga o simula la riattivazione</small></div></legend><div className="ec-preview-expiry"><label><span>Scadenza</span><input id="ec-preview-valid-until" name="validUntil" type="date" defaultValue={promotion.validUntil} required /></label><div><button type="button" data-preview-add-days="7">+7 giorni</button><button type="button" data-preview-add-days="15">+15 giorni</button><button type="button" data-preview-add-days="30">+30 giorni</button><button id="ec-preview-reactivate-button" type="button">Riattiva +30</button></div></div><input id="ec-preview-reactivate" type="hidden" name="reactivate" value="false" /></fieldset>
-            <fieldset><legend><span>04</span><div><strong>Servizi e condizioni</strong><small>Un elemento per riga</small></div></legend><div className="ec-preview-fields"><label className="wide"><span>Servizi inclusi</span><textarea id="ec-preview-services" name="services" rows={5} defaultValue={promotion.services.join("\n")} /></label><label className="wide"><span>Condizioni / avvertenze</span><textarea id="ec-preview-warnings" name="warnings" rows={4} defaultValue={promotion.warnings.join("\n")} /></label></div></fieldset>
+            <div className="ec-preview-editor-banner"><strong>PREVIEW SICURA</strong><span id="ec-preview-runtime-state" data-ready="true">COMANDI HTML ATTIVI</span><small>Nessun dato reale coinvolto</small></div>
+            <section className="ec-preview-editor-summary"><div><small>OFFERTA {promotion.offerNumber}</small><strong id="ec-preview-title-output">{title || "Titolo da completare"}</strong><span>Il titolo rimuove automaticamente duplicati come “3008 3008” al comando successivo.</span></div><em id="ec-preview-editor-status">{editorStatus}</em></section>
+            <fieldset><legend><span>01</span><div><strong>Veicolo</strong><small>Dati della scheda pubblica</small></div></legend><div className="ec-preview-fields"><label><span>Marca</span><input id="ec-preview-brand" name="brand" defaultValue={values.brand} required /></label><label><span>Modello</span><input id="ec-preview-model" name="model" defaultValue={values.model} required /></label><label className="wide"><span>Versione</span><input id="ec-preview-version" name="version" defaultValue={values.version} /></label><label><span>Alimentazione</span><input id="ec-preview-fuel" name="fuel" defaultValue={values.fuel} /></label><label><span>Cambio</span><input id="ec-preview-transmission" name="transmission" defaultValue={values.transmission} /></label><label><span>Colore</span><input id="ec-preview-color" name="color" defaultValue={values.color} /></label><label><span>Noleggiatore</span><input id="ec-preview-provider" name="provider" defaultValue={values.provider} required /></label></div></fieldset>
+            <fieldset><legend><span>02</span><div><strong>Condizioni economiche</strong><small>Canone, anticipo, durata e chilometri</small></div></legend><div className="ec-preview-fields four"><label><span>Canone €/mese</span><input id="ec-preview-monthly" name="monthly" type="number" min="0.01" step="0.01" defaultValue={values.monthly} required /></label><label><span>Anticipo €</span><input id="ec-preview-deposit" name="deposit" type="number" min="0" step="0.01" defaultValue={values.deposit} required /></label><label><span>Durata mesi</span><input id="ec-preview-duration" name="duration" type="number" min="1" defaultValue={values.duration} required /></label><label><span>Km totali</span><input id="ec-preview-km" name="totalKm" type="number" min="1" step="1" defaultValue={values.totalKm} required /></label><label className="wide"><span>Consegna</span><input id="ec-preview-delivery" name="delivery" defaultValue={values.delivery} /></label></div></fieldset>
+            <fieldset id="ec-preview-expiry"><legend><span>03</span><div><strong>Durata promozione</strong><small>Allunga o simula la riattivazione</small></div></legend><div className="ec-preview-expiry"><label><span>Scadenza</span><input id="ec-preview-valid-until" name="validUntil" type="date" defaultValue={validUntil} required /></label><div><button type="submit" name="previewAction" value="add7" formAction="/#ec-preview-expiry">+7 giorni</button><button type="submit" name="previewAction" value="add15" formAction="/#ec-preview-expiry">+15 giorni</button><button type="submit" name="previewAction" value="add30" formAction="/#ec-preview-expiry">+30 giorni</button><button id="ec-preview-reactivate-button" type="submit" name="previewAction" value="reactivate30" formAction="/#ec-preview-expiry" data-selected={reactivated ? "true" : undefined}>{reactivated ? "RIATTIVAZIONE IMPOSTATA" : "Riattiva +30"}</button></div></div><input id="ec-preview-reactivate" type="hidden" name="reactivate" value={reactivated ? "true" : "false"} />{dateCommand ? <div className="ec-preview-result" data-kind="success" data-eccomi-preview-date-updated="true"><strong>{dateCommand}</strong><span>Nuova scadenza: {italianDate(validUntil)}</span></div> : null}</fieldset>
+            <fieldset><legend><span>04</span><div><strong>Servizi e condizioni</strong><small>Un elemento per riga</small></div></legend><div className="ec-preview-fields"><label className="wide"><span>Servizi inclusi</span><textarea id="ec-preview-services" name="services" rows={5} defaultValue={values.services} /></label><label className="wide"><span>Condizioni / avvertenze</span><textarea id="ec-preview-warnings" name="warnings" rows={4} defaultValue={values.warnings} /></label></div></fieldset>
             <div className="ec-preview-shopify-id"><span>STESSO PRODOTTO SHOPIFY</span><code>{promotion.shopifyProductId}</code><small>In preview non viene effettuata alcuna chiamata a Shopify.</small></div>
-            <div id="ec-preview-result" className="ec-preview-result" hidden />
+            {saved ? <div id="ec-preview-result" className="ec-preview-result" data-kind="success"><strong>SIMULAZIONE COMPLETATA</strong><span>Nessuna modifica salvata su Supabase o Shopify. Lo stesso shopifyProductId è rimasto invariato.</span></div> : <div id="ec-preview-result" className="ec-preview-result" hidden />}
           </div>
-          <footer><span>SIMULAZIONE · nessuna scrittura su Supabase o Shopify</span><div><a href="/?view=promotions">Annulla</a><button id="ec-preview-submit" type="submit">SIMULA SALVATAGGIO</button></div></footer>
+          <footer><span>SIMULAZIONE · nessuna scrittura su Supabase o Shopify</span><div><a href="/?view=promotions">Annulla</a><button id="ec-preview-submit" type="submit" name="previewAction" value="save" formAction="/#ec-preview-result">SIMULA SALVATAGGIO</button></div></footer>
         </form>
       </aside>
-      <script data-eccomi-preview-editor-runtime="true" dangerouslySetInnerHTML={{ __html: editorRuntime }} />
     </div>
   );
 }
 
-export default function PreviewDemo({ payload, view, editId }: PreviewDemoProps) {
+export default function PreviewDemo({ payload, view, editId, query }: PreviewDemoProps) {
   const promotion = payload.promotions[0];
   const editorOpen = view === "promotions" && editId === promotion.id;
 
@@ -263,7 +264,7 @@ export default function PreviewDemo({ payload, view, editId }: PreviewDemoProps)
         <Topbar />
         {view === "promotions" ? <PromotionsView promotion={promotion} /> : <DashboardView payload={payload} />}
       </div>
-      {editorOpen ? <Editor promotion={promotion} /> : null}
+      {editorOpen ? <Editor promotion={promotion} query={query} /> : null}
     </div>
   );
 }

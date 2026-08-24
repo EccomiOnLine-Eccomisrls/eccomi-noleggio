@@ -78,12 +78,34 @@ test("renders a clientless PR demo with real dashboard, promotion and editor lin
     "/?view=promotions&edit=preview-peugeot-3008",
   );
   assert.match(editor, /id="ec-preview-editor-form"/);
-  assert.match(editor, /data-eccomi-preview-editor-runtime="true"/);
+  assert.match(editor, /data-eccomi-preview-native-form="true"/);
+  assert.match(editor, /method="get"/);
+  assert.match(
+    editor,
+    /<button(?=[^>]*name="previewAction")(?=[^>]*value="add7")[^>]*>/,
+  );
   assert.match(editor, /id="ec-preview-brand"/);
   assert.match(editor, /id="ec-preview-valid-until"/);
   assert.match(editor, /id="ec-preview-km"[^>]*step="1"/);
   assert.doesNotMatch(editor, /id="ec-preview-km"[^>]*step="1000"/);
   assert.match(editor, /SIMULA SALVATAGGIO/);
+
+  const extended = await render(
+    "/?view=promotions&edit=preview-peugeot-3008&validUntil=2026-08-29&previewAction=add7",
+  );
+  assert.match(
+    extended,
+    /<input(?=[^>]*id="ec-preview-valid-until")(?=[^>]*value="2026-09-05")[^>]*>/,
+  );
+  assert.match(extended, /data-eccomi-preview-date-updated="true"/);
+  assert.match(extended, /Nuova scadenza:[\s\S]{0,30}5 settembre 2026/);
+
+  const saved = await render(
+    "/?view=promotions&edit=preview-peugeot-3008&brand=PEUGEOT&model=3008&version=3008%203008%20Hybrid%20145&previewAction=save",
+  );
+  assert.match(saved, /PEUGEOT 3008 Hybrid 145/);
+  assert.match(saved, /SIMULAZIONE COMPLETATA/);
+  assert.match(saved, /Nessuna modifica salvata su Supabase o Shopify/);
 });
 
 test("sends the public noleggio domain to the Shopify page", async () => {

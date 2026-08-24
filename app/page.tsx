@@ -38,6 +38,7 @@ export default async function Home({ searchParams }: HomeProps) {
         payload={previewDashboardPayload()}
         view={view}
         editId={rawEdit || null}
+        query={query}
       />
     );
   }
