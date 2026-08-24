@@ -5,6 +5,7 @@ import { requireActor, routeError } from "../../lib/server/authz";
 import { getAiConnectionStatus } from "../../lib/server/ai";
 import { ensurePracticeSchema } from "../../lib/server/practice-schema";
 import { expireStalePromotions, listPromotionsForActor } from "../../lib/server/promotion-service";
+import { previewDashboardPayload } from "../../lib/server/preview-fixture";
 import { getShopifyConnectionStatus } from "../../lib/server/shopify";
 import { seedSystemData } from "../../lib/server/seed";
 
@@ -14,16 +15,16 @@ function isPullRequestPreview() {
 
 export async function GET(request: Request) {
   try {
-    const actor = await requireActor(request);
-    const preview = isPullRequestPreview();
-
-    // In production these routines keep the dataset aligned. A Render PR preview
-    // can inherit the production DB credentials, so it must remain read-only.
-    if (!preview) {
-      await seedSystemData(actor.email, actor.displayName);
-      await ensurePracticeSchema();
-      await expireStalePromotions();
+    // A PR Preview must never wait for or touch production data sources.
+    // It uses an isolated deterministic fixture for visual/functional testing.
+    if (isPullRequestPreview()) {
+      return Response.json(previewDashboardPayload());
     }
+
+    const actor = await requireActor(request);
+    await seedSystemData(actor.email, actor.displayName);
+    await ensurePracticeSchema();
+    await expireStalePromotions();
 
     const promotionRows = await listPromotionsForActor(actor);
     const shopify = await getShopifyConnectionStatus();
@@ -96,8 +97,8 @@ export async function GET(request: Request) {
       : [];
 
     return Response.json({
-      preview,
-      readOnly: preview,
+      preview: false,
+      readOnly: false,
       user: actor,
       promotions: promotionRows,
       leads: leadRows.map((lead) => ({
