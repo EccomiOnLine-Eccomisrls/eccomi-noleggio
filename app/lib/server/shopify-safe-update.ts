@@ -21,16 +21,20 @@ type SafeShopifyPromotion = {
   warnings: string[];
 };
 
+type SafeShopifyUpdateOptions = {
+  status?: "ACTIVE" | "DRAFT" | "ARCHIVED";
+};
+
 function escapeHtml(value: string) {
   return value.replace(
-    /[&<>'"]/g,
+    /[&<>'\"]/g,
     (character) =>
       ({
         "&": "&amp;",
         "<": "&lt;",
         ">": "&gt;",
         "'": "&#39;",
-        '"': "&quot;",
+        '\"': "&quot;",
       })[character] || character,
   );
 }
@@ -40,6 +44,39 @@ function euro(cents: number) {
     style: "currency",
     currency: "EUR",
   }).format(cents / 100);
+}
+
+function normalizeComparable(value: string) {
+  return value
+    .trim()
+    .toLocaleUpperCase("it-IT")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function stripPrefix(value: string, prefix: string) {
+  const normalizedValue = normalizeComparable(value);
+  const normalizedPrefix = normalizeComparable(prefix);
+  if (!normalizedValue || !normalizedPrefix || !normalizedValue.startsWith(normalizedPrefix)) {
+    return value.trim();
+  }
+
+  const sourceWords = value.trim().split(/\s+/);
+  const prefixWords = prefix.trim().split(/\s+/);
+  return sourceWords.slice(prefixWords.length).join(" ").replace(/^[\s\-–—:|]+/, "").trim();
+}
+
+export function publicPromotionTitle(promotion: Pick<SafeShopifyPromotion, "brand" | "model" | "version">) {
+  const brand = promotion.brand.trim().toUpperCase();
+  const model = promotion.model.trim();
+  let version = promotion.version.trim();
+
+  version = stripPrefix(version, `${brand} ${model}`);
+  version = stripPrefix(version, model);
+  version = stripPrefix(version, brand);
+
+  return [brand, model, version].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
 }
 
 function requestUrlFor(requestBaseUrl: string, promotionId: string) {
@@ -65,9 +102,10 @@ function descriptionFor(
     .map((warning) => `<li>${escapeHtml(warning)}</li>`)
     .join("");
   const requestUrl = requestUrlFor(requestBaseUrl, promotion.id);
+  const publicTitle = publicPromotionTitle(promotion);
 
   return [
-    `<h2>${escapeHtml(promotion.brand)} ${escapeHtml(promotion.model)}</h2>`,
+    `<h2>${escapeHtml(publicTitle)}</h2>`,
     `<p><strong>${euro(promotion.monthlyGrossCents)} al mese IVA inclusa</strong></p>`,
     `<p><strong>Anticipo:</strong> ${euro(promotion.depositGrossCents)} · <strong>Durata:</strong> ${promotion.durationMonths} mesi · <strong>Chilometri:</strong> ${promotion.totalKm.toLocaleString("it-IT")} km</p>`,
     promotion.delivery
@@ -90,6 +128,7 @@ function descriptionFor(
 export async function updatePromotionOnShopifyWithoutUrlMetafields(
   productId: string,
   promotion: SafeShopifyPromotion,
+  options: SafeShopifyUpdateOptions = {},
 ) {
   const runtime = getRuntimeEnv();
   const templateSuffix =
@@ -98,6 +137,8 @@ export async function updatePromotionOnShopifyWithoutUrlMetafields(
   const requestBaseUrl =
     runtime.PUBLIC_REQUEST_BASE_URL?.trim() ||
     "https://eccomi-noleggio.onrender.com/richiesta";
+  const productStatus = options.status || "ACTIVE";
+  const publicTitle = publicPromotionTitle(promotion);
 
   const data = await shopifyAdminFetch<{
     productUpdate: {
@@ -130,14 +171,14 @@ export async function updatePromotionOnShopifyWithoutUrlMetafields(
     {
       product: {
         id: productId,
-        title: `${promotion.brand} ${promotion.model} a noleggio lungo termine – ${euro(promotion.monthlyGrossCents)}/mese`,
+        title: publicTitle,
         descriptionHtml: descriptionFor(promotion, requestBaseUrl),
         productType: "Noleggio a lungo termine",
         vendor: "ECCOMI NOLEGGIO",
-        status: "ACTIVE",
+        status: productStatus,
         templateSuffix,
         seo: {
-          title: `${promotion.brand} ${promotion.model} a noleggio lungo termine`,
+          title: `${publicTitle} | Noleggio lungo termine`,
           description: `${euro(promotion.monthlyGrossCents)}/mese, ${promotion.durationMonths} mesi, ${promotion.totalKm.toLocaleString("it-IT")} km, anticipo ${euro(promotion.depositGrossCents)}.`,
         },
         tags: [
@@ -250,6 +291,8 @@ export async function updatePromotionOnShopifyWithoutUrlMetafields(
   return {
     productId: product.id,
     handle: product.handle,
+    status: product.status,
+    publicTitle,
     url: `${storefrontBase}/products/${product.handle}`,
     adminUrl: shopDomain
       ? `${storefrontBase}/admin/products/${product.id.split("/").pop()}`
