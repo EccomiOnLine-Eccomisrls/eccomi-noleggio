@@ -8,12 +8,23 @@ import { expireStalePromotions, listPromotionsForActor } from "../../lib/server/
 import { getShopifyConnectionStatus } from "../../lib/server/shopify";
 import { seedSystemData } from "../../lib/server/seed";
 
+function isPullRequestPreview() {
+  return typeof process !== "undefined" && process.env?.IS_PULL_REQUEST === "true";
+}
+
 export async function GET(request: Request) {
   try {
     const actor = await requireActor(request);
-    await seedSystemData(actor.email, actor.displayName);
-    await ensurePracticeSchema();
-    await expireStalePromotions();
+    const preview = isPullRequestPreview();
+
+    // In production these routines keep the dataset aligned. A Render PR preview
+    // can inherit the production DB credentials, so it must remain read-only.
+    if (!preview) {
+      await seedSystemData(actor.email, actor.displayName);
+      await ensurePracticeSchema();
+      await expireStalePromotions();
+    }
+
     const promotionRows = await listPromotionsForActor(actor);
     const shopify = await getShopifyConnectionStatus();
     const ai = await getAiConnectionStatus();
@@ -85,6 +96,8 @@ export async function GET(request: Request) {
       : [];
 
     return Response.json({
+      preview,
+      readOnly: preview,
       user: actor,
       promotions: promotionRows,
       leads: leadRows.map((lead) => ({
