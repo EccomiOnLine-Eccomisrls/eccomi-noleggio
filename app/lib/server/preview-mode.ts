@@ -12,11 +12,14 @@ export function isRenderPullRequestPreview(request?: Request) {
     }
   }
 
+  const isRenderPreviewHostname = (hostname: string) =>
+    hostname.includes("-pr-") && hostname.endsWith(".onrender.com");
+
   return (
     pullRequestFlag === "true" ||
     /^\d+$/.test(pullRequestFlag || "") ||
     serviceName.includes("-pr-") ||
-    externalHostname.includes("-pr-") ||
-    requestHostname.includes("-pr-")
+    isRenderPreviewHostname(externalHostname) ||
+    isRenderPreviewHostname(requestHostname)
   );
 }

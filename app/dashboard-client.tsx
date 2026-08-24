@@ -134,6 +134,20 @@ type LeadSummary = {
   partnerName: string;
 };
 
+export type DashboardBootstrapPayload = {
+  promotions: Promotion[];
+  leads?: LeadSummary[];
+  hubEvents?: HubEvent[];
+  integrations: {
+    shopify: ShopifyConnectionState;
+    ai: AiConnectionState;
+  };
+};
+
+type DashboardClientProps = {
+  initialDashboard?: DashboardBootstrapPayload | null;
+};
+
 const disconnectedShopify: ShopifyConnectionState = {
   connected: false,
   publishingReady: false,
@@ -793,7 +807,7 @@ function AiConnectionModal({
   );
 }
 
-export default function Home() {
+export default function Home({ initialDashboard = null }: DashboardClientProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState<ViewName>("Dashboard");
   const [searchQuery, setSearchQuery] = useState("");
@@ -803,12 +817,22 @@ export default function Home() {
   const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
   const [customerPreview, setCustomerPreview] = useState<Promotion | null>(null);
   const [applicationPreview, setApplicationPreview] = useState<Promotion | null>(null);
-  const [promotionItems, setPromotionItems] = useState<Promotion[]>(initialPromotions);
-  const [leadItems, setLeadItems] = useState<LeadSummary[]>([]);
-  const [hubEvents, setHubEvents] = useState<HubEvent[]>([]);
-  const [shopify, setShopify] = useState<ShopifyConnectionState>(disconnectedShopify);
+  const [promotionItems, setPromotionItems] = useState<Promotion[]>(
+    initialDashboard?.promotions || initialPromotions,
+  );
+  const [leadItems, setLeadItems] = useState<LeadSummary[]>(
+    initialDashboard?.leads || [],
+  );
+  const [hubEvents, setHubEvents] = useState<HubEvent[]>(
+    initialDashboard?.hubEvents || [],
+  );
+  const [shopify, setShopify] = useState<ShopifyConnectionState>(
+    initialDashboard?.integrations.shopify || disconnectedShopify,
+  );
   const [shopifyOpen, setShopifyOpen] = useState(false);
-  const [ai, setAi] = useState<AiConnectionState>(disconnectedAi);
+  const [ai, setAi] = useState<AiConnectionState>(
+    initialDashboard?.integrations.ai || disconnectedAi,
+  );
   const [aiOpen, setAiOpen] = useState(false);
   const [suggestedShopDomain] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -823,7 +847,7 @@ export default function Home() {
     "partner" | "shopify" | "ai" | null
   >(null);
   const [toast, setToast] = useState("");
-  const [authChecking, setAuthChecking] = useState(true);
+  const [authChecking, setAuthChecking] = useState(!initialDashboard);
   const [authRequired, setAuthRequired] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -1102,6 +1126,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (initialDashboard) return;
+
     let mounted = true;
 
     fetch("/api/dashboard", {
@@ -1153,7 +1179,7 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [initialDashboard]);
 
   const handleCeoLogin = async (
     event: FormEvent<HTMLFormElement>,
