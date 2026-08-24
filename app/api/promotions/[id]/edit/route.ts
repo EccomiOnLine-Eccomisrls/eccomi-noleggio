@@ -43,17 +43,13 @@ function cleanString(value: unknown, fallback = "") {
 
 function positiveInteger(value: unknown, label: string) {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${label} non valido.`);
-  }
+  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`${label} non valido.`);
   return parsed;
 }
 
 function nonNegativeInteger(value: unknown, label: string) {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new Error(`${label} non valido.`);
-  }
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`${label} non valido.`);
   return parsed;
 }
 
@@ -120,9 +116,7 @@ function previewUpdatedPromotion(body: EditPayload) {
 
   const remainingDays = daysFromToday(validUntil);
   const reactivate = body.reactivate === true;
-  if (reactivate && remainingDays <= 0) {
-    throw new Error("Per riattivare l'offerta imposta una nuova data futura.");
-  }
+  if (reactivate && remainingDays <= 0) throw new Error("Per riattivare l'offerta imposta una nuova data futura.");
 
   let status = base.status;
   if (remainingDays <= 0) status = "EXPIRED";
@@ -174,7 +168,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const { id } = await context.params;
 
-    if (isRenderPullRequestPreview()) {
+    if (isRenderPullRequestPreview(request)) {
       if (id !== previewPromotionEditable.id) {
         return Response.json({ error: "Promozione preview non trovata." }, { status: 404 });
       }
@@ -184,10 +178,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     await requireCeo(request);
     const [promotion] = await getDb().select().from(promotions).where(eq(promotions.id, id)).limit(1);
     if (!promotion) return Response.json({ error: "Promozione non trovata." }, { status: 404 });
-    return Response.json({
-      promotion: responsePromotion(promotion),
-      preview: false,
-    });
+    return Response.json({ promotion: responsePromotion(promotion), preview: false });
   } catch (error) {
     return routeError(error);
   }
@@ -198,7 +189,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { id } = await context.params;
     const body = await request.json().catch(() => ({})) as EditPayload;
 
-    if (isRenderPullRequestPreview()) {
+    if (isRenderPullRequestPreview(request)) {
       if (id !== previewPromotionEditable.id) {
         return Response.json({ error: "Promozione preview non trovata." }, { status: 404 });
       }
@@ -248,13 +239,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
 
     let nextStatus = promotion.status;
-    if (remainingDays <= 0) {
-      nextStatus = "EXPIRED";
-    } else if (promotion.status === "EXPIRED") {
-      nextStatus = reactivate ? (promotion.shopifyProductId ? "ONLINE" : "PENDING_APPROVAL") : "EXPIRED";
-    } else if (promotion.status === "EXPIRING" && remainingDays > 7) {
-      nextStatus = "ONLINE";
-    }
+    if (remainingDays <= 0) nextStatus = "EXPIRED";
+    else if (promotion.status === "EXPIRED") nextStatus = reactivate ? (promotion.shopifyProductId ? "ONLINE" : "PENDING_APPROVAL") : "EXPIRED";
+    else if (promotion.status === "EXPIRING" && remainingDays > 7) nextStatus = "ONLINE";
 
     const updatedPromotion = {
       id: promotion.id,
@@ -322,9 +309,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       servicesJson: JSON.stringify(services),
       warningsJson: JSON.stringify(warnings),
       status: nextStatus,
-      automationStatus: shopifyResult
-        ? (shopifyResult.status === "ACTIVE" ? "ONLINE" : "READY_FOR_CEO")
-        : promotion.automationStatus,
+      automationStatus: shopifyResult ? (shopifyResult.status === "ACTIVE" ? "ONLINE" : "READY_FOR_CEO") : promotion.automationStatus,
       automationError: null,
       shopifyHandle: shopifyResult?.handle || promotion.shopifyHandle,
       shopifyUrl: shopifyResult?.url || promotion.shopifyUrl,
@@ -355,9 +340,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       ecosystem: "ECCOMI_NOLEGGIO",
       entityType: "promotion",
       entityId: id,
-      title: reactivate
-        ? `${brand} ${model} riattivata fino al ${validUntil}`
-        : `${brand} ${model} aggiornata`,
+      title: reactivate ? `${brand} ${model} riattivata fino al ${validUntil}` : `${brand} ${model} aggiornata`,
       payloadJson: JSON.stringify({
         offerNumber: promotion.offerNumber,
         changedFields,
