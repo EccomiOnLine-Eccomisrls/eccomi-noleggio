@@ -110,6 +110,7 @@ export default function PromotionEditControls() {
   const [servicesText, setServicesText] = useState("");
   const [warningsText, setWarningsText] = useState("");
   const [reactivate, setReactivate] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadingEditor, setLoadingEditor] = useState(false);
   const [error, setError] = useState("");
@@ -134,6 +135,7 @@ export default function PromotionEditControls() {
       if (!response.ok) throw new Error(payload.error || "Offerta non disponibile.");
       const promotion = payload.promotion as EditablePromotion;
       setEditor(promotion);
+      setPreviewMode(payload.preview === true);
       setMonthlyEuro(centsToEuroInput(promotion.monthlyGrossCents));
       setDepositEuro(centsToEuroInput(promotion.depositGrossCents));
       setServicesText(promotion.services.join("\n"));
@@ -152,6 +154,7 @@ export default function PromotionEditControls() {
 
   useEffect(() => {
     const enhance = () => {
+      const previewHost = window.location.hostname.includes("-pr-");
       const footer = document.querySelector<HTMLElement>(".promotion-modal__footer");
       if (footer && footer.dataset.ecEditReady !== "true") {
         const offerText = document.querySelector<HTMLElement>(".promotion-check__title .offer-code")?.textContent || "";
@@ -168,6 +171,15 @@ export default function PromotionEditControls() {
           const managementGroup = footer.querySelector<HTMLElement>('[aria-label="Gestione offerta CEO"]');
           (managementGroup || footer).prepend(button);
         }
+      }
+
+      if (previewHost) {
+        document.querySelectorAll<HTMLButtonElement>('[aria-label="Gestione offerta CEO"] button').forEach((button) => {
+          if (!button.dataset.ecPromotionEditTrigger) {
+            button.disabled = true;
+            button.title = "Disabilitato nella preview: evita modifiche ai dati reali.";
+          }
+        });
       }
 
       const summary = document.querySelector<HTMLElement>(".ceo-decision-hero__summary");
@@ -208,6 +220,7 @@ export default function PromotionEditControls() {
     setEditor(null);
     setError("");
     setReactivate(false);
+    setPreviewMode(false);
   };
 
   const extend = (days: number, shouldReactivate = false) => {
@@ -247,6 +260,14 @@ export default function PromotionEditControls() {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Salvataggio non riuscito.");
+
+      if (payload.preview === true) {
+        if (payload.promotion) setEditor(payload.promotion as EditablePromotion);
+        setReactivate(false);
+        window.alert("SIMULAZIONE PREVIEW completata. Nessuna modifica è stata salvata su Supabase o Shopify.");
+        return;
+      }
+
       window.alert(
         reactivate
           ? "Promozione aggiornata, riattivata e sincronizzata sullo stesso prodotto Shopify."
@@ -270,15 +291,22 @@ export default function PromotionEditControls() {
       <aside className="ec-promo-editor__drawer" role="dialog" aria-modal="true" aria-labelledby="ec-promo-editor-title">
         <header className="ec-promo-editor__header">
           <div>
-            <span>ECCOMI NOLEGGIO · SOLO CEO</span>
+            <span>{previewMode ? "ECCOMI NOLEGGIO · PREVIEW SICURA" : "ECCOMI NOLEGGIO · SOLO CEO"}</span>
             <h2 id="ec-promo-editor-title">Modifica offerta</h2>
-            <p>Correggi la scheda e aggiorna lo stesso prodotto Shopify senza crearne uno nuovo.</p>
+            <p>{previewMode ? "Modalità simulazione: puoi provare tutto, ma Supabase e Shopify non verranno modificati." : "Correggi la scheda e aggiorna lo stesso prodotto Shopify senza crearne uno nuovo."}</p>
           </div>
           <button type="button" onClick={closeEditor} aria-label="Chiudi">×</button>
         </header>
 
         <form onSubmit={save}>
           <div className="ec-promo-editor__body">
+            {previewMode ? (
+              <div className="ec-promo-editor__preview-banner">
+                <strong>PREVIEW SICURA</strong>
+                <span>Il pulsante finale esegue solo una simulazione. Nessun dato reale viene scritto.</span>
+              </div>
+            ) : null}
+
             <section className="ec-promo-editor__summary">
               <div>
                 <small>OFFERTA {editor.offerNumber}</small>
@@ -342,10 +370,10 @@ export default function PromotionEditControls() {
           </div>
 
           <footer className="ec-promo-editor__footer">
-            <span>{editor.shopifyProductId ? "Salva = aggiorna lo stesso prodotto Shopify" : "Prodotto Shopify non ancora creato"}</span>
+            <span>{previewMode ? "PREVIEW: nessuna scrittura su Supabase o Shopify" : editor.shopifyProductId ? "Salva = aggiorna lo stesso prodotto Shopify" : "Prodotto Shopify non ancora creato"}</span>
             <div>
               <button type="button" className="ec-promo-editor__cancel" onClick={closeEditor} disabled={busy}>Annulla</button>
-              <button type="submit" className="ec-promo-editor__save" disabled={busy}>{busy ? "Salvataggio…" : reactivate ? "Salva e riattiva" : "Salva modifiche"}</button>
+              <button type="submit" className="ec-promo-editor__save" disabled={busy}>{busy ? "Simulazione…" : previewMode ? "Simula salvataggio" : reactivate ? "Salva e riattiva" : "Salva modifiche"}</button>
             </div>
           </footer>
         </form>
