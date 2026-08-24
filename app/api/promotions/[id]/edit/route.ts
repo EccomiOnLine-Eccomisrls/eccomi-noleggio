@@ -24,6 +24,10 @@ type EditPayload = {
   reactivate?: boolean;
 };
 
+function isPullRequestPreview() {
+  return process.env.IS_PULL_REQUEST === "true";
+}
+
 function jsonArray(value: string) {
   try {
     const parsed = JSON.parse(value);
@@ -101,7 +105,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const { id } = await context.params;
     const [promotion] = await getDb().select().from(promotions).where(eq(promotions.id, id)).limit(1);
     if (!promotion) return Response.json({ error: "Promozione non trovata." }, { status: 404 });
-    return Response.json({ promotion: responsePromotion(promotion) });
+    return Response.json({
+      promotion: responsePromotion(promotion),
+      preview: isPullRequestPreview(),
+    });
   } catch (error) {
     return routeError(error);
   }
@@ -173,6 +180,42 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       warnings,
     };
 
+    const changedFields = Object.entries({
+      brand: [promotion.brand, brand],
+      model: [promotion.model, model],
+      version: [promotion.version, version],
+      provider: [promotion.provider, provider],
+      monthlyGrossCents: [promotion.monthlyGrossCents, monthlyGrossCents],
+      depositGrossCents: [promotion.depositGrossCents, depositGrossCents],
+      durationMonths: [promotion.durationMonths, durationMonths],
+      totalKm: [promotion.totalKm, totalKm],
+      validUntil: [promotion.validUntil, validUntil],
+      delivery: [promotion.delivery, delivery],
+      fuel: [promotion.fuel, fuel],
+      transmission: [promotion.transmission, transmission],
+      color: [promotion.color, color],
+    }).filter(([, values]) => values[0] !== values[1]).map(([field]) => field);
+
+    // PR Preview safety: Render copies the base service environment variables to
+    // the preview. Never mutate production Supabase or Shopify from a preview.
+    if (isPullRequestPreview()) {
+      return Response.json({
+        ok: true,
+        preview: true,
+        simulated: true,
+        promotion: {
+          ...responsePromotion(promotion),
+          ...updatedPromotion,
+          status: nextStatus,
+          updatedAt: new Date().toISOString(),
+        },
+        shopify: null,
+        changedFields,
+        reactivated: reactivate,
+        message: "SIMULAZIONE PREVIEW: nessuna modifica salvata su Supabase o Shopify.",
+      });
+    }
+
     const shouldSyncShopify = body.syncShopify !== false && Boolean(promotion.shopifyProductId);
     let shopifyResult: Awaited<ReturnType<typeof updatePromotionOnShopifyWithoutUrlMetafields>> | null = null;
 
@@ -211,22 +254,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       shopifyUrl: shopifyResult?.url || promotion.shopifyUrl,
       updatedAt: now,
     }).where(eq(promotions.id, id));
-
-    const changedFields = Object.entries({
-      brand: [promotion.brand, brand],
-      model: [promotion.model, model],
-      version: [promotion.version, version],
-      provider: [promotion.provider, provider],
-      monthlyGrossCents: [promotion.monthlyGrossCents, monthlyGrossCents],
-      depositGrossCents: [promotion.depositGrossCents, depositGrossCents],
-      durationMonths: [promotion.durationMonths, durationMonths],
-      totalKm: [promotion.totalKm, totalKm],
-      validUntil: [promotion.validUntil, validUntil],
-      delivery: [promotion.delivery, delivery],
-      fuel: [promotion.fuel, fuel],
-      transmission: [promotion.transmission, transmission],
-      color: [promotion.color, color],
-    }).filter(([, values]) => values[0] !== values[1]).map(([field]) => field);
 
     await getDb().insert(auditLogs).values({
       id: crypto.randomUUID(),
@@ -269,6 +296,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const [saved] = await getDb().select().from(promotions).where(eq(promotions.id, id)).limit(1);
     return Response.json({
       ok: true,
+      preview: false,
       promotion: saved ? responsePromotion(saved) : null,
       shopify: shopifyResult,
       changedFields,
