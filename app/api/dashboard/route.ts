@@ -6,18 +6,15 @@ import { getAiConnectionStatus } from "../../lib/server/ai";
 import { ensurePracticeSchema } from "../../lib/server/practice-schema";
 import { expireStalePromotions, listPromotionsForActor } from "../../lib/server/promotion-service";
 import { previewDashboardPayload } from "../../lib/server/preview-fixture";
+import { isRenderPullRequestPreview } from "../../lib/server/preview-mode";
 import { getShopifyConnectionStatus } from "../../lib/server/shopify";
 import { seedSystemData } from "../../lib/server/seed";
 
-function isPullRequestPreview() {
-  return typeof process !== "undefined" && process.env?.IS_PULL_REQUEST === "true";
-}
-
 export async function GET(request: Request) {
   try {
-    // A PR Preview must never wait for or touch production data sources.
-    // It uses an isolated deterministic fixture for visual/functional testing.
-    if (isPullRequestPreview()) {
+    // Render PR previews must never wait for or touch production data sources.
+    // Detection uses both Render's PR flag and the generated -pr- service/host name.
+    if (isRenderPullRequestPreview()) {
       return Response.json(previewDashboardPayload());
     }
 
