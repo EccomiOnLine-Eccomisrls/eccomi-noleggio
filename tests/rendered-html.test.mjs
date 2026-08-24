@@ -43,6 +43,38 @@ test("renders development preview metadata", async () => {
   assert.match(await response.text(), developmentPreviewMeta);
 });
 
+test("renders the isolated PR fixture with its hydration guard before the client entry", async () => {
+  const worker = await loadWorker();
+  const previewHost = "eccomi-noleggio-pr-3.onrender.com";
+  const response = await worker.fetch(
+    new Request(`https://${previewHost}/`, {
+      headers: {
+        accept: "text/html",
+        host: previewHost,
+        "x-forwarded-proto": "https",
+      },
+    }),
+    testEnvironment(),
+    testContext,
+  );
+
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  const guardPosition = html.indexOf(
+    'data-eccomi-preview-hydration-guard="true"',
+  );
+  const clientEntryPosition = html.indexOf('id="_R_"');
+
+  assert.ok(guardPosition >= 0, "preview hydration guard is missing");
+  assert.ok(
+    clientEntryPosition > guardPosition,
+    "preview hydration guard must execute before the client entry",
+  );
+  assert.match(html, /PEUGEOT/);
+  assert.match(html, /3008 Hybrid 145 e-DCS6 Allure Business/);
+  assert.doesNotMatch(html, /Verifica accesso/);
+});
+
 test("sends the public noleggio domain to the Shopify page", async () => {
   const worker = await loadWorker();
   const destination = "https://eccomionline.com/pages/eccomi-noleggio";
