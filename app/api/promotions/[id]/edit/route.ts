@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
 import { auditLogs, hubEvents, promotions } from "../../../../../db/schema";
 import { requireCeo, routeError } from "../../../../lib/server/authz";
+import { previewPromotionEditable } from "../../../../lib/server/preview-fixture";
+import { isRenderPullRequestPreview } from "../../../../lib/server/preview-mode";
 import { updatePromotionOnShopifyWithoutUrlMetafields } from "../../../../lib/server/shopify-safe-update";
 
 type EditPayload = {
@@ -23,10 +25,6 @@ type EditPayload = {
   syncShopify?: boolean;
   reactivate?: boolean;
 };
-
-function isPullRequestPreview() {
-  return process.env.IS_PULL_REQUEST === "true";
-}
 
 function jsonArray(value: string) {
   try {
@@ -99,15 +97,96 @@ function responsePromotion(promotion: typeof promotions.$inferSelect) {
   };
 }
 
+function previewUpdatedPromotion(body: EditPayload) {
+  const base = previewPromotionEditable;
+  const brand = cleanString(body.brand, base.brand).toUpperCase();
+  const model = cleanString(body.model, base.model);
+  const version = cleanString(body.version, base.version);
+  const provider = cleanString(body.provider, base.provider);
+  const delivery = cleanString(body.delivery, base.delivery);
+  const fuel = cleanString(body.fuel, base.fuel);
+  const transmission = cleanString(body.transmission, base.transmission);
+  const color = cleanString(body.color, base.color);
+  const monthlyGrossCents = positiveInteger(body.monthlyGrossCents ?? base.monthlyGrossCents, "Canone");
+  const depositGrossCents = nonNegativeInteger(body.depositGrossCents ?? base.depositGrossCents, "Anticipo");
+  const durationMonths = positiveInteger(body.durationMonths ?? base.durationMonths, "Durata");
+  const totalKm = positiveInteger(body.totalKm ?? base.totalKm, "Chilometri");
+  const validUntil = cleanString(body.validUntil, base.validUntil);
+  const services = Array.isArray(body.services) ? body.services.map((item) => cleanString(item)).filter(Boolean) : base.services;
+  const warnings = Array.isArray(body.warnings) ? body.warnings.map((item) => cleanString(item)).filter(Boolean) : base.warnings;
+
+  if (!brand || !model || !provider) throw new Error("Marca, modello e noleggiatore sono obbligatori.");
+  if (!validIsoDate(validUntil)) throw new Error("Data di scadenza non valida.");
+
+  const remainingDays = daysFromToday(validUntil);
+  const reactivate = body.reactivate === true;
+  if (reactivate && remainingDays <= 0) {
+    throw new Error("Per riattivare l'offerta imposta una nuova data futura.");
+  }
+
+  let status = base.status;
+  if (remainingDays <= 0) status = "EXPIRED";
+  else if (reactivate) status = "ONLINE";
+  else if (remainingDays <= 7) status = "EXPIRING";
+  else status = "ONLINE";
+
+  const promotion = {
+    ...base,
+    brand,
+    model,
+    version,
+    provider,
+    monthlyGrossCents,
+    depositGrossCents,
+    durationMonths,
+    totalKm,
+    validUntil,
+    delivery,
+    fuel,
+    transmission,
+    color,
+    services,
+    warnings,
+    status,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const changedFields = Object.entries({
+    brand: [base.brand, brand],
+    model: [base.model, model],
+    version: [base.version, version],
+    provider: [base.provider, provider],
+    monthlyGrossCents: [base.monthlyGrossCents, monthlyGrossCents],
+    depositGrossCents: [base.depositGrossCents, depositGrossCents],
+    durationMonths: [base.durationMonths, durationMonths],
+    totalKm: [base.totalKm, totalKm],
+    validUntil: [base.validUntil, validUntil],
+    delivery: [base.delivery, delivery],
+    fuel: [base.fuel, fuel],
+    transmission: [base.transmission, transmission],
+    color: [base.color, color],
+  }).filter(([, values]) => values[0] !== values[1]).map(([field]) => field);
+
+  return { promotion, changedFields, reactivate };
+}
+
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    await requireCeo(request);
     const { id } = await context.params;
+
+    if (isRenderPullRequestPreview()) {
+      if (id !== previewPromotionEditable.id) {
+        return Response.json({ error: "Promozione preview non trovata." }, { status: 404 });
+      }
+      return Response.json({ promotion: previewPromotionEditable, preview: true });
+    }
+
+    await requireCeo(request);
     const [promotion] = await getDb().select().from(promotions).where(eq(promotions.id, id)).limit(1);
     if (!promotion) return Response.json({ error: "Promozione non trovata." }, { status: 404 });
     return Response.json({
       promotion: responsePromotion(promotion),
-      preview: isPullRequestPreview(),
+      preview: false,
     });
   } catch (error) {
     return routeError(error);
@@ -116,10 +195,27 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const actor = await requireCeo(request);
     const { id } = await context.params;
     const body = await request.json().catch(() => ({})) as EditPayload;
 
+    if (isRenderPullRequestPreview()) {
+      if (id !== previewPromotionEditable.id) {
+        return Response.json({ error: "Promozione preview non trovata." }, { status: 404 });
+      }
+      const simulated = previewUpdatedPromotion(body);
+      return Response.json({
+        ok: true,
+        preview: true,
+        simulated: true,
+        promotion: simulated.promotion,
+        shopify: null,
+        changedFields: simulated.changedFields,
+        reactivated: simulated.reactivate,
+        message: "SIMULAZIONE PREVIEW: nessuna modifica salvata su Supabase o Shopify.",
+      });
+    }
+
+    const actor = await requireCeo(request);
     const [promotion] = await getDb().select().from(promotions).where(eq(promotions.id, id)).limit(1);
     if (!promotion) return Response.json({ error: "Promozione non trovata." }, { status: 404 });
     if (["TRASHED", "ARCHIVED"].includes(promotion.status)) {
@@ -195,26 +291,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       transmission: [promotion.transmission, transmission],
       color: [promotion.color, color],
     }).filter(([, values]) => values[0] !== values[1]).map(([field]) => field);
-
-    // PR Preview safety: Render copies the base service environment variables to
-    // the preview. Never mutate production Supabase or Shopify from a preview.
-    if (isPullRequestPreview()) {
-      return Response.json({
-        ok: true,
-        preview: true,
-        simulated: true,
-        promotion: {
-          ...responsePromotion(promotion),
-          ...updatedPromotion,
-          status: nextStatus,
-          updatedAt: new Date().toISOString(),
-        },
-        shopify: null,
-        changedFields,
-        reactivated: reactivate,
-        message: "SIMULAZIONE PREVIEW: nessuna modifica salvata su Supabase o Shopify.",
-      });
-    }
 
     const shouldSyncShopify = body.syncShopify !== false && Boolean(promotion.shopifyProductId);
     let shopifyResult: Awaited<ReturnType<typeof updatePromotionOnShopifyWithoutUrlMetafields>> | null = null;
