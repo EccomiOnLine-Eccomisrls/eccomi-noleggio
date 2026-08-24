@@ -43,36 +43,45 @@ test("renders development preview metadata", async () => {
   assert.match(await response.text(), developmentPreviewMeta);
 });
 
-test("renders the isolated PR fixture with its hydration guard before the client entry", async () => {
+test("renders a clientless PR demo with real dashboard, promotion and editor links", async () => {
   const worker = await loadWorker();
   const previewHost = "eccomi-noleggio-pr-3.onrender.com";
-  const response = await worker.fetch(
-    new Request(`https://${previewHost}/`, {
-      headers: {
-        accept: "text/html",
-        host: previewHost,
-        "x-forwarded-proto": "https",
-      },
-    }),
-    testEnvironment(),
-    testContext,
-  );
+  const render = async (pathname) => {
+    const response = await worker.fetch(
+      new Request(`https://${previewHost}${pathname}`, {
+        headers: {
+          accept: "text/html",
+          host: previewHost,
+          "x-forwarded-proto": "https",
+        },
+      }),
+      testEnvironment(),
+      testContext,
+    );
+    assert.equal(response.status, 200);
+    return response.text();
+  };
 
-  assert.equal(response.status, 200);
-  const html = await response.text();
-  const guardPosition = html.indexOf(
-    'data-eccomi-preview-hydration-guard="true"',
-  );
-  const clientEntryPosition = html.indexOf('id="_R_"');
+  const dashboard = await render("/");
+  assert.match(dashboard, /data-eccomi-clientless-preview="true"/);
+  assert.match(dashboard, /href="\/?\?view=promotions"/);
+  assert.match(dashboard, /PREVIEW CLIENTLESS ATTIVA/);
+  assert.match(dashboard, /PEUGEOT/);
+  assert.doesNotMatch(dashboard, /Verifica accesso/);
 
-  assert.ok(guardPosition >= 0, "preview hydration guard is missing");
-  assert.ok(
-    clientEntryPosition > guardPosition,
-    "preview hydration guard must execute before the client entry",
+  const promotions = await render("/?view=promotions");
+  assert.match(promotions, /<h1>Promozioni<\/h1>/);
+  assert.match(promotions, /3008 Hybrid 145 e-DCS6 Allure Business/);
+  assert.match(promotions, /href="\/?\?view=promotions&amp;edit=preview-peugeot-3008"/);
+
+  const editor = await render(
+    "/?view=promotions&edit=preview-peugeot-3008",
   );
-  assert.match(html, /PEUGEOT/);
-  assert.match(html, /3008 Hybrid 145 e-DCS6 Allure Business/);
-  assert.doesNotMatch(html, /Verifica accesso/);
+  assert.match(editor, /id="ec-preview-editor-form"/);
+  assert.match(editor, /data-eccomi-preview-editor-runtime="true"/);
+  assert.match(editor, /id="ec-preview-brand"/);
+  assert.match(editor, /id="ec-preview-valid-until"/);
+  assert.match(editor, /SIMULA SALVATAGGIO/);
 });
 
 test("sends the public noleggio domain to the Shopify page", async () => {
