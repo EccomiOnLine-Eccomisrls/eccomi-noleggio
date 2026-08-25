@@ -25,6 +25,125 @@ function queryValue(
   return Array.isArray(value) ? value[0] : value;
 }
 
+function isIpadLikeUserAgent(userAgent: string) {
+  return /iPad|iPhone|iPod/i.test(userAgent)
+    || (/Macintosh/i.test(userAgent) && /Mobile\//i.test(userAgent));
+}
+
+function useServerSafeDashboard(
+  request: Request,
+  params: Record<string, string | string[] | undefined> | undefined,
+) {
+  if (queryValue(params, "client") === "1") return false;
+  if (queryValue(params, "safe") === "1") return true;
+  return isIpadLikeUserAgent(request.headers.get("user-agent") || "");
+}
+
+function CeoServerSafeDashboard({
+  dashboard,
+}: {
+  dashboard: DashboardBootstrapPayload;
+}) {
+  const promotions = dashboard.promotions.filter(
+    (promotion) => String(promotion.status) !== "TRASHED",
+  );
+  const onlineCount = promotions.filter((promotion) =>
+    ["ONLINE", "ACTIVE", "EXPIRING"].includes(promotion.status),
+  ).length;
+  const attentionCount = promotions.filter((promotion) =>
+    ["EXPIRED", "EXPIRING"].includes(promotion.status),
+  ).length;
+  const leadCount = dashboard.leads?.length || 0;
+
+  return (
+    <main className="ceo-server-page" data-ipad-safe-dashboard="true">
+      <header className="ceo-server-bar">
+        <div className="ceo-server-bar__brand">
+          <span>🚙</span>
+          <div><strong>ECCOMI</strong><small>NOLEGGIO</small></div>
+        </div>
+        <a href="/ceo/promotions">Gestione promozioni →</a>
+      </header>
+
+      <section className="ceo-server-heading">
+        <small>MODALITÀ COMPATIBILITÀ IPAD · SERVER-SIDE</small>
+        <h1>Dashboard CEO</h1>
+        <p>
+          Vista operativa leggera: non carica la dashboard React completa e
+          impedisce al browser iPad di restare bloccato durante l’accesso.
+        </p>
+      </section>
+
+      <section className="ceo-server-kpis" aria-label="Riepilogo operativo">
+        <article>
+          <small>PROMOZIONI</small>
+          <strong>{promotions.length}</strong>
+          <span>Offerte presenti</span>
+        </article>
+        <article>
+          <small>ONLINE</small>
+          <strong>{onlineCount}</strong>
+          <span>Offerte operative</span>
+        </article>
+        <article>
+          <small>DA ATTENZIONARE</small>
+          <strong>{attentionCount}</strong>
+          <span>Scadute o in scadenza</span>
+        </article>
+      </section>
+
+      <section className="ceo-server-panel" aria-label="Aree operative">
+        <article className="ceo-server-promotion">
+          <div className="ceo-server-promotion__vehicle">
+            <small>NOLEGGIO</small>
+            <strong>Promozioni</strong>
+            <em className="ceo-server-status ceo-server-status--online">OPERATIVO</em>
+          </div>
+          <div className="ceo-server-promotion__copy">
+            <small>GESTIONE REALE</small>
+            <h2>Gestione promozioni</h2>
+            <p>Modifica vetture, canoni, km, scadenze e sincronizzazione Shopify.</p>
+          </div>
+          <div className="ceo-server-promotion__actions">
+            <a className="ceo-server-primary" href="/ceo/promotions">Apri promozioni</a>
+          </div>
+        </article>
+
+        <article className="ceo-server-promotion">
+          <div className="ceo-server-promotion__vehicle">
+            <small>CLIENTI</small>
+            <strong>{leadCount}</strong>
+            <em className="ceo-server-status">LEAD E PRATICHE</em>
+          </div>
+          <div className="ceo-server-promotion__copy">
+            <small>OPERATIVITÀ</small>
+            <h2>Registro pratiche</h2>
+            <p>Consulta richieste, clienti e avanzamento delle pratiche di noleggio.</p>
+          </div>
+          <div className="ceo-server-promotion__actions">
+            <a className="ceo-server-secondary" href="/registro">Apri registro</a>
+          </div>
+        </article>
+
+        <article className="ceo-server-promotion">
+          <div className="ceo-server-promotion__vehicle">
+            <small>RETE</small>
+            <strong>Partner</strong>
+          </div>
+          <div className="ceo-server-promotion__copy">
+            <small>GESTIONE RETE</small>
+            <h2>Partner</h2>
+            <p>Accedi alla gestione della rete commerciale e dei partner operativi.</p>
+          </div>
+          <div className="ceo-server-promotion__actions">
+            <a className="ceo-server-secondary" href="/partner">Apri partner</a>
+          </div>
+        </article>
+      </section>
+    </main>
+  );
+}
+
 export default async function CeoDashboardPage({
   searchParams,
 }: CeoDashboardPageProps) {
@@ -59,6 +178,10 @@ export default async function CeoDashboardPage({
   }
 
   const initialDashboard = (await dashboardResponse.json()) as DashboardBootstrapPayload;
+
+  if (useServerSafeDashboard(request, query)) {
+    return <CeoServerSafeDashboard dashboard={initialDashboard} />;
+  }
 
   return (
     <div className="ceo-server-entry" data-server-dashboard-ready="true">
