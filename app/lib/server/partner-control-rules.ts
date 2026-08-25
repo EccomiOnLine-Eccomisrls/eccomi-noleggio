@@ -27,7 +27,7 @@ export function hoursSince(value: string | null | undefined) {
   return Math.max(0, Math.floor((Date.now() - time) / 3600000));
 }
 
-export function getPracticeSla(status: string, updatedAt: string): PracticeSla {
+export function getPracticeSla(status: string, updatedAt: string, internalEccomi = false): PracticeSla {
   if (CLOSED_STATUSES.has(status)) {
     return {
       hours: hoursSince(updatedAt),
@@ -39,12 +39,13 @@ export function getPracticeSla(status: string, updatedAt: string): PracticeSla {
   }
 
   const rule = SLA_RULES[status] || { limitHours: 24, owner: "ECCOMI" as const, phase: "Operatività ECCOMI" };
+  const owner = internalEccomi && rule.owner === "PARTNER" ? "ECCOMI" : rule.owner;
   const hours = hoursSince(updatedAt);
   return {
     hours,
     limitHours: rule.limitHours,
     stale: hours >= rule.limitHours,
-    owner: rule.owner,
+    owner,
     phase: rule.phase,
   };
 }
