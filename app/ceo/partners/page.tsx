@@ -2,7 +2,7 @@
 import { getActor } from "../../lib/server/authz";
 import { getCeoPartnerOverview, type PartnerHealth } from "../../lib/server/ceo-partner-management";
 import { currentRequest } from "../../lib/server/current-request";
-import { internalSummaryHealth, isInternalEccomiPartner } from "../../lib/server/partner-control-rules";
+import { isInternalEccomiPartner } from "../../lib/server/partner-control-rules";
 import CeoLoginFallback from "../ceo-login-fallback";
 import "../ceo-server.css";
 import "./partners.css";
@@ -78,19 +78,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
   const q = (queryValue(query, "q") || "").trim().toLocaleLowerCase("it");
   const status = (queryValue(query, "status") || "ALL").trim().toUpperCase();
   const overview = await getCeoPartnerOverview(request);
-  const effectivePartners = overview.partners.map((partner) => {
-    if (!isInternalEccomiPartner(partner.name, partner.legalName)) return partner;
-    const internalHealth = internalSummaryHealth({
-      openPractices: partner.openPractices,
-      lastActivityAt: partner.lastActivityAt,
-    });
-    return {
-      ...partner,
-      health: internalHealth.health,
-      healthReason: internalHealth.reason,
-      stalePractices: internalHealth.stalePractices,
-    };
-  });
+  const effectivePartners = overview.partners;
   const pausedPartners = effectivePartners.filter((partner) => partner.status === "PAUSED").length;
   const regularPartners = effectivePartners.filter((partner) => partner.health === "REGULAR").length;
   const attentionPartners = effectivePartners.filter((partner) => partner.health !== "REGULAR").length;
