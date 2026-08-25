@@ -75,15 +75,19 @@ export function internalSummaryHealth(input: {
   if (age >= 72) {
     return {
       health: "INTERVENTION" as const,
-      reason: `Pratica interna ferma da ${age} ore`,
-      stalePractices: 1,
+      reason: input.openPractices === 1
+        ? `Pratica interna ferma da ${age} ore`
+        : `${input.openPractices} pratiche interne da verificare · ultima attività ${age} ore fa`,
+      stalePractices: input.openPractices,
     };
   }
   if (age >= 24) {
     return {
       health: "ATTENTION" as const,
-      reason: "Pratica interna ferma oltre 24 ore",
-      stalePractices: 1,
+      reason: input.openPractices === 1
+        ? "Pratica interna ferma oltre 24 ore"
+        : `${input.openPractices} pratiche interne da verificare`,
+      stalePractices: input.openPractices,
     };
   }
   return {
