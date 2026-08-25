@@ -1,0 +1,144 @@
+.partner-network-summary {
+  max-width: 1280px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 15px 17px;
+  border: 1px solid #cbddeb;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #f8fbfe 0%, #eef7fd 100%);
+  box-shadow: 0 10px 28px rgba(30, 62, 93, 0.05);
+}
+
+.partner-network-summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.partner-network-summary small {
+  color: #0871b4;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+
+.partner-network-summary strong {
+  color: #12243a;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.partner-network-summary > span {
+  color: #5f7187;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: right;
+}
+
+.partner-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.partner-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #20a25d;
+}
+
+.partner-card--attention::before {
+  background: #e3a11a;
+}
+
+.partner-card--intervention::before {
+  background: #d64a4a;
+}
+
+.partner-card__identity > div:last-child {
+  min-width: 0;
+}
+
+.partner-card__contact {
+  align-items: start;
+}
+
+.partner-card__contact-item {
+  min-width: 0;
+}
+
+.partner-card__contact-item em {
+  display: block;
+  min-width: 0;
+  color: #526274;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.partner-card__contact-item--referent {
+  min-width: max-content;
+}
+
+.partner-card__contact-item--referent em {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.practice-ceo-heading > div:first-child {
+  min-width: 0;
+  max-width: 1020px;
+}
+
+.practice-ceo-title {
+  max-width: 1000px;
+  margin-bottom: 8px !important;
+  font-size: clamp(34px, 4.4vw, 62px) !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.035em;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.practice-ceo-id {
+  margin: 0 0 7px !important;
+  color: #5d7087 !important;
+  font-size: 13px !important;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.practice-ceo-context {
+  margin: 0 !important;
+  color: #7a8ba0 !important;
+  font-size: 14px !important;
+}
+
+@media (max-width: 980px) {
+  .partner-network-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .partner-network-summary > span {
+    text-align: left;
+  }
+}
+
+@media (max-width: 680px) {
+  .partner-card__contact-item--referent {
+    min-width: 0;
+  }
+
+  .partner-card__contact-item--referent em {
+    white-space: normal;
+  }
+
+  .practice-ceo-title {
+    font-size: 34px !important;
+  }
+}
