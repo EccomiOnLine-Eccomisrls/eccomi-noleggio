@@ -11,6 +11,24 @@ function redirectBack(request: Request, id: string, ok: boolean, message: string
   return Response.redirect(target, 303);
 }
 
+function sameStatusAlreadyApplied(error: string | undefined) {
+  if (!error) return null;
+  const match = /^Passaggio da ([A-Z0-9_]+) a \1 non consentito\.$/.exec(error.trim());
+  return match?.[1] || null;
+}
+
+const statusLabels: Record<string, string> = {
+  NEW: "Richiesta ricevuta",
+  ECCOMI_REVIEW: "In verifica ECCOMI",
+  NEEDS_INFO: "Integrazione richiesta",
+  SENT_TO_PARTNER: "Inviata al partner",
+  PARTNER_REVIEW: "In lavorazione partner",
+  QUOTE: "Preventivo predisposto",
+  CONTRACT: "Contratto acquisito",
+  DELIVERED: "Veicolo consegnato",
+  ARCHIVED: "Pratica archiviata",
+};
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -65,6 +83,20 @@ export async function POST(
     };
 
     if (!response.ok) {
+      const sameStatus = operation === "status"
+        ? sameStatusAlreadyApplied(payload.error)
+        : null;
+
+      if (sameStatus) {
+        const label = statusLabels[sameStatus] || sameStatus.replaceAll("_", " ");
+        return redirectBack(
+          request,
+          id,
+          true,
+          `Stato già aggiornato: ${label}. Nessuna seconda modifica eseguita.`,
+        );
+      }
+
       return redirectBack(
         request,
         id,
