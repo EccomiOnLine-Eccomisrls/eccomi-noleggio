@@ -48,7 +48,7 @@ export default function RegisterPage() {
           <p style={{ margin: 0, color: "#5b6778" }}>Tutte le manovre effettuate sulle promozioni, in ordine cronologico.</p>
           <label style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 10, border: "1px solid #dce6f1", borderRadius: 12, padding: "11px 14px", maxWidth: 520 }}>
             <Search size={18} color="#5b6778" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca auto, azione o utente…" style={{ border: 0, outline: "none", flex: 1, fontSize: 15 }} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca auto, azione o utente…" style={{ border: 0, outline: 0, flex: 1, fontSize: 15 }} />
           </label>
         </header>
 
