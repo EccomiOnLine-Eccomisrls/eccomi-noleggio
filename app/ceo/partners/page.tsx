@@ -5,6 +5,7 @@ import { currentRequest } from "../../lib/server/current-request";
 import CeoLoginFallback from "../ceo-login-fallback";
 import "../ceo-server.css";
 import "./partners.css";
+import "./final-touches.css";
 
 type PartnerPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
