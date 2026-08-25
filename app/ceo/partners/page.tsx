@@ -46,6 +46,15 @@ function healthLabel(health: PartnerHealth) {
   return "🟢 REGOLARE";
 }
 
+function partnerStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    ACTIVE: "● ATTIVO",
+    PAUSED: "IN PAUSA",
+    INACTIVE: "DISATTIVATO",
+  };
+  return labels[status] || status.replaceAll("_", " ");
+}
+
 export default async function CeoPartnersPage({ searchParams }: PartnerPageProps) {
   const request = await currentRequest("/ceo/partners");
   const actor = await getActor(request);
@@ -145,7 +154,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
 
               <div className="partner-card__status-row">
                 <span className={`partner-pill ${active ? "partner-pill--active" : "partner-pill--muted"}`}>
-                  {active ? "● ATTIVO" : partner.status}
+                  {partnerStatusLabel(partner.status)}
                 </span>
                 <span className={`partner-pill partner-health partner-health--${partner.health.toLowerCase()}`}>
                   {healthLabel(partner.health)}
@@ -161,7 +170,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
               </dl>
 
               <div className="partner-card__contact">
-                <span><strong>Referente</strong>{partner.contactName || "Non indicato"}</span>
+                <span className="partner-card__contact-name"><strong>Referente</strong>{partner.contactName || "Non indicato"}</span>
                 <span><strong>Email</strong>{partner.contactEmail || "Non indicata"}</span>
                 <span><strong>Ultima attività</strong>{shortDate(partner.lastActivityAt)}</span>
                 <span><strong>Commissioni</strong>{money(partner.commissionCents)}</span>
