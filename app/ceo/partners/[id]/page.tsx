@@ -2,6 +2,7 @@
 import { getActor } from "../../../lib/server/authz";
 import { getCeoPartnerDetail, type PartnerHealth } from "../../../lib/server/ceo-partner-management";
 import { currentRequest } from "../../../lib/server/current-request";
+import { getPracticeSla, isInternalEccomiPartner } from "../../../lib/server/partner-control-rules";
 import CeoLoginFallback from "../../ceo-login-fallback";
 import "../../ceo-server.css";
 import "../partners.css";
@@ -123,6 +124,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
   }
 
   const partner = detail.partner;
+  const internalEccomi = isInternalEccomiPartner(partner.name, partner.legalName);
   const shownPractices = detail.practices.length;
   const monogram = partner.name
     .split(/\s+/)
@@ -132,13 +134,44 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
     .join("")
     .toUpperCase() || "P";
 
-  const onlinePromotions = detail.promotions.filter((promotion) =>
+  const visiblePromotions = detail.promotions.filter((promotion) => promotion.status !== "TRASHED");
+  const onlinePromotions = visiblePromotions.filter((promotion) =>
     ["ONLINE", "ACTIVE", "EXPIRING"].includes(promotion.status),
   );
   const nextExpiry = onlinePromotions
     .map((promotion) => promotion.validUntil)
     .filter(Boolean)
     .sort()[0] || null;
+
+  const practicesWithSla = detail.practices.map((practice) => ({
+    practice,
+    sla: getPracticeSla(practice.status, practice.updatedAt),
+  }));
+  const accountableStale = practicesWithSla.filter(({ sla }) =>
+    sla.stale && (internalEccomi ? sla.owner === "ECCOMI" : sla.owner === "PARTNER"),
+  );
+  const maxStaleHours = accountableStale.reduce((max, row) => Math.max(max, row.sla.hours), 0);
+
+  let displayHealth: PartnerHealth = partner.health;
+  let displayHealthReason = partner.healthReason;
+  if (partner.status !== "ACTIVE") {
+    displayHealth = "ATTENTION";
+    displayHealthReason = partner.status === "PAUSED" ? "Partner attualmente in pausa" : "Partner non operativo";
+  } else if (!internalEccomi && partner.openPractices > 0 && partner.activeUsers === 0) {
+    displayHealth = "INTERVENTION";
+    displayHealthReason = "Pratiche aperte senza account partner attivi";
+  } else if (accountableStale.length >= 2 || maxStaleHours >= 72) {
+    displayHealth = "INTERVENTION";
+    displayHealthReason = internalEccomi
+      ? `${accountableStale.length} pratica${accountableStale.length === 1 ? "" : "he"} ECCOMI fuori SLA`
+      : `${accountableStale.length} pratica${accountableStale.length === 1 ? "" : "he"} partner fuori SLA`;
+  } else if (accountableStale.length === 1) {
+    displayHealth = "ATTENTION";
+    displayHealthReason = internalEccomi ? "1 pratica ECCOMI fuori SLA" : "1 pratica partner fuori SLA";
+  } else {
+    displayHealth = "REGULAR";
+    displayHealthReason = internalEccomi ? "Operatività interna sotto controllo" : "Nessuna anomalia operativa rilevata";
+  }
 
   const lastAccessAt = latestDate(detail.users.map((user) => user.lastAccessAt));
   const accruedCents = detail.commissions
@@ -181,7 +214,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
     activities.push({
       at: partner.lastActivityAt,
       label: "Attività partner aggiornata",
-      detail: partner.healthReason,
+      detail: displayHealthReason,
       kind: "system",
     });
   }
@@ -214,22 +247,24 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
           <span className={`partner-pill ${partner.status === "ACTIVE" ? "partner-pill--active" : "partner-pill--muted"}`}>
             {partner.status === "ACTIVE" ? "● ATTIVO" : statusLabel(partner.status)}
           </span>
-          <span className={`partner-pill partner-health partner-health--${partner.health.toLowerCase()}`}>
-            {healthLabel(partner.health)}
+          <span className={`partner-pill partner-health partner-health--${displayHealth.toLowerCase()}`}>
+            {healthLabel(displayHealth)}
           </span>
         </div>
       </section>
 
-      <section className={`partner-attention-panel partner-attention-panel--${partner.health.toLowerCase()}`}>
-        <div className="partner-attention-panel__icon">{partner.health === "REGULAR" ? "✓" : partner.health === "ATTENTION" ? "!" : "⚠"}</div>
+      <section className={`partner-attention-panel partner-attention-panel--${displayHealth.toLowerCase()}`}>
+        <div className="partner-attention-panel__icon">{displayHealth === "REGULAR" ? "✓" : displayHealth === "ATTENTION" ? "!" : "⚠"}</div>
         <div className="partner-attention-panel__copy">
           <small>COSA RICHIEDE LA TUA ATTENZIONE</small>
-          <strong>{partner.health === "REGULAR" ? "Nessuna azione richiesta" : partner.healthReason}</strong>
+          <strong>{displayHealth === "REGULAR" ? "Nessuna azione richiesta" : displayHealthReason}</strong>
           <span>
-            {partner.health === "REGULAR"
-              ? "Operatività regolare, accessi disponibili e SLA sotto controllo."
-              : partner.stalePractices
-                ? `${partner.stalePractices} ${partner.stalePractices === 1 ? "pratica è ferma" : "pratiche sono ferme"} oltre 24 ore.`
+            {displayHealth === "REGULAR"
+              ? internalEccomi
+                ? "Struttura interna ECCOMI: nessun account Partner richiesto e SLA sotto controllo."
+                : "Operatività regolare, accessi disponibili e SLA sotto controllo."
+              : accountableStale.length
+                ? `${accountableStale.length} ${accountableStale.length === 1 ? "pratica è fuori" : "pratiche sono fuori"} SLA operativo.`
                 : "Verifica lo stato operativo del partner e gli accessi disponibili."}
           </span>
         </div>
@@ -243,17 +278,17 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
         <article>
           <small>PRATICHE</small>
           <strong>{partner.openPractices}</strong>
-          <span>{partner.stalePractices ? `${partner.stalePractices} ferme oltre 24h` : "0 ferme oltre 24h"} · {partner.completedPractices} concluse</span>
+          <span>{accountableStale.length ? `${accountableStale.length} fuori SLA` : "0 fuori SLA"} · {partner.completedPractices} concluse</span>
         </article>
         <article>
           <small>OFFERTE ONLINE</small>
-          <strong>{partner.onlinePromotions}</strong>
+          <strong>{onlinePromotions.length}</strong>
           <span>{nextExpiry ? `Prossima scadenza ${dateOnly(nextExpiry)}` : "Nessuna scadenza attiva"}</span>
         </article>
         <article>
-          <small>ACCESSI</small>
-          <strong>{partner.activeUsers}</strong>
-          <span>{lastAccessAt ? `Ultimo accesso ${shortDate(lastAccessAt)}` : "Nessun accesso registrato"}</span>
+          <small>ACCESSI PARTNER</small>
+          <strong>{internalEccomi ? "—" : partner.activeUsers}</strong>
+          <span>{internalEccomi ? "Non richiesto per struttura interna" : lastAccessAt ? `Ultimo accesso ${shortDate(lastAccessAt)}` : "Nessun accesso registrato"}</span>
         </article>
         <article>
           <small>COMMISSIONI</small>
@@ -266,7 +301,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
         <section className="partner-quick-actions partner-premium-actions" aria-label="Azioni rapide CEO">
           <span className="partner-premium-actions__label">AZIONI CEO</span>
           <a href="#pratiche">Gestisci pratiche</a>
-          <a href="#accessi">Gestisci accessi</a>
+          {!internalEccomi ? <a href="#accessi">Gestisci accessi</a> : null}
           {partner.contactEmail ? <a href={`mailto:${partner.contactEmail}`}>Contatta partner</a> : null}
         </section>
 
@@ -294,7 +329,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
             <div><small>Stato</small><strong>{statusLabel(partner.status)}</strong></div>
             <div><small>Ultima attività</small><strong>{shortDate(partner.lastActivityAt)}</strong></div>
             <div><small>Pratiche concluse</small><strong>{partner.completedPractices}</strong></div>
-            <div><small>Offerte collegate</small><strong>{partner.promotions}</strong></div>
+            <div><small>Offerte collegate</small><strong>{visiblePromotions.length}</strong></div>
           </div>
         </section>
 
@@ -328,20 +363,20 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
             <div className="partner-section-badges">
               <span className="partner-premium-section-number">03</span>
               <span className="partner-pill partner-pill--attention">{partner.openPractices} APERTE</span>
-              {partner.stalePractices ? <span className="partner-pill partner-health--intervention">{partner.stalePractices} FERME &gt;24H</span> : null}
+              {accountableStale.length ? <span className="partner-pill partner-health--intervention">{accountableStale.length} FUORI SLA</span> : null}
             </div>
           </div>
           <div className="partner-table-wrap">
             <table className="partner-table">
               <thead><tr><th>Pratica</th><th>Cliente</th><th>Veicolo</th><th>Stato</th><th>SLA</th><th>Documenti</th><th>Aggiornata</th><th></th></tr></thead>
               <tbody>
-                {detail.practices.length ? detail.practices.map((practice) => (
-                  <tr key={practice.id} className={practice.stale ? "partner-table-row--stale" : undefined}>
+                {practicesWithSla.length ? practicesWithSla.map(({ practice, sla }) => (
+                  <tr key={practice.id} className={sla.stale ? "partner-table-row--stale" : undefined}>
                     <td><strong>{practice.id}</strong><br /><small>Offerta {practice.offerNumber}</small></td>
                     <td>{practice.customerName}</td>
                     <td>{practice.vehicle}</td>
                     <td>{statusLabel(practice.status)}</td>
-                    <td><span className={`partner-sla ${practice.stale ? "partner-sla--late" : "partner-sla--ok"}`}>{practice.stale ? `${practice.slaHours}h · SOLLECITA` : `${practice.slaHours}h · OK`}</span></td>
+                    <td><span className={`partner-sla ${sla.stale ? "partner-sla--late" : "partner-sla--ok"}`}>{sla.limitHours === null ? "CONCLUSA" : sla.stale ? `${sla.hours}h · ${sla.owner}` : `${sla.hours}h · ${sla.owner} OK`}</span></td>
                     <td>{statusLabel(practice.documentStatus)}</td>
                     <td>{shortDate(practice.updatedAt)}</td>
                     <td><a href={`/ceo/practices/${encodeURIComponent(practice.id)}`}>Apri pratica →</a></td>
@@ -354,17 +389,17 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
 
         <section className="partner-detail-section" id="offerte">
           <div className="partner-detail-section__head">
-            <div><h2>Offerte</h2><p>Promozioni originate o gestite da questo partner.</p></div>
+            <div><h2>Offerte</h2><p>Promozioni operative originate o gestite da questo partner. Le offerte nel cestino non sono mostrate.</p></div>
             <div className="partner-section-badges">
               <span className="partner-premium-section-number">04</span>
-              <span className="partner-pill partner-pill--active">{partner.onlinePromotions} ONLINE</span>
+              <span className="partner-pill partner-pill--active">{onlinePromotions.length} ONLINE</span>
             </div>
           </div>
           <div className="partner-table-wrap">
             <table className="partner-table">
               <thead><tr><th>Offerta</th><th>Vettura</th><th>Versione</th><th>Stato</th><th>Scadenza</th><th></th></tr></thead>
               <tbody>
-                {detail.promotions.length ? detail.promotions.map((promotion) => (
+                {visiblePromotions.length ? visiblePromotions.map((promotion) => (
                   <tr key={promotion.id}>
                     <td><strong>{promotion.offerNumber}</strong></td>
                     <td>{promotion.brand} {promotion.model}</td>
@@ -373,7 +408,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
                     <td>{dateOnly(promotion.validUntil)}</td>
                     <td><a href={`/ceo/promotions/${encodeURIComponent(promotion.id)}${offerContext}`}>Apri offerta →</a></td>
                   </tr>
-                )) : <tr><td className="partner-empty-row" colSpan={6}>Nessuna offerta collegata.</td></tr>}
+                )) : <tr><td className="partner-empty-row" colSpan={6}>Nessuna offerta operativa collegata.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -413,27 +448,31 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
 
         <section className="partner-detail-section" id="accessi">
           <div className="partner-detail-section__head">
-            <div><h2>Accessi Partner</h2><p>Account autorizzati ad accedere all’Area Partner.</p></div>
+            <div><h2>Accessi Partner</h2><p>{internalEccomi ? "ECCOMI è una struttura interna: l’account Area Partner non è richiesto." : "Account autorizzati ad accedere all’Area Partner."}</p></div>
             <div className="partner-section-badges">
               <span className="partner-premium-section-number">06</span>
-              <span className="partner-pill partner-pill--active">{partner.activeUsers} ATTIVI</span>
+              <span className="partner-pill partner-pill--active">{internalEccomi ? "INTERNO" : `${partner.activeUsers} ATTIVI`}</span>
             </div>
           </div>
-          <div className="partner-table-wrap">
-            <table className="partner-table">
-              <thead><tr><th>Nome</th><th>Email</th><th>Stato</th><th>Ultimo accesso</th></tr></thead>
-              <tbody>
-                {detail.users.length ? detail.users.map((user) => (
-                  <tr key={user.email}>
-                    <td>{user.displayName}</td>
-                    <td>{user.email}</td>
-                    <td>{user.active ? "Attivo" : "Disabilitato"}</td>
-                    <td>{shortDate(user.lastAccessAt)}</td>
-                  </tr>
-                )) : <tr><td className="partner-empty-row" colSpan={4}>Nessun account partner configurato.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          {internalEccomi ? (
+            <div className="partner-activity-empty">Nessun account Partner necessario per ECCOMI.</div>
+          ) : (
+            <div className="partner-table-wrap">
+              <table className="partner-table">
+                <thead><tr><th>Nome</th><th>Email</th><th>Stato</th><th>Ultimo accesso</th></tr></thead>
+                <tbody>
+                  {detail.users.length ? detail.users.map((user) => (
+                    <tr key={user.email}>
+                      <td>{user.displayName}</td>
+                      <td>{user.email}</td>
+                      <td>{user.active ? "Attivo" : "Disabilitato"}</td>
+                      <td>{shortDate(user.lastAccessAt)}</td>
+                    </tr>
+                  )) : <tr><td className="partner-empty-row" colSpan={4}>Nessun account partner configurato.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </div>
 
