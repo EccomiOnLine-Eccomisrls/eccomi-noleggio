@@ -4,9 +4,11 @@ import { getCeoPracticeDetail } from "../../../lib/server/ceo-partner-management
 import { currentRequest } from "../../../lib/server/current-request";
 import { getPracticeSla, isClosedPractice } from "../../../lib/server/partner-control-rules";
 import CeoLoginFallback from "../../ceo-login-fallback";
+import CeoPracticeActions from "./ceo-practice-actions";
 import "../../ceo-server.css";
 import "../../partners/partners.css";
 import "../../partners/final-touches.css";
+import "./ceo-practice-actions.css";
 
 type PracticePageProps = {
   params: Promise<{ id: string }>;
@@ -129,6 +131,15 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
         <a href={`mailto:${practice.email}`}>Email cliente</a>
         <a href={`tel:${practice.phone}`}>Chiama cliente</a>
       </section>
+
+      <CeoPracticeActions
+        practiceId={practice.id}
+        initialStatus={practice.status}
+        preview={detail.preview}
+        partnerName={detail.partner.name}
+        partnerLegalName={detail.partner.legalName}
+        partnerContactEmail={detail.partner.contactEmail}
+      />
 
       <section className="partner-detail-stack">
         <article className="partner-detail-section">
