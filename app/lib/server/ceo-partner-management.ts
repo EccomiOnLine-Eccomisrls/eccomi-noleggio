@@ -1,10 +1,9 @@
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { commissions, leads, partners, practiceDocuments, promotions, users } from "../../../db/schema";
+import { getPracticeSla, isClosedPractice, isInternalEccomiPartner } from "./partner-control-rules";
 import { isRenderPullRequestPreview } from "./preview-mode";
 
-const CLOSED_PRACTICE_STATUSES = new Set(["DELIVERED", "ARCHIVED"]);
-const PARTNER_STAGE_STATUSES = new Set(["SENT_TO_PARTNER", "PARTNER_REVIEW", "NEEDS_INFO", "QUOTE", "CONTRACT"]);
 const ONLINE_PROMOTION_STATUSES = new Set(["ONLINE", "ACTIVE", "EXPIRING"]);
 const SLA_ATTENTION_HOURS = 24;
 
@@ -133,47 +132,43 @@ function maxDate(values: Array<string | null | undefined>) {
   return filtered.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
 }
 
-function hoursSince(value: string | null | undefined) {
-  if (!value) return 0;
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return 0;
-  return Math.max(0, Math.floor((Date.now() - time) / 3600000));
-}
-
-function practiceIsStale(row: { status: string; updatedAt: string; sentToPartnerAt?: string | null }) {
-  if (CLOSED_PRACTICE_STATUSES.has(row.status)) return false;
-  const inPartnerStage = Boolean(row.sentToPartnerAt) || PARTNER_STAGE_STATUSES.has(row.status);
-  return inPartnerStage && hoursSince(row.updatedAt) >= SLA_ATTENTION_HOURS;
-}
-
-function partnerHealth(status: string, openPractices: number, stalePractices: number, activeUsers: number) {
-  if (status === "ACTIVE" && openPractices > 0 && activeUsers === 0) {
-    return {
-      health: "INTERVENTION" as const,
-      reason: "Pratiche aperte senza account partner attivi",
-    };
-  }
-  if (stalePractices >= 2) {
-    return {
-      health: "INTERVENTION" as const,
-      reason: `${stalePractices} pratiche ferme oltre 24 ore`,
-    };
-  }
-  if (stalePractices === 1) {
-    return {
-      health: "ATTENTION" as const,
-      reason: "1 pratica ferma oltre 24 ore",
-    };
-  }
+function partnerHealth(
+  status: string,
+  openPractices: number,
+  stalePractices: number,
+  activeUsers: number,
+  internalEccomi = false,
+  maxStaleHours = 0,
+) {
   if (status !== "ACTIVE") {
     return {
       health: "ATTENTION" as const,
       reason: status === "PAUSED" ? "Partner attualmente in pausa" : "Partner non operativo",
     };
   }
+  if (!internalEccomi && openPractices > 0 && activeUsers === 0) {
+    return {
+      health: "INTERVENTION" as const,
+      reason: "Pratiche aperte senza account partner attivi",
+    };
+  }
+  if (stalePractices >= 2 || maxStaleHours >= 72) {
+    return {
+      health: "INTERVENTION" as const,
+      reason: internalEccomi
+        ? `${stalePractices} pratica${stalePractices === 1 ? "" : "he"} ECCOMI fuori SLA`
+        : `${stalePractices} pratica${stalePractices === 1 ? "" : "he"} partner fuori SLA`,
+    };
+  }
+  if (stalePractices === 1) {
+    return {
+      health: "ATTENTION" as const,
+      reason: internalEccomi ? "1 pratica ECCOMI fuori SLA" : "1 pratica partner fuori SLA",
+    };
+  }
   return {
     health: "REGULAR" as const,
-    reason: "Nessuna anomalia operativa rilevata",
+    reason: internalEccomi ? "Operatività interna sotto controllo" : "Nessuna anomalia operativa rilevata",
   };
 }
 
@@ -306,13 +301,27 @@ export async function getCeoPartnerOverview(request: Request): Promise<CeoPartne
 
   const summaries = partnerRows.map<CeoPartnerSummary>((partner) => {
     const partnerPromotions = promotionRows.filter((row) => row.partnerId === partner.id);
+    const operationalPromotions = partnerPromotions.filter((row) => row.status !== "TRASHED");
     const partnerPractices = leadRows.filter((row) => row.partnerId === partner.id);
     const partnerCommissions = commissionRows.filter((row) => row.partnerId === partner.id);
     const partnerUsers = userRows.filter((row) => row.partnerId === partner.id);
-    const openPractices = partnerPractices.filter((row) => !CLOSED_PRACTICE_STATUSES.has(row.status));
-    const stalePractices = openPractices.filter(practiceIsStale).length;
+    const openPractices = partnerPractices.filter((row) => !isClosedPractice(row.status));
+    const internalEccomi = isInternalEccomiPartner(partner.name, partner.legalName);
+    const accountableSla = openPractices
+      .map((row) => getPracticeSla(row.status, row.updatedAt))
+      .filter((sla) => internalEccomi ? sla.owner === "ECCOMI" : sla.owner === "PARTNER");
+    const staleSla = accountableSla.filter((sla) => sla.stale);
+    const stalePractices = staleSla.length;
+    const maxStaleHours = staleSla.reduce((max, sla) => Math.max(max, sla.hours), 0);
     const activeUsers = partnerUsers.filter((row) => row.active).length;
-    const health = partnerHealth(partner.status, openPractices.length, stalePractices, activeUsers);
+    const health = partnerHealth(
+      partner.status,
+      openPractices.length,
+      stalePractices,
+      activeUsers,
+      internalEccomi,
+      maxStaleHours,
+    );
 
     return {
       id: partner.id,
@@ -322,8 +331,8 @@ export async function getCeoPartnerOverview(request: Request): Promise<CeoPartne
       contactName: partner.contactName,
       contactEmail: partner.contactEmail,
       activeUsers,
-      promotions: partnerPromotions.length,
-      onlinePromotions: partnerPromotions.filter((row) => ONLINE_PROMOTION_STATUSES.has(row.status)).length,
+      promotions: operationalPromotions.length,
+      onlinePromotions: operationalPromotions.filter((row) => ONLINE_PROMOTION_STATUSES.has(row.status)).length,
       practices: partnerPractices.length,
       openPractices: openPractices.length,
       completedPractices: partnerPractices.length - openPractices.length,
@@ -331,7 +340,7 @@ export async function getCeoPartnerOverview(request: Request): Promise<CeoPartne
       commissionCents: partnerCommissions.reduce((sum, row) => sum + row.amountCents, 0),
       lastActivityAt: maxDate([
         partner.updatedAt,
-        ...partnerPromotions.map((row) => row.updatedAt),
+        ...operationalPromotions.map((row) => row.updatedAt),
         ...partnerPractices.map((row) => row.updatedAt),
         ...partnerCommissions.map((row) => row.updatedAt),
         ...partnerUsers.map((row) => row.updatedAt),
@@ -496,20 +505,23 @@ export async function getCeoPartnerDetail(request: Request, id: string): Promise
       lastAccessAt: row.updatedAt,
     })),
     promotions: promotionRows,
-    practices: practiceRows.map((row) => ({
-      id: row.id,
-      customerName: `${row.firstName} ${row.lastName}`.trim(),
-      status: row.status,
-      documentStatus: row.documentStatus,
-      vehicle: `${row.brand} ${row.model}`.trim(),
-      offerNumber: row.offerNumber,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      sentToPartnerAt: row.sentToPartnerAt,
-      completedAt: row.completedAt,
-      slaHours: hoursSince(row.updatedAt),
-      stale: practiceIsStale(row),
-    })),
+    practices: practiceRows.map((row) => {
+      const sla = getPracticeSla(row.status, row.updatedAt);
+      return {
+        id: row.id,
+        customerName: `${row.firstName} ${row.lastName}`.trim(),
+        status: row.status,
+        documentStatus: row.documentStatus,
+        vehicle: `${row.brand} ${row.model}`.trim(),
+        offerNumber: row.offerNumber,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        sentToPartnerAt: row.sentToPartnerAt,
+        completedAt: row.completedAt,
+        slaHours: sla.hours,
+        stale: sla.stale,
+      };
+    }),
     commissions: commissionRows,
   };
 }
@@ -609,6 +621,7 @@ export async function getCeoPracticeDetail(request: Request, id: string): Promis
     .where(eq(practiceDocuments.leadId, id))
     .orderBy(desc(practiceDocuments.createdAt));
 
+  const sla = getPracticeSla(row.status, row.updatedAt);
   return {
     preview: false,
     practice: {
@@ -624,8 +637,8 @@ export async function getCeoPracticeDetail(request: Request, id: string): Promis
       updatedAt: row.updatedAt,
       sentToPartnerAt: row.sentToPartnerAt,
       completedAt: row.completedAt,
-      slaHours: hoursSince(row.updatedAt),
-      stale: practiceIsStale(row),
+      slaHours: sla.hours,
+      stale: sla.stale,
     },
     partner: {
       id: row.partnerId,
