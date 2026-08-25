@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getActor } from "../../lib/server/authz";
 import { currentRequest } from "../../lib/server/current-request";
 import { isRenderPullRequestPreview } from "../../lib/server/preview-mode";
-import type { previewPromotionEditable } from "../../lib/server/preview-fixture";
+import { previewPromotionEditable } from "../../lib/server/preview-fixture";
 import "../ceo-server.css";
 
 type PreviewPromotion = typeof previewPromotionEditable;
