@@ -5,6 +5,7 @@ import { currentRequest } from "../../../lib/server/current-request";
 import CeoLoginFallback from "../../ceo-login-fallback";
 import "../../ceo-server.css";
 import "../../partners/partners.css";
+import "../../partners/final-touches.css";
 
 type PracticePageProps = {
   params: Promise<{ id: string }>;
