@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const developmentPreviewMeta =
@@ -106,6 +107,22 @@ test("renders a clientless PR demo with real dashboard, promotion and editor lin
   assert.match(saved, /PEUGEOT 3008 Hybrid 145/);
   assert.match(saved, /SIMULAZIONE COMPLETATA/);
   assert.match(saved, /Nessuna modifica salvata su Supabase o Shopify/);
+});
+
+test("accepts exact mileage values in the production promotion editor", async () => {
+  const source = await readFile(
+    new URL("../app/promotion-edit-controls.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /<input type="number" min="1" step="1" value=\{editor\.totalKm\}/,
+  );
+  assert.doesNotMatch(
+    source,
+    /<input type="number" min="1" step="1000" value=\{editor\.totalKm\}/,
+  );
 });
 
 test("sends the public noleggio domain to the Shopify page", async () => {
