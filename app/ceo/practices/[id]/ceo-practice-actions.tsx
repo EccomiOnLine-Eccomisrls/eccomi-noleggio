@@ -1,3 +1,5 @@
+import { isInternalEccomiPartner } from "../../../lib/partner-identity";
+
 type StatusAction = {
   label: string;
   status: string;
@@ -56,9 +58,17 @@ const actionsByStatus: Record<string, StatusAction[]> = {
   ARCHIVED: [],
 };
 
-function normalized(value: string) {
-  return value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
-}
+const statusLabels: Record<string, string> = {
+  NEW: "Richiesta ricevuta",
+  ECCOMI_REVIEW: "In verifica ECCOMI",
+  NEEDS_INFO: "Integrazione richiesta",
+  SENT_TO_PARTNER: "Inviata al partner",
+  PARTNER_REVIEW: "In lavorazione partner",
+  QUOTE: "Preventivo predisposto",
+  CONTRACT: "Contratto acquisito",
+  DELIVERED: "Veicolo consegnato",
+  ARCHIVED: "Pratica archiviata",
+};
 
 function cleanPriority(value: string) {
   const priority = value.trim().toUpperCase();
@@ -78,17 +88,20 @@ export default function CeoPracticeActions({
   feedbackMessage,
 }: Props) {
   const status = initialStatus.trim().toUpperCase();
-  const actions = actionsByStatus[status] || [];
   const priority = cleanPriority(initialPriority);
   const assignedTo = initialAssignedTo?.trim() || "";
-  const internalEccomi = (() => {
-    const name = normalized(partnerName);
-    const legal = normalized(partnerLegalName);
-    return name === "ECCOMI"
-      || name.startsWith("ECCOMI ")
-      || legal === "ECCOMI SRLS"
-      || legal.startsWith("ECCOMI SRLS ");
-  })();
+  const internalEccomi = isInternalEccomiPartner({
+    name: partnerName,
+    legalName: partnerLegalName,
+  });
+  const actions = internalEccomi && status === "ECCOMI_REVIEW"
+    ? [
+        { label: "Preventivo predisposto", status: "QUOTE", tone: "primary" as const },
+        { label: "Richiedi integrazione", status: "NEEDS_INFO" },
+        { label: "Archivia pratica", status: "ARCHIVED", tone: "danger" as const },
+      ]
+    : actionsByStatus[status] || [];
+  const statusLabel = statusLabels[status] || status.replaceAll("_", " ");
 
   if (preview) {
     return (
@@ -124,7 +137,7 @@ export default function CeoPracticeActions({
       <div className="ceo-practice-control__grid">
         <article>
           <h3>Avanzamento</h3>
-          <p>Stato corrente: <strong>{status.replaceAll("_", " ")}</strong></p>
+          <p>Stato corrente: <strong>{statusLabel}</strong></p>
           {actions.length ? (
             <form method="post" action={actionPath} className="ceo-practice-control__stack">
               <input type="hidden" name="operation" value="status" />
@@ -201,7 +214,7 @@ export default function CeoPracticeActions({
           {internalEccomi ? (
             <div className="ceo-practice-control__internal">
               <strong>Struttura interna ECCOMI</strong>
-              <span>L’invio all’Area Partner non è necessario per questa pratica.</span>
+              <span>Workflow interno: dopo la verifica puoi predisporre direttamente il preventivo, senza passaggi fittizi nell’Area Partner.</span>
             </div>
           ) : (
             <form method="post" action={partnerPath} className="ceo-practice-control__stack">
