@@ -14,32 +14,40 @@ type HomeProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const previewSidebarScript = `
-(() => {
-  const items = Array.from(document.querySelectorAll('.ec-preview-sidebar nav .disabled'));
-  for (const item of items) {
-    const text = (item.textContent || '').trim();
-    if (text.includes('Partner')) {
-      const link = document.createElement('a');
-      link.href = '/ceo/partners';
-      link.innerHTML = item.innerHTML;
-      link.setAttribute('data-preview-real-link', 'partner');
-      item.replaceWith(link);
-      continue;
-    }
-    const label = document.createElement('small');
-    label.textContent = 'IN SVILUPPO';
-    label.style.marginLeft = 'auto';
-    label.style.fontSize = '10px';
-    label.style.fontWeight = '800';
-    label.style.letterSpacing = '.06em';
-    label.style.opacity = '.7';
-    item.appendChild(label);
-    item.setAttribute('aria-disabled', 'true');
-    item.setAttribute('title', 'Sezione non ancora disponibile nella preview');
-  }
-})();
+const previewNavigationCss = `
+.ec-preview-sidebar nav .disabled{visibility:hidden!important}
+.ec-preview-nav-overrides{position:fixed;left:20px;top:312px;width:246px;z-index:9000;display:grid;gap:5px;font-family:Arial,Helvetica,sans-serif}
+.ec-preview-nav-overrides>a,.ec-preview-nav-overrides>span{min-height:48px;display:flex;align-items:center;gap:12px;padding:0 13px;border-radius:11px;color:#b8cee0;text-decoration:none;font-size:14px;font-weight:700}
+.ec-preview-nav-overrides>a:hover,.ec-preview-nav-overrides>a:focus{color:#fff;background:linear-gradient(90deg,#1096e8,#1278c9);outline:none}
+.ec-preview-nav-overrides .nav-icon{width:21px;text-align:center;font-size:17px;font-style:normal}
+.ec-preview-nav-overrides .nav-disabled{opacity:.62;cursor:default}
+.ec-preview-nav-overrides small{margin-left:auto;padding:4px 6px;border:1px solid rgba(255,255,255,.16);border-radius:999px;color:#9fc0d9;font-size:8px;font-weight:900;letter-spacing:.06em;white-space:nowrap}
+@media(max-width:700px){.ec-preview-nav-overrides{display:none}}
 `;
+
+function PreviewNavigationOverride() {
+  return (
+    <>
+      <style>{previewNavigationCss}</style>
+      <nav className="ec-preview-nav-overrides" aria-label="Navigazione operativa preview">
+        <span className="nav-disabled" aria-disabled="true" title="Sezione in sviluppo">
+          <i className="nav-icon">♙</i>
+          Lead e pratiche
+          <small>IN SVILUPPO</small>
+        </span>
+        <a href="/ceo/partners" data-preview-real-link="partner">
+          <i className="nav-icon">⌁</i>
+          Partner
+        </a>
+        <span className="nav-disabled" aria-disabled="true" title="Sezione in sviluppo">
+          <i className="nav-icon">€</i>
+          Commissioni
+          <small>IN SVILUPPO</small>
+        </span>
+      </nav>
+    </>
+  );
+}
 
 export default async function Home({ searchParams }: HomeProps) {
   const incomingHeaders = await headers();
@@ -68,7 +76,7 @@ export default async function Home({ searchParams }: HomeProps) {
           editId={rawEdit || null}
           query={query}
         />
-        <script dangerouslySetInnerHTML={{ __html: previewSidebarScript }} />
+        <PreviewNavigationOverride />
       </>
     );
   }
