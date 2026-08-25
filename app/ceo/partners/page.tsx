@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- This management view intentionally uses native links and forms on iPad. */
 import { getActor } from "../../lib/server/authz";
-import { getCeoPartnerOverview } from "../../lib/server/ceo-partner-management";
+import { getCeoPartnerOverview, type PartnerHealth } from "../../lib/server/ceo-partner-management";
 import { currentRequest } from "../../lib/server/current-request";
 import CeoLoginFallback from "../ceo-login-fallback";
 import "../ceo-server.css";
@@ -38,6 +38,12 @@ function shortDate(value: string | null) {
     minute: "2-digit",
     timeZone: "Europe/Rome",
   }).format(date);
+}
+
+function healthLabel(health: PartnerHealth) {
+  if (health === "INTERVENTION") return "🔴 INTERVENTO CEO";
+  if (health === "ATTENTION") return "🟠 DA ATTENZIONARE";
+  return "🟢 REGOLARE";
 }
 
 export default async function CeoPartnersPage({ searchParams }: PartnerPageProps) {
@@ -94,7 +100,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
       <section className="ceo-server-kpis partner-kpis" aria-label="Riepilogo rete partner">
         <article><small>PARTNER ATTIVI</small><strong>{overview.stats.activePartners}</strong><span>su {overview.stats.partners} presenti</span></article>
         <article><small>PRATICHE APERTE</small><strong>{overview.stats.openPractices}</strong><span>{overview.stats.practices} pratiche totali</span></article>
-        <article><small>PARTNER OPERATIVI</small><strong>{overview.stats.partnersWithOpenPractices}</strong><span>con pratiche aperte</span></article>
+        <article><small>DA ATTENZIONARE</small><strong>{overview.stats.attentionPartners}</strong><span>partner con anomalie operative</span></article>
         <article><small>COMMISSIONI</small><strong>{money(overview.stats.commissionCents)}</strong><span>maturato registrato</span></article>
       </section>
 
@@ -126,7 +132,6 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
 
         {filteredPartners.map((partner) => {
           const active = partner.status === "ACTIVE";
-          const needsAttention = partner.openPractices > 0 && partner.activeUsers === 0;
           return (
             <article className="partner-card" key={partner.id}>
               <div className="partner-card__identity">
@@ -142,12 +147,15 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
                 <span className={`partner-pill ${active ? "partner-pill--active" : "partner-pill--muted"}`}>
                   {active ? "● ATTIVO" : partner.status}
                 </span>
-                {needsAttention ? <span className="partner-pill partner-pill--attention">ATTENZIONE ACCESSI</span> : null}
+                <span className={`partner-pill partner-health partner-health--${partner.health.toLowerCase()}`}>
+                  {healthLabel(partner.health)}
+                </span>
               </div>
+              <p className="partner-health-reason">{partner.healthReason}</p>
 
               <dl className="partner-card__metrics">
                 <div><dt>Pratiche aperte</dt><dd>{partner.openPractices}</dd></div>
-                <div><dt>Concluse</dt><dd>{partner.completedPractices}</dd></div>
+                <div><dt>Ferme &gt;24h</dt><dd>{partner.stalePractices}</dd></div>
                 <div><dt>Offerte online</dt><dd>{partner.onlinePromotions}</dd></div>
                 <div><dt>Utenti attivi</dt><dd>{partner.activeUsers}</dd></div>
               </dl>
