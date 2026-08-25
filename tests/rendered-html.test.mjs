@@ -125,6 +125,93 @@ test("accepts exact mileage values in the production promotion editor", async ()
   );
 });
 
+test("renders server-first CEO login and native iPad promotion management", async () => {
+  const worker = await loadWorker();
+  const previewHost = "eccomi-noleggio-pr-4.onrender.com";
+  const request = async (pathname, init = {}) => worker.fetch(
+    new Request(`https://${previewHost}${pathname}`, {
+      ...init,
+      headers: {
+        accept: "text/html",
+        host: previewHost,
+        "x-forwarded-proto": "https",
+        ...(init.headers || {}),
+      },
+    }),
+    testEnvironment(),
+    testContext,
+  );
+
+  const loginResponse = await request("/ceo?authPreview=1");
+  assert.equal(loginResponse.status, 200);
+  const login = await loginResponse.text();
+  assert.match(login, /data-server-auth-ready="true"/);
+  assert.match(login, /Entra in ECCOMI NOLEGGIO/);
+  assert.doesNotMatch(login, /Verifica accesso/);
+
+  const dashboardResponse = await request("/ceo");
+  assert.equal(dashboardResponse.status, 200);
+  const dashboard = await dashboardResponse.text();
+  assert.match(dashboard, /data-server-dashboard-ready="true"/);
+  assert.match(dashboard, /Gestione promozioni iPad/);
+  assert.doesNotMatch(dashboard, /Verifica accesso/);
+
+  const promotionsResponse = await request("/ceo/promotions");
+  assert.equal(promotionsResponse.status, 200);
+  const promotions = await promotionsResponse.text();
+  assert.match(promotions, /data-server-promotions-ready="true"/);
+  assert.match(promotions, /PEUGEOT/);
+  assert.match(promotions, /href="\/ceo\/promotions\/preview-peugeot-3008"/);
+
+  const editorResponse = await request(
+    "/ceo/promotions/preview-peugeot-3008?dateAction=reactivate30",
+  );
+  assert.equal(editorResponse.status, 200);
+  const editor = await editorResponse.text();
+  assert.match(editor, /data-server-editor-ready="true"/);
+  assert.match(editor, /method="post"/);
+  assert.match(editor, /action="\/api\/promotions\/preview-peugeot-3008\/edit-form"/);
+  assert.match(
+    editor,
+    /<input(?=[^>]*name="totalKm")(?=[^>]*step="1")[^>]*>/,
+  );
+  assert.match(editor, /SALVA E RIATTIVA|SIMULA SALVATAGGIO/);
+
+  const form = new URLSearchParams({
+    returnTo: "/ceo/promotions/preview-peugeot-3008",
+    brand: "PEUGEOT",
+    model: "3008",
+    version: "Hybrid 145 e-DCS6 Allure Business",
+    provider: "Partner demo ECCOMI",
+    monthly: "561.13",
+    deposit: "0.00",
+    duration: "36",
+    totalKm: "60000",
+    validUntil: "2026-09-24",
+    delivery: "22 settimane",
+    fuel: "Hybrid",
+    transmission: "Automatico e-DCS6",
+    color: "Grigio",
+    services: "Manutenzione ordinaria e straordinaria",
+    warnings: "Immagine illustrativa",
+    reactivate: "true",
+  });
+  const saveResponse = await request(
+    "/api/promotions/preview-peugeot-3008/edit-form",
+    {
+      method: "POST",
+      body: form,
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      redirect: "manual",
+    },
+  );
+  assert.equal(saveResponse.status, 303);
+  assert.equal(
+    saveResponse.headers.get("location"),
+    `https://${previewHost}/ceo/promotions/preview-peugeot-3008?saved=1`,
+  );
+});
+
 test("sends the public noleggio domain to the Shopify page", async () => {
   const worker = await loadWorker();
   const destination = "https://eccomionline.com/pages/eccomi-noleggio";
