@@ -129,14 +129,15 @@ function CeoServerSafeDashboard({
           <div className="ceo-server-promotion__vehicle">
             <small>RETE</small>
             <strong>Partner</strong>
+            <em className="ceo-server-status ceo-server-status--online">CEO</em>
           </div>
           <div className="ceo-server-promotion__copy">
             <small>GESTIONE RETE</small>
-            <h2>Partner</h2>
-            <p>Accedi alla gestione della rete commerciale e dei partner operativi.</p>
+            <h2>Gestione Partner CEO</h2>
+            <p>Controlla rete, pratiche, offerte, accessi e commissioni senza entrare nell’Area Partner.</p>
           </div>
           <div className="ceo-server-promotion__actions">
-            <a className="ceo-server-secondary" href="/partner">Apri partner</a>
+            <a className="ceo-server-secondary" href="/ceo/partners">Apri gestione partner</a>
           </div>
         </article>
       </section>

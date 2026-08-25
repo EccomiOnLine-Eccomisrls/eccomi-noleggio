@@ -35,6 +35,42 @@ export const previewPromotionEditable = {
   updatedAt: new Date().toISOString(),
 };
 
+export const previewPromotionEditableYpsilon = {
+  id: "preview-lancia-ypsilon",
+  offerNumber: "PREVIEW-YPSILON",
+  brand: "LANCIA",
+  model: "Ypsilon",
+  version: "Ypsilon Ibrida e-DCT",
+  provider: "Partner demo ECCOMI",
+  monthlyGrossCents: 38900,
+  depositGrossCents: 0,
+  durationMonths: 36,
+  totalKm: 45000,
+  validUntil: isoDateFromNow(18),
+  delivery: "Disponibilità demo",
+  fuel: "Ibrido benzina",
+  transmission: "Automatico e-DCT",
+  color: "Blu",
+  services: [
+    "Manutenzione ordinaria e straordinaria",
+    "Assistenza stradale",
+    "Coperture assicurative previste dall'offerta",
+  ],
+  warnings: [
+    "Immagine illustrativa",
+    "Offerta soggetta a disponibilità e approvazione",
+  ],
+  status: "ONLINE",
+  shopifyProductId: "gid://shopify/Product/PREVIEWYPSILON",
+  shopifyUrl: "https://eccomionline.com/products/lancia-ypsilon-preview",
+  updatedAt: new Date().toISOString(),
+};
+
+export function getPreviewPromotionEditable(id: string) {
+  return [previewPromotionEditable, previewPromotionEditableYpsilon]
+    .find((promotion) => promotion.id === id) || null;
+}
+
 export function previewDashboardPayload() {
   const p = previewPromotionEditable;
   return {
@@ -53,7 +89,7 @@ export function previewDashboardPayload() {
         brand: p.brand,
         model: p.model,
         owner: "ECCOMI diretto",
-        source: "Preview sicura PR #3",
+        source: "Preview sicura",
         rental: p.provider,
         price: "561,13 €",
         deposit: "0,00 €",
