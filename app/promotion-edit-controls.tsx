@@ -337,7 +337,7 @@ export default function PromotionEditControls() {
                 <label><span>Canone €/mese</span><input type="number" min="0.01" step="0.01" value={monthlyEuro} onChange={(event) => setMonthlyEuro(event.target.value)} required /></label>
                 <label><span>Anticipo €</span><input type="number" min="0" step="0.01" value={depositEuro} onChange={(event) => setDepositEuro(event.target.value)} required /></label>
                 <label><span>Durata mesi</span><input type="number" min="1" step="1" value={editor.durationMonths} onChange={(event) => setEditor({ ...editor, durationMonths: Number(event.target.value) })} required /></label>
-                <label><span>Km totali</span><input type="number" min="1" step="1000" value={editor.totalKm} onChange={(event) => setEditor({ ...editor, totalKm: Number(event.target.value) })} required /></label>
+                <label><span>Km totali</span><input type="number" min="1" step="1" value={editor.totalKm} onChange={(event) => setEditor({ ...editor, totalKm: Number(event.target.value) })} required /></label>
                 <label className="ec-promo-editor__wide"><span>Consegna</span><input value={editor.delivery} onChange={(event) => setEditor({ ...editor, delivery: event.target.value })} /></label>
               </div>
             </section>
