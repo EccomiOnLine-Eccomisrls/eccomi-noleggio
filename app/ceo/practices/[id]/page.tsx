@@ -74,6 +74,8 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
   }
 
   const practice = detail.practice;
+  const partnerId = encodeURIComponent(detail.partner.id);
+  const offerHref = `/ceo/promotions/${encodeURIComponent(detail.promotion.id)}?partner=${partnerId}`;
 
   return (
     <main className="ceo-server-page" data-ceo-practice-ready="true">
@@ -82,7 +84,7 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
           <span>🚙</span>
           <div><strong>ECCOMI</strong><small>NOLEGGIO</small></div>
         </div>
-        <a href={`/ceo/partners/${encodeURIComponent(detail.partner.id)}#pratiche`}>← Scheda partner</a>
+        <a href={`/ceo/partners/${partnerId}#pratiche`}>← Scheda partner</a>
       </header>
 
       <section className="ceo-server-heading partner-heading">
@@ -97,8 +99,8 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
       </section>
 
       <section className="practice-ceo-actions" aria-label="Azioni rapide pratica">
-        <a href={`/ceo/partners/${encodeURIComponent(detail.partner.id)}`}>Apri partner</a>
-        <a href={`/ceo/promotions/${encodeURIComponent(detail.promotion.id)}`}>Apri offerta</a>
+        <a href={`/ceo/partners/${partnerId}`}>Apri partner</a>
+        <a href={offerHref}>Apri offerta</a>
         <a href={`mailto:${practice.email}`}>Email cliente</a>
         <a href={`tel:${practice.phone}`}>Chiama cliente</a>
       </section>
