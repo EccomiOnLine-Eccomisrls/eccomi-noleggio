@@ -5,15 +5,24 @@ import { requireActor, routeError } from "../../lib/server/authz";
 import { getAiConnectionStatus } from "../../lib/server/ai";
 import { ensurePracticeSchema } from "../../lib/server/practice-schema";
 import { expireStalePromotions, listPromotionsForActor } from "../../lib/server/promotion-service";
+import { previewDashboardPayload } from "../../lib/server/preview-fixture";
+import { isRenderPullRequestPreview } from "../../lib/server/preview-mode";
 import { getShopifyConnectionStatus } from "../../lib/server/shopify";
 import { seedSystemData } from "../../lib/server/seed";
 
 export async function GET(request: Request) {
   try {
+    // Render PR previews must never wait for or touch production data sources.
+    // Detection uses both Render's environment and the actual request hostname.
+    if (isRenderPullRequestPreview(request)) {
+      return Response.json(previewDashboardPayload());
+    }
+
     const actor = await requireActor(request);
     await seedSystemData(actor.email, actor.displayName);
     await ensurePracticeSchema();
     await expireStalePromotions();
+
     const promotionRows = await listPromotionsForActor(actor);
     const shopify = await getShopifyConnectionStatus();
     const ai = await getAiConnectionStatus();
@@ -85,6 +94,8 @@ export async function GET(request: Request) {
       : [];
 
     return Response.json({
+      preview: false,
+      readOnly: false,
       user: actor,
       promotions: promotionRows,
       leads: leadRows.map((lead) => ({

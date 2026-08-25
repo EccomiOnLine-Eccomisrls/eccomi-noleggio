@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const developmentPreviewMeta =
@@ -41,6 +42,87 @@ test("renders development preview metadata", async () => {
     /^text\/html\b/i,
   );
   assert.match(await response.text(), developmentPreviewMeta);
+});
+
+test("renders a clientless PR demo with real dashboard, promotion and editor links", async () => {
+  const worker = await loadWorker();
+  const previewHost = "eccomi-noleggio-pr-3.onrender.com";
+  const render = async (pathname) => {
+    const response = await worker.fetch(
+      new Request(`https://${previewHost}${pathname}`, {
+        headers: {
+          accept: "text/html",
+          host: previewHost,
+          "x-forwarded-proto": "https",
+        },
+      }),
+      testEnvironment(),
+      testContext,
+    );
+    assert.equal(response.status, 200);
+    return response.text();
+  };
+
+  const dashboard = await render("/");
+  assert.match(dashboard, /data-eccomi-clientless-preview="true"/);
+  assert.match(dashboard, /href="\/?\?view=promotions"/);
+  assert.match(dashboard, /PREVIEW CLIENTLESS ATTIVA/);
+  assert.match(dashboard, /PEUGEOT/);
+  assert.doesNotMatch(dashboard, /Verifica accesso/);
+
+  const promotions = await render("/?view=promotions");
+  assert.match(promotions, /<h1>Promozioni<\/h1>/);
+  assert.match(promotions, /3008 Hybrid 145 e-DCS6 Allure Business/);
+  assert.match(promotions, /href="\/?\?view=promotions&amp;edit=preview-peugeot-3008"/);
+
+  const editor = await render(
+    "/?view=promotions&edit=preview-peugeot-3008",
+  );
+  assert.match(editor, /id="ec-preview-editor-form"/);
+  assert.match(editor, /data-eccomi-preview-native-form="true"/);
+  assert.match(editor, /method="get"/);
+  assert.match(
+    editor,
+    /<button(?=[^>]*name="previewAction")(?=[^>]*value="add7")[^>]*>/,
+  );
+  assert.match(editor, /id="ec-preview-brand"/);
+  assert.match(editor, /id="ec-preview-valid-until"/);
+  assert.match(editor, /id="ec-preview-km"[^>]*step="1"/);
+  assert.doesNotMatch(editor, /id="ec-preview-km"[^>]*step="1000"/);
+  assert.match(editor, /SIMULA SALVATAGGIO/);
+
+  const extended = await render(
+    "/?view=promotions&edit=preview-peugeot-3008&validUntil=2026-08-29&previewAction=add7",
+  );
+  assert.match(
+    extended,
+    /<input(?=[^>]*id="ec-preview-valid-until")(?=[^>]*value="2026-09-05")[^>]*>/,
+  );
+  assert.match(extended, /data-eccomi-preview-date-updated="true"/);
+  assert.match(extended, /Nuova scadenza:[\s\S]{0,30}5 settembre 2026/);
+
+  const saved = await render(
+    "/?view=promotions&edit=preview-peugeot-3008&brand=PEUGEOT&model=3008&version=3008%203008%20Hybrid%20145&previewAction=save",
+  );
+  assert.match(saved, /PEUGEOT 3008 Hybrid 145/);
+  assert.match(saved, /SIMULAZIONE COMPLETATA/);
+  assert.match(saved, /Nessuna modifica salvata su Supabase o Shopify/);
+});
+
+test("accepts exact mileage values in the production promotion editor", async () => {
+  const source = await readFile(
+    new URL("../app/promotion-edit-controls.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /<input type="number" min="1" step="1" value=\{editor\.totalKm\}/,
+  );
+  assert.doesNotMatch(
+    source,
+    /<input type="number" min="1" step="1000" value=\{editor\.totalKm\}/,
+  );
 });
 
 test("sends the public noleggio domain to the Shopify page", async () => {

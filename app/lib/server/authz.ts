@@ -3,6 +3,7 @@ import { getDb } from "../../../db";
 import { users } from "../../../db/schema";
 import { readCeoSession } from "./ceo-session";
 import { readPartnerSession } from "./partner-session";
+import { isRenderPullRequestPreview } from "./preview-mode";
 import { getRuntimeEnv } from "./runtime";
 
 export type Actor = {
@@ -39,6 +40,19 @@ function isLocalRequest(request: Request) {
 
 export async function getActor(request: Request): Promise<Actor | null> {
   const runtime = getRuntimeEnv();
+
+  // Render PR previews live on a temporary domain, so the production CEO cookie
+  // cannot be shared with them. For preview builds only, allow a synthetic CEO
+  // identity so the UI can be inspected. Production never enters this branch.
+  if (isRenderPullRequestPreview(request)) {
+    return {
+      email: runtime.CEO_EMAIL?.trim().toLowerCase() || "preview-ceo@eccomi.local",
+      displayName: "Salvatore Del Libano",
+      role: "CEO",
+      partnerId: null,
+    };
+  }
+
   const headerEmail = request.headers.get("oai-authenticated-user-email")?.trim().toLowerCase();
   const ceoSessionEmail = await readCeoSession(request);
   const partnerSession = await readPartnerSession(request);
