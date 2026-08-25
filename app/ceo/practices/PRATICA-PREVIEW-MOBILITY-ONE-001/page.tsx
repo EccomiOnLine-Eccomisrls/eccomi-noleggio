@@ -1,26 +1,13 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- Preview iPad uses native navigation intentionally. */
-import { isRenderPullRequestPreview } from "../../../lib/server/preview-mode";
-import CeoPracticeActions from "../[id]/ceo-practice-actions";
+import PreviewPracticeActions from "./preview-practice-actions";
 import "../../ceo-server.css";
 import "../../partners/partners.css";
 import "../../partners/final-touches.css";
-import "../[id]/ceo-practice-actions.css";
+import "./preview-practice-actions.css";
 
 const PRACTICE_ID = "PRATICA-PREVIEW-MOBILITY-ONE-001";
 
 export default function PreviewMobilityOnePracticePage() {
-  if (!isRenderPullRequestPreview()) {
-    return (
-      <main className="ceo-server-login">
-        <section className="ceo-server-login__card">
-          <h1>Pagina disponibile solo in preview</h1>
-          <p>Questa pratica contiene esclusivamente dati dimostrativi per il collaudo della PR.</p>
-          <a className="ceo-server-primary" href="/ceo/partners">Torna alla Gestione Partner</a>
-        </section>
-      </main>
-    );
-  }
-
   return (
     <main className="ceo-server-page" data-ceo-practice-ready="true" data-pr9-static-preview="true">
       <header className="ceo-server-bar">
@@ -48,14 +35,7 @@ export default function PreviewMobilityOnePracticePage() {
         <a href="tel:+393330000000">Chiama cliente</a>
       </section>
 
-      <CeoPracticeActions
-        practiceId={PRACTICE_ID}
-        initialStatus="PARTNER_REVIEW"
-        preview={true}
-        partnerName="MOBILITY ONE"
-        partnerLegalName="Mobility One S.r.l."
-        partnerContactEmail="mobility.preview@eccomi.local"
-      />
+      <PreviewPracticeActions />
 
       <section className="partner-detail-stack">
         <article className="partner-detail-section">
