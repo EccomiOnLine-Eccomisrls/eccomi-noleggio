@@ -41,7 +41,7 @@ export default function RegisterPage() {
   return (
     <main style={{ minHeight: "100vh", background: "#f4f7fb", padding: 28, color: "#102033", fontFamily: "Arial, sans-serif" }}>
       <section style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#073f73", textDecoration: "none", fontWeight: 800, marginBottom: 24 }}><ArrowLeft size={18} /> Torna alla dashboard</a>
+        <a href="/ceo" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#073f73", textDecoration: "none", fontWeight: 800, marginBottom: 24 }}><ArrowLeft size={18} /> Torna alla dashboard</a>
         <header style={{ background: "#fff", border: "1px solid #dce6f1", borderRadius: 20, padding: 26, boxShadow: "0 14px 35px rgba(7,63,115,.08)" }}>
           <p style={{ margin: 0, color: "#0c5597", fontSize: 12, fontWeight: 900, letterSpacing: ".12em" }}>ECCOMI HUB</p>
           <h1 style={{ margin: "8px 0 6px", fontSize: 34 }}>Registro automatico</h1>
