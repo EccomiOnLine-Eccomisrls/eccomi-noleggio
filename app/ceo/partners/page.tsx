@@ -2,6 +2,7 @@
 import { getActor } from "../../lib/server/authz";
 import { getCeoPartnerOverview, type PartnerHealth } from "../../lib/server/ceo-partner-management";
 import { currentRequest } from "../../lib/server/current-request";
+import { internalSummaryHealth, isInternalEccomiPartner } from "../../lib/server/partner-control-rules";
 import CeoLoginFallback from "../ceo-login-fallback";
 import "../ceo-server.css";
 import "./partners.css";
@@ -77,9 +78,23 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
   const q = (queryValue(query, "q") || "").trim().toLocaleLowerCase("it");
   const status = (queryValue(query, "status") || "ALL").trim().toUpperCase();
   const overview = await getCeoPartnerOverview(request);
-  const pausedPartners = overview.partners.filter((partner) => partner.status === "PAUSED").length;
-  const regularPartners = overview.partners.filter((partner) => partner.health === "REGULAR").length;
-  const filteredPartners = overview.partners.filter((partner) => {
+  const effectivePartners = overview.partners.map((partner) => {
+    if (!isInternalEccomiPartner(partner.name, partner.legalName)) return partner;
+    const internalHealth = internalSummaryHealth({
+      openPractices: partner.openPractices,
+      lastActivityAt: partner.lastActivityAt,
+    });
+    return {
+      ...partner,
+      health: internalHealth.health,
+      healthReason: internalHealth.reason,
+      stalePractices: internalHealth.stalePractices,
+    };
+  });
+  const pausedPartners = effectivePartners.filter((partner) => partner.status === "PAUSED").length;
+  const regularPartners = effectivePartners.filter((partner) => partner.health === "REGULAR").length;
+  const attentionPartners = effectivePartners.filter((partner) => partner.health !== "REGULAR").length;
+  const filteredPartners = effectivePartners.filter((partner) => {
     const matchesQuery = !q || [
       partner.name,
       partner.legalName,
@@ -112,7 +127,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
       <section className="partner-network-summary" aria-label="Stato executive della rete">
         <div>
           <small>RETE PARTNER</small>
-          <strong>{overview.stats.activePartners} attivi · {overview.stats.attentionPartners} da attenzionare · {pausedPartners} in pausa</strong>
+          <strong>{overview.stats.activePartners} attivi · {attentionPartners} da attenzionare · {pausedPartners} in pausa</strong>
         </div>
         <span>{regularPartners} regolari · {overview.stats.openPractices} pratiche aperte · {money(overview.stats.commissionCents)} maturato</span>
       </section>
@@ -120,7 +135,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
       <section className="ceo-server-kpis partner-kpis" aria-label="Riepilogo rete partner">
         <article><small>PARTNER ATTIVI</small><strong>{overview.stats.activePartners}</strong><span>su {overview.stats.partners} presenti</span></article>
         <article><small>PRATICHE APERTE</small><strong>{overview.stats.openPractices}</strong><span>{overview.stats.practices} pratiche totali</span></article>
-        <article><small>DA ATTENZIONARE</small><strong>{overview.stats.attentionPartners}</strong><span>partner con anomalie operative</span></article>
+        <article><small>DA ATTENZIONARE</small><strong>{attentionPartners}</strong><span>strutture con anomalie operative</span></article>
         <article><small>COMMISSIONI</small><strong>{money(overview.stats.commissionCents)}</strong><span>maturato registrato</span></article>
       </section>
 
@@ -152,12 +167,13 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
 
         {filteredPartners.map((partner) => {
           const active = partner.status === "ACTIVE";
+          const internalEccomi = isInternalEccomiPartner(partner.name, partner.legalName);
           return (
             <article className={`partner-card partner-card--${partner.health.toLowerCase()}`} data-health={partner.health} key={partner.id}>
               <div className="partner-card__identity">
                 <div className="partner-card__avatar">{partner.name.slice(0, 2).toUpperCase()}</div>
                 <div>
-                  <small>PARTNER · CONTROLLO CEO</small>
+                  <small>{internalEccomi ? "STRUTTURA INTERNA · CONTROLLO CEO" : "PARTNER · CONTROLLO CEO"}</small>
                   <h2>{partner.name}</h2>
                   <p>{partner.legalName}</p>
                 </div>
@@ -175,9 +191,9 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
 
               <dl className="partner-card__metrics">
                 <div><dt>Pratiche aperte</dt><dd>{partner.openPractices}</dd></div>
-                <div><dt>Ferme &gt;24h</dt><dd>{partner.stalePractices}</dd></div>
+                <div><dt>Fuori SLA</dt><dd>{partner.stalePractices}</dd></div>
                 <div><dt>Offerte online</dt><dd>{partner.onlinePromotions}</dd></div>
-                <div><dt>Utenti attivi</dt><dd>{partner.activeUsers}</dd></div>
+                <div><dt>{internalEccomi ? "Accessi partner" : "Utenti attivi"}</dt><dd>{internalEccomi ? "—" : partner.activeUsers}</dd></div>
               </dl>
 
               <div className="partner-card__contact">
