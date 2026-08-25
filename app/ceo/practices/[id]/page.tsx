@@ -2,6 +2,7 @@
 import { getActor } from "../../../lib/server/authz";
 import { getCeoPracticeDetail } from "../../../lib/server/ceo-partner-management";
 import { currentRequest } from "../../../lib/server/current-request";
+import { getPracticeSla, isClosedPractice } from "../../../lib/server/partner-control-rules";
 import CeoLoginFallback from "../../ceo-login-fallback";
 import "../../ceo-server.css";
 import "../../partners/partners.css";
@@ -39,6 +40,15 @@ function statusLabel(value: string) {
     COMPLETE: "Completi",
     PENDING_UPLOAD: "Da caricare",
     UPLOADED: "Caricato",
+    PRIVATE: "Privato",
+    BUSINESS: "Azienda",
+    COMPANY: "Azienda",
+    INCOME: "Reddito",
+    TAX_CODE: "Codice fiscale",
+    "TAX CODE": "Codice fiscale",
+    IDENTITY: "Documento d’identità",
+    DOCUMENTO_IDENTITA: "Documento d’identità",
+    PAYSLIP: "Busta paga",
   };
   return labels[value] || value.replaceAll("_", " ");
 }
@@ -78,6 +88,18 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
   const partnerId = encodeURIComponent(detail.partner.id);
   const offerHref = `/ceo/promotions/${encodeURIComponent(detail.promotion.id)}?partner=${partnerId}`;
   const vehicle = `${detail.promotion.brand} ${detail.promotion.model}`.trim();
+  const sla = getPracticeSla(practice.status, practice.updatedAt);
+  const completedAt = isClosedPractice(practice.status) ? practice.completedAt : null;
+  const slaBadge = sla.limitHours === null
+    ? "✓ CONCLUSA"
+    : sla.stale
+      ? `🔴 ${sla.hours}h · SLA ${sla.owner} SCADUTO`
+      : `🟢 ${sla.hours}h · SLA ${sla.owner} OK`;
+  const slaDetail = sla.limitHours === null
+    ? "Pratica conclusa · nessun SLA aperto"
+    : sla.stale
+      ? `${sla.hours} ore · fuori SLA ${sla.owner} (limite ${sla.limitHours}h)`
+      : `${sla.hours} ore · SLA ${sla.owner} regolare (limite ${sla.limitHours}h)`;
 
   return (
     <main className="ceo-server-page" data-ceo-practice-ready="true">
@@ -96,8 +118,8 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
           <p className="practice-ceo-id">Pratica #{practice.id}</p>
           <p className="practice-ceo-context">{detail.partner.name} · {statusLabel(practice.status)}</p>
         </div>
-        <span className={`partner-sla partner-sla--large ${practice.stale ? "partner-sla--late" : "partner-sla--ok"}`}>
-          {practice.stale ? `🔴 ${practice.slaHours}h · SOLLECITA` : `🟢 ${practice.slaHours}h · SLA OK`}
+        <span className={`partner-sla partner-sla--large ${sla.stale ? "partner-sla--late" : "partner-sla--ok"}`}>
+          {slaBadge}
         </span>
       </section>
 
@@ -121,8 +143,8 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
             <div><small>Ultimo aggiornamento</small><strong>{shortDate(practice.updatedAt)}</strong></div>
             <div><small>Creata</small><strong>{shortDate(practice.createdAt)}</strong></div>
             <div><small>Inviata al partner</small><strong>{shortDate(practice.sentToPartnerAt)}</strong></div>
-            <div><small>Conclusa</small><strong>{shortDate(practice.completedAt)}</strong></div>
-            <div><small>SLA</small><strong>{practice.stale ? `${practice.slaHours} ore · da sollecitare` : `${practice.slaHours} ore · regolare`}</strong></div>
+            <div><small>Conclusa</small><strong>{shortDate(completedAt)}</strong></div>
+            <div><small>SLA · {sla.phase}</small><strong>{slaDetail}</strong></div>
           </div>
         </article>
 
@@ -134,7 +156,7 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
             <div><small>Email</small><strong>{practice.email}</strong></div>
             <div><small>Telefono</small><strong>{practice.phone}</strong></div>
             <div><small>Provincia</small><strong>{practice.province || "—"}</strong></div>
-            <div><small>Tipo cliente</small><strong>{practice.customerType || "—"}</strong></div>
+            <div><small>Tipo cliente</small><strong>{practice.customerType ? statusLabel(practice.customerType) : "—"}</strong></div>
           </div>
         </article>
 
