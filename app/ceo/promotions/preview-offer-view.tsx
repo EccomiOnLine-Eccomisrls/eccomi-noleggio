@@ -8,6 +8,12 @@ import "../ceo-server.css";
 
 type PreviewPromotion = typeof previewPromotionEditable;
 
+const previewPartnerNames: Record<string, string> = {
+  "preview-goal-rent": "GOAL RENT",
+  "preview-mobility-one": "MOBILITY ONE",
+  "preview-rent-network": "RENT NETWORK",
+};
+
 function money(cents: number) {
   return new Intl.NumberFormat("it-IT", {
     style: "currency",
@@ -27,12 +33,26 @@ function dateOnly(value: string) {
   }).format(date);
 }
 
-export default async function PreviewOfferView({ promotion }: { promotion: PreviewPromotion }) {
+export default async function PreviewOfferView({
+  promotion,
+  partnerId,
+}: {
+  promotion: PreviewPromotion;
+  partnerId?: string;
+}) {
   const request = await currentRequest(`/ceo/promotions/${promotion.id}`);
   if (!isRenderPullRequestPreview(request)) notFound();
 
   const actor = await getActor(request);
   if (!actor || actor.role !== "CEO") notFound();
+
+  const validPartnerId = partnerId && previewPartnerNames[partnerId] ? partnerId : null;
+  const partnerName = validPartnerId ? previewPartnerNames[validPartnerId] : null;
+  const returnHref = validPartnerId
+    ? `/ceo/partners/${encodeURIComponent(validPartnerId)}#offerte`
+    : "/ceo/partners";
+  const returnLabel = partnerName ? `← ${partnerName}` : "← Gestione Partner";
+  const returnButton = partnerName ? `Torna a ${partnerName}` : "Torna ai partner";
 
   return (
     <main className="ceo-server-page" data-preview-partner-offer-ready="true">
@@ -41,7 +61,7 @@ export default async function PreviewOfferView({ promotion }: { promotion: Previ
           <span>🚙</span>
           <div><strong>ECCOMI</strong><small>NOLEGGIO</small></div>
         </div>
-        <a href="/ceo/partners">← Gestione Partner</a>
+        <a href={returnHref}>{returnLabel}</a>
       </header>
 
       <section className="ceo-server-heading">
@@ -76,7 +96,7 @@ export default async function PreviewOfferView({ promotion }: { promotion: Previ
             </div>
           </div>
           <div className="ceo-server-promotion__actions">
-            <a className="ceo-server-secondary" href="/ceo/partners">Torna ai partner</a>
+            <a className="ceo-server-secondary" href={returnHref}>{returnButton}</a>
           </div>
         </article>
       </section>
