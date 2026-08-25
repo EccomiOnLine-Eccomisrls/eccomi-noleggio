@@ -14,6 +14,33 @@ type HomeProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+const previewSidebarScript = `
+(() => {
+  const items = Array.from(document.querySelectorAll('.ec-preview-sidebar nav .disabled'));
+  for (const item of items) {
+    const text = (item.textContent || '').trim();
+    if (text.includes('Partner')) {
+      const link = document.createElement('a');
+      link.href = '/ceo/partners';
+      link.innerHTML = item.innerHTML;
+      link.setAttribute('data-preview-real-link', 'partner');
+      item.replaceWith(link);
+      continue;
+    }
+    const label = document.createElement('small');
+    label.textContent = 'IN SVILUPPO';
+    label.style.marginLeft = 'auto';
+    label.style.fontSize = '10px';
+    label.style.fontWeight = '800';
+    label.style.letterSpacing = '.06em';
+    label.style.opacity = '.7';
+    item.appendChild(label);
+    item.setAttribute('aria-disabled', 'true');
+    item.setAttribute('title', 'Sezione non ancora disponibile nella preview');
+  }
+})();
+`;
+
 export default async function Home({ searchParams }: HomeProps) {
   const incomingHeaders = await headers();
   const host = incomingHeaders.get("host")?.trim() || "localhost";
@@ -34,12 +61,15 @@ export default async function Home({ searchParams }: HomeProps) {
     const view = rawView === "promotions" ? "promotions" : "dashboard";
 
     return (
-      <PreviewDemo
-        payload={previewDashboardPayload()}
-        view={view}
-        editId={rawEdit || null}
-        query={query}
-      />
+      <>
+        <PreviewDemo
+          payload={previewDashboardPayload()}
+          view={view}
+          editId={rawEdit || null}
+          query={query}
+        />
+        <script dangerouslySetInnerHTML={{ __html: previewSidebarScript }} />
+      </>
     );
   }
 
