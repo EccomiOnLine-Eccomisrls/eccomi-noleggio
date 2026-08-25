@@ -366,14 +366,16 @@ function previewDetail(id: string): CeoPartnerDetail | null {
   return {
     preview: true,
     partner,
-    users: partner.activeUsers
-      ? [{
-          email: partner.contactEmail || "partner.preview@eccomi.local",
-          displayName: partner.contactName || partner.name,
-          active: true,
-          lastAccessAt: partner.lastActivityAt,
-        }]
-      : [],
+    users: Array.from({ length: partner.activeUsers }, (_, index) => ({
+      email: index === 0
+        ? (partner.contactEmail || "partner.preview@eccomi.local")
+        : `operatore${index + 1}.${partner.id.replace(/^preview-/, "")}@eccomi.local`,
+      displayName: index === 0
+        ? (partner.contactName || partner.name)
+        : `Operatore Demo ${index + 1}`,
+      active: true,
+      lastAccessAt: index === 0 ? partner.lastActivityAt : isoAgo(index + 1),
+    })),
     promotions: [
       { id: "preview-promo-1", offerNumber: "PREVIEW-3008", brand: "PEUGEOT", model: "3008", version: "Hybrid 145 Allure Business", status: partner.onlinePromotions ? "ONLINE" : "ARCHIVED", validUntil: "2026-09-30" },
       { id: "preview-promo-2", offerNumber: "PREVIEW-YPSILON", brand: "LANCIA", model: "Ypsilon", version: "Ibrida e-DCT", status: partner.onlinePromotions > 1 ? "ONLINE" : "ARCHIVED", validUntil: "2026-10-15" },
