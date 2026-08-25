@@ -18,6 +18,12 @@
   letter-spacing: 0.08em;
 }
 
+.partner-heading__status-stack {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
 .partner-kpis {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -148,7 +154,8 @@
   color: #6c7d91;
 }
 
-.partner-card__status-row {
+.partner-card__status-row,
+.partner-section-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -178,6 +185,27 @@
 .partner-pill--attention {
   color: #8a4e00;
   background: #fff2d5;
+}
+
+.partner-health--regular {
+  color: #19743e;
+  background: #e6f7ec;
+}
+
+.partner-health--attention {
+  color: #8a4e00;
+  background: #fff2d5;
+}
+
+.partner-health--intervention {
+  color: #a32828;
+  background: #ffe9e9;
+}
+
+.partner-health-reason {
+  margin: -7px 0 0;
+  color: #65768b;
+  font-size: 12px;
 }
 
 .partner-card__metrics {
@@ -247,6 +275,79 @@
   text-align: center;
 }
 
+.partner-health-banner,
+.partner-quick-actions,
+.practice-ceo-actions {
+  max-width: 1280px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.partner-health-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid #b7dfc4;
+  border-radius: 14px;
+  color: #216c3d;
+  background: #effbf3;
+}
+
+.partner-health-banner[data-health="ATTENTION"] {
+  border-color: #ead49a;
+  color: #76510b;
+  background: #fff8e6;
+}
+
+.partner-health-banner[data-health="INTERVENTION"] {
+  border-color: #efb3b3;
+  color: #972929;
+  background: #fff0f0;
+}
+
+.partner-health-banner div {
+  display: grid;
+  gap: 3px;
+}
+
+.partner-health-banner small {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+
+.partner-health-banner span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.partner-quick-actions,
+.practice-ceo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+
+.partner-quick-actions a,
+.practice-ceo-actions a {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border: 1px solid #bfd4e6;
+  border-radius: 11px;
+  color: #07588f;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
 .partner-detail-nav {
   display: flex;
   flex-wrap: wrap;
@@ -313,6 +414,10 @@
   overflow-wrap: anywhere;
 }
 
+.partner-detail-grid__wide {
+  grid-column: span 2;
+}
+
 .partner-detail-grid small {
   color: #708096;
   font-size: 10px;
@@ -364,6 +469,37 @@
   text-decoration: none;
 }
 
+.partner-table-row--stale td {
+  background: #fff8f2;
+}
+
+.partner-sla {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.partner-sla--ok {
+  color: #19743e;
+  background: #e6f7ec;
+}
+
+.partner-sla--late {
+  color: #a32828;
+  background: #ffe9e9;
+}
+
+.partner-sla--large {
+  min-height: 36px;
+  padding: 8px 11px;
+  font-size: 11px;
+}
+
 .partner-empty-row {
   color: #728197;
   text-align: center !important;
@@ -387,8 +523,13 @@
 
 @media (max-width: 680px) {
   .partner-heading,
-  .partner-detail-section__head {
+  .partner-detail-section__head,
+  .partner-health-banner {
     flex-direction: column;
+  }
+
+  .partner-heading__status-stack {
+    justify-items: start;
   }
 
   .partner-kpis,
@@ -400,8 +541,14 @@
     grid-template-columns: 1fr;
   }
 
+  .partner-detail-grid__wide {
+    grid-column: auto;
+  }
+
   .partner-card__actions,
-  .partner-card__actions .ceo-server-primary {
+  .partner-card__actions .ceo-server-primary,
+  .partner-quick-actions a,
+  .practice-ceo-actions a {
     width: 100%;
   }
 }
