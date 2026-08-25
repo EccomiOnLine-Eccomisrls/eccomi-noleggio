@@ -25,6 +25,7 @@ export async function POST(
     const saveRecipient = form.get("saveRecipient") === "true";
 
     const headers = new Headers(request.headers);
+    headers.delete("content-length");
     headers.set("content-type", "application/json");
 
     const forwarded = new Request(
