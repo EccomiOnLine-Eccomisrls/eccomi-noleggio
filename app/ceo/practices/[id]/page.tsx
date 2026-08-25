@@ -3,7 +3,8 @@ import { getActor } from "../../../lib/server/authz";
 import { getCeoPracticeDetail } from "../../../lib/server/ceo-partner-management";
 import { getCeoPracticeControlState } from "../../../lib/server/ceo-practice-control-state";
 import { currentRequest } from "../../../lib/server/current-request";
-import { getPracticeSla, isClosedPractice } from "../../../lib/server/partner-control-rules";
+import { getPracticeSla, isClosedPractice, isInternalEccomiPartner } from "../../../lib/server/partner-control-rules";
+import { getPracticeWorkflowClosedAt } from "../../../lib/server/practice-workflow-closure";
 import CeoLoginFallback from "../../ceo-login-fallback";
 import CeoPracticeActions from "./ceo-practice-actions";
 import "../../ceo-server.css";
@@ -98,8 +99,13 @@ export default async function CeoPracticePage({ params, searchParams }: Practice
   const partnerId = encodeURIComponent(detail.partner.id);
   const offerHref = `/ceo/promotions/${encodeURIComponent(detail.promotion.id)}?partner=${partnerId}`;
   const vehicle = `${detail.promotion.brand} ${detail.promotion.model}`.trim();
-  const sla = getPracticeSla(practice.status, practice.updatedAt);
-  const completedAt = isClosedPractice(practice.status) ? practice.completedAt : null;
+  const internalEccomi = isInternalEccomiPartner(detail.partner.name, detail.partner.legalName);
+  const sla = getPracticeSla(practice.status, practice.updatedAt, internalEccomi);
+  const completedAt = isClosedPractice(practice.status)
+    ? detail.preview
+      ? practice.completedAt
+      : await getPracticeWorkflowClosedAt(practice.id, practice.status, practice.completedAt)
+    : null;
   const slaBadge = sla.limitHours === null
     ? "✓ CONCLUSA"
     : sla.stale
