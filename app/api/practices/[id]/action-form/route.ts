@@ -62,6 +62,7 @@ export async function POST(
       priority?: string;
       trashed?: boolean;
       noteAdded?: boolean;
+      idempotent?: boolean;
     };
 
     if (!response.ok) {
@@ -77,6 +78,11 @@ export async function POST(
       ? `Operazione completata: ${payload.label}.`
       : "Operazione completata.";
 
+    if (payload.idempotent) {
+      message = payload.label
+        ? `Stato già aggiornato: ${payload.label}. Nessuna seconda modifica eseguita.`
+        : "Stato già aggiornato. Nessuna seconda modifica eseguita.";
+    }
     if (payload.noteAdded) message = "Nota operativa salvata.";
     if (payload.trashed) message = "Pratica spostata nel cestino.";
     if (operation === "priority") message = "Priorità aggiornata.";
