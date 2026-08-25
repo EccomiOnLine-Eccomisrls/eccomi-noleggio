@@ -39,6 +39,7 @@ export async function POST(
     }
 
     const headers = new Headers(request.headers);
+    headers.delete("content-length");
     headers.set("content-type", "application/json");
 
     const forwarded = new Request(
