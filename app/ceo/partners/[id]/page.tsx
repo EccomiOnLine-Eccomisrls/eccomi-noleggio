@@ -5,9 +5,17 @@ import { currentRequest } from "../../../lib/server/current-request";
 import CeoLoginFallback from "../../ceo-login-fallback";
 import "../../ceo-server.css";
 import "../partners.css";
+import "../premium.css";
 
 type PartnerDetailPageProps = {
   params: Promise<{ id: string }>;
+};
+
+type ActivityItem = {
+  at: string;
+  label: string;
+  detail: string;
+  kind: "practice" | "commission" | "access" | "system";
 };
 
 function money(cents: number) {
@@ -76,6 +84,13 @@ function statusLabel(value: string) {
   return labels[value] || value.replaceAll("_", " ");
 }
 
+function latestDate(values: Array<string | null>) {
+  const dates = values
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  return dates[0] || null;
+}
+
 export default async function CeoPartnerDetailPage({ params }: PartnerDetailPageProps) {
   const { id } = await params;
   const request = await currentRequest(`/ceo/partners/${id}`);
@@ -109,9 +124,73 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
 
   const partner = detail.partner;
   const shownPractices = detail.practices.length;
+  const monogram = partner.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase() || "P";
+
+  const onlinePromotions = detail.promotions.filter((promotion) =>
+    ["ONLINE", "ACTIVE", "EXPIRING"].includes(promotion.status),
+  );
+  const nextExpiry = onlinePromotions
+    .map((promotion) => promotion.validUntil)
+    .filter(Boolean)
+    .sort()[0] || null;
+
+  const lastAccessAt = latestDate(detail.users.map((user) => user.lastAccessAt));
+  const accruedCents = detail.commissions
+    .filter((commission) => commission.status === "ACCRUED")
+    .reduce((sum, commission) => sum + commission.amountCents, 0);
+  const invoicedCents = detail.commissions
+    .filter((commission) => commission.status === "INVOICED")
+    .reduce((sum, commission) => sum + commission.amountCents, 0);
+  const paidCents = detail.commissions
+    .filter((commission) => commission.status === "PAID")
+    .reduce((sum, commission) => sum + commission.amountCents, 0);
+
+  const activities: ActivityItem[] = [
+    ...detail.practices.map((practice) => ({
+      at: practice.updatedAt,
+      label: `Pratica ${practice.id} aggiornata`,
+      detail: `${practice.customerName} · ${statusLabel(practice.status)}`,
+      kind: "practice" as const,
+    })),
+    ...detail.commissions.map((commission) => ({
+      at: commission.paidAt || commission.invoicedAt || commission.accruedAt,
+      label: `Commissione ${statusLabel(commission.status).toLowerCase()}`,
+      detail: `${money(commission.amountCents)} · ${commission.leadId}`,
+      kind: "commission" as const,
+    })),
+    ...detail.users
+      .filter((user) => Boolean(user.lastAccessAt))
+      .map((user) => ({
+        at: user.lastAccessAt as string,
+        label: "Accesso Area Partner",
+        detail: `${user.displayName} · ${user.email}`,
+        kind: "access" as const,
+      })),
+  ]
+    .filter((activity) => !Number.isNaN(new Date(activity.at).getTime()))
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    .slice(0, 5);
+
+  if (!activities.length && partner.lastActivityAt) {
+    activities.push({
+      at: partner.lastActivityAt,
+      label: "Attività partner aggiornata",
+      detail: partner.healthReason,
+      kind: "system",
+    });
+  }
+
+  const partnerReturn = `/ceo/partners/${encodeURIComponent(partner.id)}#offerte`;
+  const offerContext = `?partnerId=${encodeURIComponent(partner.id)}&partnerName=${encodeURIComponent(partner.name)}`;
 
   return (
-    <main className="ceo-server-page" data-ceo-partner-detail-ready="true">
+    <main className="ceo-server-page partner-premium-page" data-ceo-partner-detail-ready="true">
       <header className="ceo-server-bar">
         <div className="ceo-server-bar__brand">
           <span>🚙</span>
@@ -120,13 +199,18 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
         <a href="/ceo/partners">← Gestione Partner</a>
       </header>
 
-      <section className="ceo-server-heading partner-heading">
-        <div>
-          <small>{detail.preview ? "PREVIEW SICURA · DATI DIMOSTRATIVI" : "SCHEDA PARTNER · DATI REALI"}</small>
-          <h1>{partner.name}</h1>
-          <p>{partner.legalName} · {partner.contactName || "Referente non indicato"} · {partner.contactEmail || "Email non indicata"}</p>
+      <section className="partner-premium-hero">
+        <div className="partner-premium-identity">
+          <div className="partner-premium-monogram" aria-hidden="true">{monogram}</div>
+          <div>
+            <small>{detail.preview ? "PREVIEW SICURA · DATI DIMOSTRATIVI" : "ECCOMI PARTNER CONTROL CENTER · DATI REALI"}</small>
+            <h1>{partner.name}</h1>
+            <p>{partner.legalName} · {partner.contactName || "Referente non indicato"}</p>
+            {partner.contactEmail ? <a href={`mailto:${partner.contactEmail}`}>{partner.contactEmail}</a> : null}
+          </div>
         </div>
-        <div className="partner-heading__status-stack">
+        <div className="partner-premium-state">
+          <span className="partner-premium-eyebrow">STATO RETE</span>
           <span className={`partner-pill ${partner.status === "ACTIVE" ? "partner-pill--active" : "partner-pill--muted"}`}>
             {partner.status === "ACTIVE" ? "● ATTIVO" : statusLabel(partner.status)}
           </span>
@@ -136,36 +220,71 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
         </div>
       </section>
 
-      <section className="partner-health-banner" data-health={partner.health}>
-        <div><small>STATO OPERATIVO</small><strong>{partner.healthReason}</strong></div>
-        <span>{partner.stalePractices ? `${partner.stalePractices} pratiche ferme oltre 24h` : "SLA sotto controllo"}</span>
+      <section className={`partner-attention-panel partner-attention-panel--${partner.health.toLowerCase()}`}>
+        <div className="partner-attention-panel__icon">{partner.health === "REGULAR" ? "✓" : partner.health === "ATTENTION" ? "!" : "⚠"}</div>
+        <div className="partner-attention-panel__copy">
+          <small>COSA RICHIEDE LA TUA ATTENZIONE</small>
+          <strong>{partner.health === "REGULAR" ? "Nessuna azione richiesta" : partner.healthReason}</strong>
+          <span>
+            {partner.health === "REGULAR"
+              ? "Operatività regolare, accessi disponibili e SLA sotto controllo."
+              : partner.stalePractices
+                ? `${partner.stalePractices} ${partner.stalePractices === 1 ? "pratica è ferma" : "pratiche sono ferme"} oltre 24 ore.`
+                : "Verifica lo stato operativo del partner e gli accessi disponibili."}
+          </span>
+        </div>
+        <div className="partner-attention-panel__meta">
+          <small>ULTIMA ATTIVITÀ</small>
+          <strong>{shortDate(partner.lastActivityAt)}</strong>
+        </div>
       </section>
 
-      <section className="ceo-server-kpis partner-kpis" aria-label="Riepilogo partner">
-        <article><small>PRATICHE APERTE</small><strong>{partner.openPractices}</strong><span>{partner.practices} totali</span></article>
-        <article><small>FERME &gt;24H</small><strong>{partner.stalePractices}</strong><span>da sollecitare</span></article>
-        <article><small>OFFERTE ONLINE</small><strong>{partner.onlinePromotions}</strong><span>{partner.promotions} collegate</span></article>
-        <article><small>COMMISSIONI</small><strong>{money(partner.commissionCents)}</strong><span>maturato registrato</span></article>
+      <section className="ceo-server-kpis partner-kpis partner-premium-kpis" aria-label="Riepilogo partner">
+        <article>
+          <small>PRATICHE</small>
+          <strong>{partner.openPractices}</strong>
+          <span>{partner.stalePractices ? `${partner.stalePractices} ferme oltre 24h` : "0 ferme oltre 24h"} · {partner.completedPractices} concluse</span>
+        </article>
+        <article>
+          <small>OFFERTE ONLINE</small>
+          <strong>{partner.onlinePromotions}</strong>
+          <span>{nextExpiry ? `Prossima scadenza ${dateOnly(nextExpiry)}` : "Nessuna scadenza attiva"}</span>
+        </article>
+        <article>
+          <small>ACCESSI</small>
+          <strong>{partner.activeUsers}</strong>
+          <span>{lastAccessAt ? `Ultimo accesso ${shortDate(lastAccessAt)}` : "Nessun accesso registrato"}</span>
+        </article>
+        <article>
+          <small>COMMISSIONI</small>
+          <strong>{money(partner.commissionCents)}</strong>
+          <span>{money(accruedCents)} maturate · {money(invoicedCents)} fatturate · {money(paidCents)} pagate</span>
+        </article>
       </section>
 
-      <section className="partner-quick-actions" aria-label="Azioni rapide CEO">
-        <a href="#pratiche">Assegna / gestisci pratiche</a>
-        <a href="#accessi">Gestisci accessi</a>
-        {partner.contactEmail ? <a href={`mailto:${partner.contactEmail}`}>Contatta partner</a> : null}
-      </section>
+      <div className="partner-premium-sticky">
+        <section className="partner-quick-actions partner-premium-actions" aria-label="Azioni rapide CEO">
+          <span className="partner-premium-actions__label">AZIONI CEO</span>
+          <a href="#pratiche">Gestisci pratiche</a>
+          <a href="#accessi">Gestisci accessi</a>
+          {partner.contactEmail ? <a href={`mailto:${partner.contactEmail}`}>Contatta partner</a> : null}
+        </section>
 
-      <nav className="partner-detail-nav" aria-label="Sezioni partner">
-        <a href="#panoramica">Panoramica</a>
-        <a href="#pratiche">Pratiche</a>
-        <a href="#offerte">Offerte</a>
-        <a href="#commissioni">Commissioni</a>
-        <a href="#accessi">Accessi</a>
-      </nav>
+        <nav className="partner-detail-nav partner-premium-nav" aria-label="Sezioni partner">
+          <a href="#panoramica">Panoramica</a>
+          <a href="#attivita">Attività</a>
+          <a href="#pratiche">Pratiche</a>
+          <a href="#offerte">Offerte</a>
+          <a href="#commissioni">Commissioni</a>
+          <a href="#accessi">Accessi</a>
+        </nav>
+      </div>
 
       <div className="partner-detail-stack">
         <section className="partner-detail-section" id="panoramica">
           <div className="partner-detail-section__head">
-            <div><h2>Panoramica</h2><p>Informazioni operative principali della struttura.</p></div>
+            <div><h2>Panoramica</h2><p>Identità e quadro operativo della struttura.</p></div>
+            <span className="partner-premium-section-number">01</span>
           </div>
           <div className="partner-detail-grid">
             <div><small>Nome partner</small><strong>{partner.name}</strong></div>
@@ -179,6 +298,27 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
           </div>
         </section>
 
+        <section className="partner-detail-section partner-activity-section" id="attivita">
+          <div className="partner-detail-section__head">
+            <div><h2>Ultime attività</h2><p>Gli ultimi movimenti utili per capire cosa sta succedendo senza aprire ogni pratica.</p></div>
+            <span className="partner-premium-section-number">02</span>
+          </div>
+          <div className="partner-activity-list">
+            {activities.length ? activities.map((activity, index) => (
+              <article className="partner-activity-item" key={`${activity.kind}-${activity.at}-${index}`}>
+                <span className={`partner-activity-dot partner-activity-dot--${activity.kind}`} />
+                <div>
+                  <strong>{activity.label}</strong>
+                  <span>{activity.detail}</span>
+                </div>
+                <time>{shortDate(activity.at)}</time>
+              </article>
+            )) : (
+              <div className="partner-activity-empty">Nessuna attività recente disponibile.</div>
+            )}
+          </div>
+        </section>
+
         <section className="partner-detail-section" id="pratiche">
           <div className="partner-detail-section__head">
             <div>
@@ -186,6 +326,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
               <p>Richieste clienti collegate a questo partner. Mostrate {shownPractices} di {partner.practices}.</p>
             </div>
             <div className="partner-section-badges">
+              <span className="partner-premium-section-number">03</span>
               <span className="partner-pill partner-pill--attention">{partner.openPractices} APERTE</span>
               {partner.stalePractices ? <span className="partner-pill partner-health--intervention">{partner.stalePractices} FERME &gt;24H</span> : null}
             </div>
@@ -214,7 +355,10 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
         <section className="partner-detail-section" id="offerte">
           <div className="partner-detail-section__head">
             <div><h2>Offerte</h2><p>Promozioni originate o gestite da questo partner.</p></div>
-            <span className="partner-pill partner-pill--active">{partner.onlinePromotions} ONLINE</span>
+            <div className="partner-section-badges">
+              <span className="partner-premium-section-number">04</span>
+              <span className="partner-pill partner-pill--active">{partner.onlinePromotions} ONLINE</span>
+            </div>
           </div>
           <div className="partner-table-wrap">
             <table className="partner-table">
@@ -227,7 +371,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
                     <td>{promotion.version || "—"}</td>
                     <td>{statusLabel(promotion.status)}</td>
                     <td>{dateOnly(promotion.validUntil)}</td>
-                    <td><a href={`/ceo/promotions/${encodeURIComponent(promotion.id)}`}>Apri offerta →</a></td>
+                    <td><a href={`/ceo/promotions/${encodeURIComponent(promotion.id)}${offerContext}`}>Apri offerta →</a></td>
                   </tr>
                 )) : <tr><td className="partner-empty-row" colSpan={6}>Nessuna offerta collegata.</td></tr>}
               </tbody>
@@ -238,7 +382,15 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
         <section className="partner-detail-section" id="commissioni">
           <div className="partner-detail-section__head">
             <div><h2>Commissioni</h2><p>Storico economico collegato alle pratiche del partner.</p></div>
-            <strong>{money(partner.commissionCents)}</strong>
+            <div className="partner-section-badges">
+              <span className="partner-premium-section-number">05</span>
+              <strong>{money(partner.commissionCents)}</strong>
+            </div>
+          </div>
+          <div className="partner-commission-summary">
+            <div><small>MATURATE</small><strong>{money(accruedCents)}</strong></div>
+            <div><small>FATTURATE</small><strong>{money(invoicedCents)}</strong></div>
+            <div><small>PAGATE</small><strong>{money(paidCents)}</strong></div>
           </div>
           <div className="partner-table-wrap">
             <table className="partner-table">
@@ -262,7 +414,10 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
         <section className="partner-detail-section" id="accessi">
           <div className="partner-detail-section__head">
             <div><h2>Accessi Partner</h2><p>Account autorizzati ad accedere all’Area Partner.</p></div>
-            <span className="partner-pill partner-pill--active">{partner.activeUsers} ATTIVI</span>
+            <div className="partner-section-badges">
+              <span className="partner-premium-section-number">06</span>
+              <span className="partner-pill partner-pill--active">{partner.activeUsers} ATTIVI</span>
+            </div>
           </div>
           <div className="partner-table-wrap">
             <table className="partner-table">
@@ -281,6 +436,12 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
           </div>
         </section>
       </div>
+
+      <footer className="partner-premium-footer">
+        <span>ECCOMI NOLEGGIO · PARTNER CONTROL CENTER</span>
+        <span>Ultimo aggiornamento dati: {shortDate(partner.lastActivityAt)}</span>
+        <a href={partnerReturn}>Torna alle offerte di {partner.name}</a>
+      </footer>
     </main>
   );
 }
