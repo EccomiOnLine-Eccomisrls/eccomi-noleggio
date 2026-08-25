@@ -1,15 +1,19 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- This CEO practice view intentionally uses native navigation on iPad. */
 import { getActor } from "../../../lib/server/authz";
 import { getCeoPracticeDetail } from "../../../lib/server/ceo-partner-management";
+import { getCeoPracticeControlState } from "../../../lib/server/ceo-practice-control-state";
 import { currentRequest } from "../../../lib/server/current-request";
 import { getPracticeSla, isClosedPractice } from "../../../lib/server/partner-control-rules";
 import CeoLoginFallback from "../../ceo-login-fallback";
+import CeoPracticeActions from "./ceo-practice-actions";
 import "../../ceo-server.css";
 import "../../partners/partners.css";
 import "../../partners/final-touches.css";
+import "./ceo-practice-actions.css";
 
 type PracticePageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 function shortDate(value: string | null) {
@@ -53,8 +57,13 @@ function statusLabel(value: string) {
   return labels[value] || value.replaceAll("_", " ");
 }
 
-export default async function CeoPracticePage({ params }: PracticePageProps) {
+function one(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : "";
+}
+
+export default async function CeoPracticePage({ params, searchParams }: PracticePageProps) {
   const { id } = await params;
+  const query = await searchParams;
   const request = await currentRequest(`/ceo/practices/${id}`);
   const actor = await getActor(request);
   if (!actor) return <CeoLoginFallback />;
@@ -84,6 +93,7 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
     );
   }
 
+  const controlState = await getCeoPracticeControlState(request, id);
   const practice = detail.practice;
   const partnerId = encodeURIComponent(detail.partner.id);
   const offerHref = `/ceo/promotions/${encodeURIComponent(detail.promotion.id)}?partner=${partnerId}`;
@@ -100,9 +110,11 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
     : sla.stale
       ? `${sla.hours} ore · fuori SLA ${sla.owner} (limite ${sla.limitHours}h)`
       : `${sla.hours} ore · SLA ${sla.owner} regolare (limite ${sla.limitHours}h)`;
+  const feedbackStatus = one(query.ceoAction) === "error" ? "error" as const : one(query.ceoAction) === "ok" ? "ok" as const : null;
+  const feedbackMessage = one(query.message) || null;
 
   return (
-    <main className="ceo-server-page" data-ceo-practice-ready="true">
+    <main className="ceo-server-page" data-ceo-practice-ready="true" data-ceo-practice-server-only="true">
       <header className="ceo-server-bar">
         <div className="ceo-server-bar__brand">
           <span>🚙</span>
@@ -129,6 +141,19 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
         <a href={`mailto:${practice.email}`}>Email cliente</a>
         <a href={`tel:${practice.phone}`}>Chiama cliente</a>
       </section>
+
+      <CeoPracticeActions
+        practiceId={practice.id}
+        initialStatus={practice.status}
+        initialPriority={controlState.priority}
+        initialAssignedTo={controlState.assignedTo}
+        preview={detail.preview}
+        partnerName={detail.partner.name}
+        partnerLegalName={detail.partner.legalName}
+        partnerContactEmail={detail.partner.contactEmail}
+        feedbackStatus={feedbackStatus}
+        feedbackMessage={feedbackMessage}
+      />
 
       <section className="partner-detail-stack">
         <article className="partner-detail-section">
