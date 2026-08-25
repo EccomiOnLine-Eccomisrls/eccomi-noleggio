@@ -170,7 +170,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
               </dl>
 
               <div className="partner-card__contact">
-                <span className="partner-card__contact-name"><strong>Referente</strong>{partner.contactName || "Non indicato"}</span>
+                <span style={{ whiteSpace: "nowrap", overflowWrap: "normal", wordBreak: "normal" }}><strong>Referente</strong>{partner.contactName || "Non indicato"}</span>
                 <span><strong>Email</strong>{partner.contactEmail || "Non indicata"}</span>
                 <span><strong>Ultima attività</strong>{shortDate(partner.lastActivityAt)}</span>
                 <span><strong>Commissioni</strong>{money(partner.commissionCents)}</span>
