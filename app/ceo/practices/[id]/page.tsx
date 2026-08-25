@@ -76,6 +76,7 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
   const practice = detail.practice;
   const partnerId = encodeURIComponent(detail.partner.id);
   const offerHref = `/ceo/promotions/${encodeURIComponent(detail.promotion.id)}?partner=${partnerId}`;
+  const vehicle = `${detail.promotion.brand} ${detail.promotion.model}`.trim();
 
   return (
     <main className="ceo-server-page" data-ceo-practice-ready="true">
@@ -87,11 +88,12 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
         <a href={`/ceo/partners/${partnerId}#pratiche`}>← Scheda partner</a>
       </header>
 
-      <section className="ceo-server-heading partner-heading">
+      <section className="ceo-server-heading partner-heading practice-ceo-heading">
         <div>
           <small>{detail.preview ? "PREVIEW SICURA · DATI DIMOSTRATIVI" : "PRATICA CEO · DATI REALI"}</small>
-          <h1>{practice.id}</h1>
-          <p>{practice.customerName} · {detail.promotion.brand} {detail.promotion.model} · {detail.partner.name}</p>
+          <h1 className="practice-ceo-title">{practice.customerName} · {vehicle}</h1>
+          <p className="practice-ceo-id">Pratica #{practice.id}</p>
+          <p className="practice-ceo-context">{detail.partner.name} · {statusLabel(practice.status)}</p>
         </div>
         <span className={`partner-sla partner-sla--large ${practice.stale ? "partner-sla--late" : "partner-sla--ok"}`}>
           {practice.stale ? `🔴 ${practice.slaHours}h · SOLLECITA` : `🟢 ${practice.slaHours}h · SLA OK`}
@@ -143,7 +145,7 @@ export default async function CeoPracticePage({ params }: PracticePageProps) {
             <div><small>Partner</small><strong>{detail.partner.name}</strong></div>
             <div><small>Referente</small><strong>{detail.partner.contactName || "Non indicato"}</strong></div>
             <div><small>Offerta</small><strong>{detail.promotion.offerNumber}</strong></div>
-            <div><small>Veicolo</small><strong>{detail.promotion.brand} {detail.promotion.model}</strong></div>
+            <div><small>Veicolo</small><strong>{vehicle}</strong></div>
             <div className="partner-detail-grid__wide"><small>Versione</small><strong>{detail.promotion.version || "—"}</strong></div>
           </div>
         </article>
