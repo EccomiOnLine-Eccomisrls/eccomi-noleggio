@@ -76,6 +76,8 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
   const q = (queryValue(query, "q") || "").trim().toLocaleLowerCase("it");
   const status = (queryValue(query, "status") || "ALL").trim().toUpperCase();
   const overview = await getCeoPartnerOverview(request);
+  const pausedPartners = overview.partners.filter((partner) => partner.status === "PAUSED").length;
+  const regularPartners = overview.partners.filter((partner) => partner.health === "REGULAR").length;
   const filteredPartners = overview.partners.filter((partner) => {
     const matchesQuery = !q || [
       partner.name,
@@ -104,6 +106,14 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
           <p>Controlla rete, offerte, pratiche, accessi e commissioni senza entrare nell’area operativa del partner.</p>
         </div>
         <div className="partner-heading__badge">CEO CONTROL CENTER</div>
+      </section>
+
+      <section className="partner-network-summary" aria-label="Stato executive della rete">
+        <div>
+          <small>RETE PARTNER</small>
+          <strong>{overview.stats.activePartners} attivi · {overview.stats.attentionPartners} da attenzionare · {pausedPartners} in pausa</strong>
+        </div>
+        <span>{regularPartners} regolari · {overview.stats.openPractices} pratiche aperte · {money(overview.stats.commissionCents)} maturato</span>
       </section>
 
       <section className="ceo-server-kpis partner-kpis" aria-label="Riepilogo rete partner">
@@ -142,11 +152,11 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
         {filteredPartners.map((partner) => {
           const active = partner.status === "ACTIVE";
           return (
-            <article className="partner-card" key={partner.id}>
+            <article className={`partner-card partner-card--${partner.health.toLowerCase()}`} data-health={partner.health} key={partner.id}>
               <div className="partner-card__identity">
                 <div className="partner-card__avatar">{partner.name.slice(0, 2).toUpperCase()}</div>
                 <div>
-                  <small>PARTNER</small>
+                  <small>PARTNER · CONTROLLO CEO</small>
                   <h2>{partner.name}</h2>
                   <p>{partner.legalName}</p>
                 </div>
@@ -170,10 +180,10 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
               </dl>
 
               <div className="partner-card__contact">
-                <span style={{ whiteSpace: "nowrap", overflowWrap: "normal", wordBreak: "normal" }}><strong>Referente</strong>{partner.contactName || "Non indicato"}</span>
-                <span><strong>Email</strong>{partner.contactEmail || "Non indicata"}</span>
-                <span><strong>Ultima attività</strong>{shortDate(partner.lastActivityAt)}</span>
-                <span><strong>Commissioni</strong>{money(partner.commissionCents)}</span>
+                <span className="partner-card__contact-item partner-card__contact-item--referent"><strong>Referente</strong><em>{partner.contactName || "Non indicato"}</em></span>
+                <span className="partner-card__contact-item"><strong>Email</strong><em>{partner.contactEmail || "Non indicata"}</em></span>
+                <span className="partner-card__contact-item"><strong>Ultima attività</strong><em>{shortDate(partner.lastActivityAt)}</em></span>
+                <span className="partner-card__contact-item"><strong>Commissioni</strong><em>{money(partner.commissionCents)}</em></span>
               </div>
 
               <div className="partner-card__actions">
