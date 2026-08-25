@@ -1,4 +1,5 @@
 import { POST as loginWithJson } from "../ceo-login/route";
+import { publicUrl } from "../../../lib/server/public-url";
 
 function safeReturnTo(value: FormDataEntryValue | null) {
   const target = typeof value === "string" ? value : "/ceo";
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     const payload = (await loginResponse.json().catch(() => ({}))) as {
       error?: string;
     };
-    const target = new URL("/ceo", request.url);
+    const target = publicUrl(request, "/ceo");
     target.searchParams.set("loginError", payload.error || "Accesso non riuscito.");
     return Response.redirect(target, 303);
   }
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     status: 303,
     headers: {
       ...Object.fromEntries(responseHeaders.entries()),
-      location: new URL(returnTo, request.url).toString(),
+      location: publicUrl(request, returnTo).toString(),
     },
   });
 }

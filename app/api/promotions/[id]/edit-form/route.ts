@@ -1,4 +1,5 @@
 import { PATCH as editPromotion } from "../edit/route";
+import { publicUrl } from "../../../../lib/server/public-url";
 
 function euroToCents(value: FormDataEntryValue | null) {
   const normalized = String(value || "").replace(",", ".");
@@ -78,7 +79,7 @@ export async function POST(
   const payload = (await editResponse.json().catch(() => ({}))) as {
     error?: string;
   };
-  const target = new URL(returnTo, request.url);
+  const target = publicUrl(request, returnTo);
 
   if (!editResponse.ok) {
     target.searchParams.set("error", payload.error || "Salvataggio non riuscito.");
