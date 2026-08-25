@@ -59,6 +59,36 @@ function safeStatus(value: string) {
   return Object.prototype.hasOwnProperty.call(actionsByStatus, status) ? status : "PARTNER_REVIEW";
 }
 
+function PreservedPreviewState({
+  status,
+  priority,
+  assignedTo,
+  note,
+  recipientEmail,
+  deleteReason,
+  omit = [],
+}: {
+  status: string;
+  priority: string;
+  assignedTo: string;
+  note: string;
+  recipientEmail: string;
+  deleteReason: string;
+  omit?: string[];
+}) {
+  const omitted = new Set(omit);
+  return (
+    <>
+      {!omitted.has("status") ? <input type="hidden" name="status" value={status} /> : null}
+      {!omitted.has("priority") ? <input type="hidden" name="priority" value={priority} /> : null}
+      {!omitted.has("assignedTo") ? <input type="hidden" name="assignedTo" value={assignedTo} /> : null}
+      {!omitted.has("note") ? <input type="hidden" name="note" value={note} /> : null}
+      {!omitted.has("recipientEmail") ? <input type="hidden" name="recipientEmail" value={recipientEmail} /> : null}
+      {!omitted.has("deleteReason") ? <input type="hidden" name="deleteReason" value={deleteReason} /> : null}
+    </>
+  );
+}
+
 export default async function Pr9PracticeDemoPage({
   searchParams,
 }: {
@@ -96,6 +126,15 @@ export default async function Pr9PracticeDemoPage({
       ? `PREVIEW · Spostamento nel cestino simulato · Motivo: ${deleteReason}`
       : "PREVIEW · Per il cestino serve un motivo di almeno 5 caratteri.";
   }
+
+  const preservedState = {
+    status,
+    priority,
+    assignedTo,
+    note,
+    recipientEmail,
+    deleteReason,
+  };
 
   return (
     <main className="ceo-server-page" data-pr9-demo-ready="true" data-pr9-server-only="true">
@@ -141,6 +180,7 @@ export default async function Pr9PracticeDemoPage({
             {actions.length ? (
               <form method="get" action="/pr9-pratica-demo" className="ceo-practice-control__stack">
                 <input type="hidden" name="demoAction" value="status" />
+                <PreservedPreviewState {...preservedState} omit={["status", "note"]} />
                 <label>
                   Nota per l’avanzamento
                   <textarea name="note" defaultValue={note} placeholder="Facoltativa; per integrazione indica cosa manca…" />
@@ -166,7 +206,7 @@ export default async function Pr9PracticeDemoPage({
             <h3>Priorità e responsabile</h3>
             <form method="get" action="/pr9-pratica-demo" className="ceo-practice-control__stack">
               <input type="hidden" name="demoAction" value="priority" />
-              <input type="hidden" name="status" value={status} />
+              <PreservedPreviewState {...preservedState} omit={["priority"]} />
               <label>
                 Priorità
                 <select name="priority" defaultValue={priority}>
@@ -180,8 +220,7 @@ export default async function Pr9PracticeDemoPage({
 
             <form method="get" action="/pr9-pratica-demo" className="ceo-practice-control__stack">
               <input type="hidden" name="demoAction" value="assignment" />
-              <input type="hidden" name="status" value={status} />
-              <input type="hidden" name="priority" value={priority} />
+              <PreservedPreviewState {...preservedState} omit={["assignedTo"]} />
               <label>
                 Responsabile interno
                 <input name="assignedTo" defaultValue={assignedTo} placeholder="Nome o email operatore" maxLength={160} />
@@ -194,7 +233,7 @@ export default async function Pr9PracticeDemoPage({
             <h3>Nota operativa</h3>
             <form method="get" action="/pr9-pratica-demo" className="ceo-practice-control__stack">
               <input type="hidden" name="demoAction" value="note" />
-              <input type="hidden" name="status" value={status} />
+              <PreservedPreviewState {...preservedState} omit={["note"]} />
               <label>
                 Nota / istruzioni
                 <textarea name="note" required defaultValue={note} placeholder="Es. cliente richiamato, documento mancante…" />
@@ -207,7 +246,7 @@ export default async function Pr9PracticeDemoPage({
             <h3>Partner</h3>
             <form method="get" action="/pr9-pratica-demo" className="ceo-practice-control__stack">
               <input type="hidden" name="demoAction" value="partner" />
-              <input type="hidden" name="status" value={status} />
+              <PreservedPreviewState {...preservedState} omit={["recipientEmail"]} />
               <label>
                 Email partner
                 <input type="email" name="recipientEmail" required defaultValue={recipientEmail} />
@@ -222,7 +261,7 @@ export default async function Pr9PracticeDemoPage({
           <p>In preview il cestino è simulato e non modifica alcuna pratica.</p>
           <form method="get" action="/pr9-pratica-demo" className="ceo-practice-control__stack">
             <input type="hidden" name="demoAction" value="trash" />
-            <input type="hidden" name="status" value={status} />
+            <PreservedPreviewState {...preservedState} omit={["deleteReason"]} />
             <label>
               Motivo
               <input name="deleteReason" required minLength={5} defaultValue={deleteReason} placeholder="Es. pratica duplicata / test" />
