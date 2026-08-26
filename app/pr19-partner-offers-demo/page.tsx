@@ -1,7 +1,7 @@
 const offers = [
   { offer: "4022223346", car: "FIAT PANDA", version: "1.0 Hybrid", status: "PUBBLICATA", date: "03/09/2026", actions: ["Aggiorna scadenza", "Sospendi", "Archivia"] },
   { offer: "4022223351", car: "KIA PICANTO", version: "1.0 GDi AMT Urban", status: "IN VERIFICA ECCOMI", date: "08/09/2026", actions: ["Archivia"] },
-  { offer: "4022223360", car: "JEEP AVENGER", version: "1.2 e-Hybrid", status: "SOSPESA", date: "15/09/2026", actions: ["Aggiorna scadenza", "Archivia"] },
+  { offer: "4022223360", car: "JEEP AVENGER", version: "1.2 e-Hybrid", status: "SOSPESA", date: "15/09/2026", actions: ["Aggiorna scadenza", "Riattiva", "Archivia"] },
   { offer: "4022223370", car: "RENAULT CAPTUR", version: "E-Tech Full Hybrid", status: "SCADUTA", date: "25/08/2026", actions: ["Aggiorna scadenza", "Archivia"] },
 ];
 
