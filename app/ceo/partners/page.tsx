@@ -109,7 +109,10 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
           <h1>Partner Noleggio</h1>
           <p>Controlla rete, offerte, pratiche, accessi e commissioni senza entrare nell’area operativa del partner.</p>
         </div>
-        <div className="partner-heading__badge">CEO CONTROL CENTER</div>
+        <div style={{ display: "grid", gap: 10, justifyItems: "end" }}>
+          <div className="partner-heading__badge">CEO CONTROL CENTER</div>
+          <a className="ceo-server-primary" href="/ceo/partners/new">＋ Nuovo Partner</a>
+        </div>
       </section>
 
       <section className="partner-network-summary" aria-label="Stato executive della rete">
