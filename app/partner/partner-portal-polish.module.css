@@ -1,0 +1,5 @@
+.portal :global(strong + small),
+.portal :global(small + strong),
+.portal :global(span + strong) {
+  margin-left: 0.35rem;
+}
