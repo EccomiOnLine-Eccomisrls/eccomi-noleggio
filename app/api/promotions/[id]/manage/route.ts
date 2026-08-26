@@ -4,7 +4,7 @@ import { auditLogs, hubEvents, integrations, leads, promotions } from "../../../
 import { isPartnerNoleggioRole, type NoleggioPermission } from "../../../../lib/permissions";
 import { actorHasPermission, requireActor, routeError } from "../../../../lib/server/authz";
 import { decryptCredential } from "../../../../lib/server/credential-crypto";
-import { partnerCanManageOffer, statusAfterPartnerExtension, type PartnerOfferAction } from "../../../../lib/server/partner-offer-policy";
+import { partnerCanManageOffer, statusAfterPartnerExtension, statusAfterPartnerReactivation, type PartnerOfferAction } from "../../../../lib/server/partner-offer-policy";
 import { isRenderPullRequestPreview } from "../../../../lib/server/preview-mode";
 import { getRuntimeEnv } from "../../../../lib/server/runtime";
 
@@ -15,6 +15,7 @@ const partnerPermissionForAction: Record<PartnerOfferAction, NoleggioPermission>
   SUSPEND: "QUOTE_SUSPEND_OWN",
   ARCHIVE: "QUOTE_ARCHIVE_OWN",
   EXTEND: "QUOTE_EXTEND_OWN",
+  REACTIVATE: "QUOTE_REACTIVATE_OWN",
 };
 
 function todayRome() {
@@ -106,7 +107,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { id } = await context.params;
     const body = await request.json().catch(() => ({})) as { action?: Action; confirm?: string; validUntil?: string };
     const action = body.action;
-    if (!action || !["SUSPEND", "ARCHIVE", "EXTEND", "DELETE", "RESTORE", "PURGE"].includes(action)) {
+    if (!action || !["SUSPEND", "ARCHIVE", "EXTEND", "REACTIVATE", "DELETE", "RESTORE", "PURGE"].includes(action)) {
       return Response.json({ error: "Azione non valida." }, { status: 400 });
     }
 
@@ -122,7 +123,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (!actor.partnerId || promotion.partnerId !== actor.partnerId) {
         return Response.json({ error: "Questa offerta non appartiene alla tua società." }, { status: 403 });
       }
-      if (!["SUSPEND", "ARCHIVE", "EXTEND"].includes(action)) {
+      if (!["SUSPEND", "ARCHIVE", "EXTEND", "REACTIVATE"].includes(action)) {
         return Response.json({ error: "Azione riservata a ECCOMI." }, { status: 403 });
       }
       const partnerAction = action as PartnerOfferAction;
@@ -157,7 +158,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     } else if (action === "SUSPEND") {
       if (promotion.shopifyProductId) await setProductStatus(promotion.shopifyProductId, "DRAFT");
       nextStatus = "SUSPENDED";
-      await getDb().update(promotions).set({ status: nextStatus, automationStatus: "SUSPENDED", automationError: null, shopifyUrl: null, updatedAt: now }).where(eq(promotions.id, id));
+      await getDb().update(promotions).set({ status: nextStatus, automationStatus: "SUSPENDED", automationError: null, updatedAt: now }).where(eq(promotions.id, id));
+    } else if (action === "REACTIVATE") {
+      if (!promotion.shopifyProductId || !promotion.publishedAt) {
+        return Response.json({ error: "Questa offerta deve essere verificata da ECCOMI prima di poter essere riattivata." }, { status: 409 });
+      }
+      const days = remainingDays(promotion.validUntil);
+      if (days <= 0) {
+        return Response.json({ error: "L’offerta è scaduta. Aggiorna prima la data di scadenza." }, { status: 409 });
+      }
+      nextStatus = statusAfterPartnerReactivation(days);
+      await setProductStatus(promotion.shopifyProductId, "ACTIVE");
+      await getDb().update(promotions).set({ status: nextStatus, automationStatus: "ONLINE", automationError: null, updatedAt: now }).where(eq(promotions.id, id));
     } else if (action === "ARCHIVE") {
       if (promotion.shopifyProductId) await setProductStatus(promotion.shopifyProductId, "ARCHIVED");
       nextStatus = "ARCHIVED";
@@ -168,7 +180,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         return Response.json({ error: "Imposta una nuova data di scadenza futura." }, { status: 400 });
       }
       const days = remainingDays(validUntil);
-      nextStatus = statusAfterPartnerExtension({ currentStatus: promotion.status, remainingDays: days, hasShopifyProduct: Boolean(promotion.shopifyProductId) });
+      nextStatus = statusAfterPartnerExtension({ currentStatus: promotion.status, remainingDays: days, wasPublished: Boolean(promotion.publishedAt) });
       nextValidUntil = validUntil;
       if (promotion.shopifyProductId) {
         if (nextStatus === "SUSPENDED" || nextStatus === "PENDING_APPROVAL") await setProductStatus(promotion.shopifyProductId, "DRAFT");
@@ -185,15 +197,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const label = action === "SUSPEND"
       ? "sospesa"
-      : action === "ARCHIVE"
-        ? "archiviata"
-        : action === "EXTEND"
-          ? `prorogata fino al ${nextValidUntil}`
-          : action === "DELETE"
-            ? "spostata nel cestino"
-            : action === "RESTORE"
-              ? "ripristinata dal cestino"
-              : "eliminata definitivamente";
+      : action === "REACTIVATE"
+        ? "riattivata"
+        : action === "ARCHIVE"
+          ? "archiviata"
+          : action === "EXTEND"
+            ? `prorogata fino al ${nextValidUntil}`
+            : action === "DELETE"
+              ? "spostata nel cestino"
+              : action === "RESTORE"
+                ? "ripristinata dal cestino"
+                : "eliminata definitivamente";
 
     await getDb().insert(auditLogs).values({
       id: crypto.randomUUID(), actorEmail: actor.email,
@@ -208,7 +222,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       actorEmail: actor.email, createdAt: now,
     });
 
-    return Response.json({ ok: true, action, status: nextStatus, validUntil: nextValidUntil, trashed: action === "DELETE", deleted: action === "PURGE", restored: action === "RESTORE" });
+    return Response.json({ ok: true, action, status: nextStatus, validUntil: nextValidUntil, reactivated: action === "REACTIVATE", trashed: action === "DELETE", deleted: action === "PURGE", restored: action === "RESTORE" });
   } catch (error) {
     return routeError(error);
   }
