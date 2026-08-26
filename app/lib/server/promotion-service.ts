@@ -75,7 +75,7 @@ export async function expireStalePromotions() {
     .set({ status: "EXPIRED", updatedAt: new Date().toISOString() })
     .where(and(
       lte(promotions.validUntil, today),
-      inArray(promotions.status, ["PENDING_APPROVAL", "APPROVED", "ONLINE", "ACTIVE", "EXPIRING", "SUSPENDED"]),
+      inArray(promotions.status, ["PENDING_APPROVAL", "APPROVED", "ONLINE", "ACTIVE", "EXPIRING"]),
     ));
 }
 
