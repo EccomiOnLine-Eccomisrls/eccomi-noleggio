@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { partners, users } from "../../../../db/schema";
+import { isPartnerNoleggioRole, type NoleggioRole } from "../../../lib/permissions";
 import { routeError } from "../../../lib/server/authz";
 import { createPartnerSession, partnerSessionCookie } from "../../../lib/server/partner-session";
 import { ensurePracticeSchema } from "../../../lib/server/practice-schema";
@@ -37,27 +38,38 @@ export async function POST(request: Request) {
     }
 
     const db = getDb();
+    const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (existing && !existing.active) {
+      return Response.json({ error: "Account Partner disattivato." }, { status: 403 });
+    }
+    if (existing && (!isPartnerNoleggioRole(existing.role as NoleggioRole) || !existing.partnerId)) {
+      return Response.json({ error: "Questo account non è abilitato come Partner." }, { status: 403 });
+    }
+
     const partnerRows = await db.select().from(partners).where(eq(partners.status, "ACTIVE"));
-    const partner = partnerRows.find((item) => {
-      const additional = JSON.parse(item.additionalEmailsJson || "[]") as string[];
-      return item.contactEmail?.trim().toLowerCase() === email || additional.map((value) => value.trim().toLowerCase()).includes(email);
-    });
+    const partner = existing?.partnerId
+      ? partnerRows.find((item) => item.id === existing.partnerId)
+      : partnerRows.find((item) => {
+          const additional = JSON.parse(item.additionalEmailsJson || "[]") as string[];
+          return item.contactEmail?.trim().toLowerCase() === email || additional.map((value) => value.trim().toLowerCase()).includes(email);
+        });
     if (!partner || partner.id === "eccomi-direct") {
       return Response.json({ error: "Email non associata a un partner autorizzato." }, { status: 403 });
     }
 
+    const role = existing?.role === "PARTNER_ADMIN" ? "PARTNER_ADMIN" : "PARTNER";
     await db.insert(users).values({
       email,
-      displayName: partner.contactName || partner.name,
-      role: "PARTNER",
+      displayName: existing?.displayName || partner.contactName || partner.name,
+      role,
       partnerId: partner.id,
       active: true,
       updatedAt: new Date().toISOString(),
     }).onConflictDoUpdate({
       target: users.email,
       set: {
-        displayName: partner.contactName || partner.name,
-        role: "PARTNER",
+        displayName: existing?.displayName || partner.contactName || partner.name,
+        role,
         partnerId: partner.id,
         active: true,
         updatedAt: new Date().toISOString(),
@@ -67,7 +79,7 @@ export async function POST(request: Request) {
     const session = await createPartnerSession(email, partner.id);
     return Response.json({
       ok: true,
-      actor: { email, displayName: partner.contactName || partner.name, role: "PARTNER", partnerId: partner.id },
+      actor: { email, displayName: existing?.displayName || partner.contactName || partner.name, role, partnerId: partner.id },
     }, {
       headers: { "set-cookie": partnerSessionCookie(session) },
     });
