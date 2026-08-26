@@ -221,6 +221,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
 
   const partnerReturn = `/ceo/partners/${encodeURIComponent(partner.id)}#offerte`;
   const offerContext = `?partnerId=${encodeURIComponent(partner.id)}&partnerName=${encodeURIComponent(partner.name)}`;
+  const accessCenter = `/ceo/partners/${encodeURIComponent(partner.id)}/accessi`;
 
   return (
     <main className="ceo-server-page partner-premium-page" data-ceo-partner-detail-ready="true">
@@ -301,7 +302,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
         <section className="partner-quick-actions partner-premium-actions" aria-label="Azioni rapide CEO">
           <span className="partner-premium-actions__label">AZIONI CEO</span>
           <a href="#pratiche">Gestisci pratiche</a>
-          {!internalEccomi ? <a href="#accessi">Gestisci accessi</a> : null}
+          {!internalEccomi ? <a href={accessCenter}>Gestisci accessi</a> : null}
           {partner.contactEmail ? <a href={`mailto:${partner.contactEmail}`}>Contatta partner</a> : null}
         </section>
 
@@ -452,6 +453,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
             <div className="partner-section-badges">
               <span className="partner-premium-section-number">06</span>
               <span className="partner-pill partner-pill--active">{internalEccomi ? "INTERNO" : `${partner.activeUsers} ATTIVI`}</span>
+              {!internalEccomi ? <a href={accessCenter}>Apri Centro Accessi →</a> : null}
             </div>
           </div>
           {internalEccomi ? (
@@ -465,7 +467,7 @@ export default async function CeoPartnerDetailPage({ params }: PartnerDetailPage
                     <tr key={user.email}>
                       <td>{user.displayName}</td>
                       <td>{user.email}</td>
-                      <td>{user.active ? "Attivo" : "Disabilitato"}</td>
+                      <td>{user.active ? "Attivo" : "Invito / accesso non attivo"}</td>
                       <td>{shortDate(user.lastAccessAt)}</td>
                     </tr>
                   )) : <tr><td className="partner-empty-row" colSpan={4}>Nessun account partner configurato.</td></tr>}

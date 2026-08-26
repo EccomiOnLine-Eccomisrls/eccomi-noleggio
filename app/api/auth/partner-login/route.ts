@@ -1,11 +1,10 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { partners, users } from "../../../../db/schema";
+import { auditLogs, partners, users } from "../../../../db/schema";
 import { isPartnerNoleggioRole, type NoleggioRole } from "../../../lib/permissions";
 import { routeError } from "../../../lib/server/authz";
+import { authenticatePartnerPassword } from "../../../lib/server/partner-auth-provider";
 import { createPartnerSession, partnerSessionCookie } from "../../../lib/server/partner-session";
-import { ensurePracticeSchema } from "../../../lib/server/practice-schema";
-import { getRuntimeEnv } from "../../../lib/server/runtime";
 
 function requireSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
@@ -25,65 +24,51 @@ function clean(value: unknown, max: number) {
 export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
-    await ensurePracticeSchema();
-    const body = await request.json() as { email?: unknown; password?: unknown };
+    const body = await request.json().catch(() => ({})) as { email?: unknown; password?: unknown };
     const email = clean(body.email, 160).toLowerCase();
     const password = clean(body.password, 300);
-    const configuredPassword = getRuntimeEnv().PARTNER_ACCESS_PASSWORD?.trim();
-    if (!configuredPassword) {
-      return Response.json({ error: "Accesso partner non ancora configurato." }, { status: 503 });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password !== configuredPassword) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 1) {
       return Response.json({ error: "Email o password non corretti." }, { status: 401 });
     }
 
     const db = getDb();
     const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (existing && !existing.active) {
-      return Response.json({ error: "Account Partner disattivato." }, { status: 403 });
+    if (!existing || !existing.active || !isPartnerNoleggioRole(existing.role as NoleggioRole) || !existing.partnerId) {
+      return Response.json({ error: "Account Partner non attivo o non autorizzato." }, { status: 403 });
     }
-    if (existing && (!isPartnerNoleggioRole(existing.role as NoleggioRole) || !existing.partnerId)) {
-      return Response.json({ error: "Questo account non è abilitato come Partner." }, { status: 403 });
-    }
-
-    const partnerRows = await db.select().from(partners).where(eq(partners.status, "ACTIVE"));
-    const partner = existing?.partnerId
-      ? partnerRows.find((item) => item.id === existing.partnerId)
-      : partnerRows.find((item) => {
-          const additional = JSON.parse(item.additionalEmailsJson || "[]") as string[];
-          return item.contactEmail?.trim().toLowerCase() === email || additional.map((value) => value.trim().toLowerCase()).includes(email);
-        });
-    if (!partner || partner.id === "eccomi-direct") {
-      return Response.json({ error: "Email non associata a un partner autorizzato." }, { status: 403 });
+    const [partner] = await db.select().from(partners).where(eq(partners.id, existing.partnerId)).limit(1);
+    if (!partner || partner.status !== "ACTIVE" || partner.id === "eccomi-direct") {
+      return Response.json({ error: "Società Partner non attiva." }, { status: 403 });
     }
 
-    const role = existing?.role === "PARTNER_ADMIN" ? "PARTNER_ADMIN" : "PARTNER";
-    await db.insert(users).values({
-      email,
-      displayName: existing?.displayName || partner.contactName || partner.name,
-      role,
-      partnerId: partner.id,
-      active: true,
-      updatedAt: new Date().toISOString(),
-    }).onConflictDoUpdate({
-      target: users.email,
-      set: {
-        displayName: existing?.displayName || partner.contactName || partner.name,
-        role,
-        partnerId: partner.id,
-        active: true,
-        updatedAt: new Date().toISOString(),
-      },
+    const authenticated = await authenticatePartnerPassword(email, password);
+    if (authenticated.user.email?.trim().toLowerCase() !== email) {
+      return Response.json({ error: "Account Auth non coerente." }, { status: 403 });
+    }
+
+    const now = new Date().toISOString();
+    await db.update(users).set({ updatedAt: now }).where(eq(users.email, email));
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      actorEmail: email,
+      action: "PARTNER_LOGIN",
+      entityType: "partner_user",
+      entityId: email,
+      payloadJson: JSON.stringify({ partnerId: existing.partnerId, role: existing.role }),
+      createdAt: now,
     });
 
-    const session = await createPartnerSession(email, partner.id);
+    const session = await createPartnerSession(email, existing.partnerId);
     return Response.json({
       ok: true,
-      actor: { email, displayName: existing?.displayName || partner.contactName || partner.name, role, partnerId: partner.id },
+      actor: { email, displayName: existing.displayName, role: existing.role, partnerId: existing.partnerId },
     }, {
       headers: { "set-cookie": partnerSessionCookie(session) },
     });
   } catch (error) {
+    if (error instanceof Error && /invalid login credentials|email not confirmed|password/i.test(error.message)) {
+      return Response.json({ error: "Email o password non corretti." }, { status: 401 });
+    }
     return routeError(error);
   }
 }

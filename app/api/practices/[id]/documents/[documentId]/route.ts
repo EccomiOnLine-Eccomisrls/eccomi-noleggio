@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../../../db";
 import { leads, practiceDocuments } from "../../../../../../db/schema";
+import { isPartnerNoleggioRole } from "../../../../../lib/permissions";
 import { requireActor, routeError } from "../../../../../lib/server/authz";
 import { ensurePracticeSchema } from "../../../../../lib/server/practice-schema";
 import { createPracticeDocumentSignedUrl } from "../../../../../lib/server/practice-storage";
@@ -25,7 +26,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       .limit(1);
 
     if (!document) return Response.json({ error: "Documento non trovato." }, { status: 404 });
-    if (actor.role === "PARTNER" && actor.partnerId !== document.partnerId) {
+    if (isPartnerNoleggioRole(actor.role) && actor.partnerId !== document.partnerId) {
       return Response.json({ error: "Documento non autorizzato." }, { status: 403 });
     }
 

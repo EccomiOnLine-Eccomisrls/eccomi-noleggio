@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { auditLogs, hubEvents, promotions } from "../../../db/schema";
+import { isPartnerNoleggioRole } from "../../lib/permissions";
 import type { QuoteDraft } from "../../lib/quote-parser";
 import { extractQuoteWithAi } from "../../lib/server/ai";
 import { requireActor, routeError } from "../../lib/server/authz";
@@ -85,7 +86,11 @@ export async function POST(request: Request) {
       return Response.json({ error: "L’AI non ha riconosciuto correttamente canone, durata o chilometri." }, { status: 422 });
     }
 
-    const partnerId = actor.role === "PARTNER" ? actor.partnerId : /GOAL\s+RENT/i.test(draft.partner) ? "goal-rent" : "eccomi-direct";
+    const partnerId = isPartnerNoleggioRole(actor.role)
+      ? actor.partnerId
+      : /GOAL\s+RENT/i.test(draft.partner)
+        ? "goal-rent"
+        : "eccomi-direct";
     if (!partnerId) return Response.json({ error: "Partner non associato all’utente." }, { status: 403 });
 
     const [similarQuotation] = await getDb()
