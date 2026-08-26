@@ -64,6 +64,27 @@ export const ORDINARY_OPERATOR_DELEGABLE_PERMISSIONS = [
   "DOCUMENT_MANAGE_ALL",
 ] as const satisfies readonly NoleggioPermission[];
 
+export const CEO_GRANTABLE_INTERNAL_PERMISSIONS = [
+  "NOLEGGIO_VIEW_ALL",
+  "NOLEGGIO_MANAGE_OPERATOR_GRANTS",
+  "NOLEGGIO_PROPOSE_OPERATOR",
+  "PARTNER_ACTIVATE_ANY",
+  "QUOTE_CREATE_OWN",
+  "QUOTE_VIEW_ALL",
+  "QUOTE_VERIFY",
+  "QUOTE_APPROVE",
+  "QUOTE_PUBLISH",
+  "QUOTE_SUSPEND_ANY",
+  "QUOTE_ARCHIVE_ANY",
+  "QUOTE_RESTORE_ARCHIVED_ANY",
+  "PRACTICE_VIEW_ALL",
+  "PRACTICE_WORK_ALL",
+  "PRACTICE_REASSIGN_RED",
+  "DOCUMENT_VIEW_ALL",
+  "DOCUMENT_MANAGE_ALL",
+  "COMMISSION_VIEW_ALL",
+] as const satisfies readonly NoleggioPermission[];
+
 const BASE_PERMISSIONS: Record<NoleggioRole, readonly NoleggioPermission[]> = {
   CEO: NOLEGGIO_PERMISSIONS,
   NOLEGGIO_MANAGER: [
@@ -170,8 +191,7 @@ export function canCeoGrantPermission(
   permission: NoleggioPermission,
 ) {
   if (targetRole === "CEO" || isPartnerNoleggioRole(targetRole)) return false;
-  return (SENSITIVE_DELEGABLE_PERMISSIONS as readonly NoleggioPermission[]).includes(permission)
-    || (ORDINARY_OPERATOR_DELEGABLE_PERMISSIONS as readonly NoleggioPermission[]).includes(permission);
+  return (CEO_GRANTABLE_INTERNAL_PERMISSIONS as readonly NoleggioPermission[]).includes(permission);
 }
 
 export function canManagerManageOperatorPermission(
