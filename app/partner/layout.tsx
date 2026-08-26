@@ -47,6 +47,67 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
           font-size: 13px;
           line-height: 1.45;
         }
+
+        /* PR18 · workspace Partner: nessun identificativo tecnico visibile */
+        .partner-route-branding > main > header + div > section:first-child > div:last-child > span > strong {
+          font-size: 0;
+        }
+
+        .partner-route-branding > main > header + div > section:first-child > div:last-child > span > strong::after {
+          content: "Area protetta";
+          font-size: 14px;
+        }
+
+        .partner-route-branding > main > header + div > section:first-child > div:last-child > span > small {
+          display: block;
+          max-width: 240px;
+          margin-top: 2px;
+          font-size: 12px;
+          line-height: 1.3;
+          color: #2f7c5b;
+        }
+
+        .partner-route-branding > main > header + div > section:first-child > div:last-child > span > small {
+          font-size: 0;
+        }
+
+        .partner-route-branding > main > header + div > section:first-child > div:last-child > span > small::after {
+          content: "Accesso riservato alla tua organizzazione";
+          font-size: 12px;
+        }
+
+        /* Le cinque aree sono il menu di lavoro, non semplici filtri. */
+        .partner-route-branding > main > header + div > nav::before {
+          content: "IL TUO SPAZIO DI LAVORO";
+          flex-basis: 100%;
+          margin-bottom: 2px;
+          color: #0c5597;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: .1em;
+        }
+
+        /* Firma prodotto richiesta: visibile solo nella dashboard autenticata. */
+        .partner-route-branding > main:has(> header + div)::after {
+          content: "ECCOMI NOLEGGIO · Ideato e progettato by Eccomi OnLine";
+          display: block;
+          max-width: 1320px;
+          margin: -42px auto 0;
+          padding: 0 24px 34px;
+          color: #6b7c90;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: .015em;
+          text-align: center;
+        }
+
+        @media (max-width: 720px) {
+          .partner-route-branding > main:has(> header + div)::after {
+            margin-top: -30px;
+            padding-bottom: 26px;
+            font-size: 11px;
+          }
+        }
       `}</style>
       {children}
     </div>
