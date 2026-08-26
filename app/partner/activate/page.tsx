@@ -53,7 +53,7 @@ export default function PartnerActivatePage() {
   return (
     <main style={styles.page}>
       <section style={styles.card}>
-        <div style={styles.brand}><span style={styles.icon}>🚙</span><div><strong>ECCOMI</strong><small>NOLEGGIO · AREA PARTNER</small></div></div>
+        <div style={styles.brand}><span style={styles.icon}>🚙</span><div><strong>ECCOMI </strong><small>NOLEGGIO · AREA PARTNER</small></div></div>
         {done ? (
           <div style={styles.success}><CheckCircle2 size={34} /><h1>Accesso attivato</h1><p>La password è stata impostata. Stai entrando nella tua Area Partner.</p></div>
         ) : (
