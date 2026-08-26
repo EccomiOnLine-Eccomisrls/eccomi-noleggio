@@ -30,7 +30,7 @@ export default function Pr20WorkspaceBrandingDemo() {
 
       <div style={s.content}>
         <section style={s.hero}>
-          <div><span style={s.kicker}>PARTNER ADMIN · AREA PARTNER</span><h1 style={s.title}>Eccomi OnLine Test</h1><p style={s.muted}>Eccomi OnLine Test S.r.l. · Sasa</p></div>
+          <div><span style={s.kicker}>PARTNER ADMIN</span><h1 style={s.title}>Eccomi OnLine Test</h1><p style={s.muted}>Eccomi OnLine Test S.r.l. · Sasa</p></div>
           <div style={s.scope}><strong>Area protetta</strong><small>Accesso riservato alla tua organizzazione</small></div>
         </section>
 
