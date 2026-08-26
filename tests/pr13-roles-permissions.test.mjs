@@ -45,7 +45,7 @@ test("PR13 prepara HUB per Responsabile, Vice e Operatore senza fidarsi dei gran
 
 test("PR13 preview esplicita account separati e subentro del Responsabile", () => {
   assert.match(preview, /STESSA PERSONA · DUE IDENTITÀ OPERATIVE/);
-  assert.match(preview, /Tony → Arcibaldo/);
+  assert.match(preview, /Robin → Arcibaldo/);
   assert.match(preview, /Se ROSSA: CEO\/Responsabile può riassegnare/);
   assert.match(preview, /SERVER-SAFE · ZERO JS/);
 });
