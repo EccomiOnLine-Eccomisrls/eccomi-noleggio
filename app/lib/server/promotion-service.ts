@@ -12,6 +12,7 @@ export const promotionStatuses = [
   "ACTIVE",
   "EXPIRING",
   "EXPIRED",
+  "SUSPENDED",
   "ARCHIVED",
   "TRASHED",
 ] as const;
@@ -61,6 +62,7 @@ export function statusLabel(status: string) {
     ACTIVE: "ONLINE",
     EXPIRING: "IN SCADENZA",
     EXPIRED: "SCADUTA",
+    SUSPENDED: "SOSPESA",
     ARCHIVED: "ARCHIVIATA",
     TRASHED: "NEL CESTINO",
   } as Record<string, string>)[status] || status;
@@ -73,7 +75,7 @@ export async function expireStalePromotions() {
     .set({ status: "EXPIRED", updatedAt: new Date().toISOString() })
     .where(and(
       lte(promotions.validUntil, today),
-      inArray(promotions.status, ["PENDING_APPROVAL", "APPROVED", "ONLINE", "ACTIVE", "EXPIRING"]),
+      inArray(promotions.status, ["PENDING_APPROVAL", "APPROVED", "ONLINE", "ACTIVE", "EXPIRING", "SUSPENDED"]),
     ));
 }
 
