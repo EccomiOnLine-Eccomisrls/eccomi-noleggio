@@ -60,7 +60,7 @@ type PracticeDetail = {
   documents: Array<{ id: string; documentType: string; originalName: string; sizeBytes: number; status: string }>;
 };
 type Section = "overview" | "offers" | "practices" | "commissions" | "team";
-type OfferAction = "SUSPEND" | "ARCHIVE" | "EXTEND";
+type OfferAction = "SUSPEND" | "ARCHIVE" | "EXTEND" | "REACTIVATE";
 
 const money = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
 const date = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short", year: "numeric", timeZone: "Europe/Rome" });
@@ -218,9 +218,11 @@ export default function PartnerPortalClient() {
       if (!response.ok) throw new Error(payload.error || "Operazione non riuscita.");
       setNotice(action === "SUSPEND"
         ? "Offerta sospesa: non è più visibile al pubblico."
-        : action === "ARCHIVE"
-          ? "Offerta archiviata e mantenuta nello storico."
-          : "Scadenza aggiornata correttamente.");
+        : action === "REACTIVATE"
+          ? "Offerta riattivata: è tornata disponibile al pubblico."
+          : action === "ARCHIVE"
+            ? "Offerta archiviata e mantenuta nello storico."
+            : "Scadenza aggiornata correttamente.");
       await loadPortal();
       setSection("offers");
     } catch (manageError) {
@@ -304,6 +306,7 @@ export default function PartnerPortalClient() {
             <div style={styles.offerGrid}>{dashboard.promotions.map((item) => {
               const offerBusy = offerBusyId === item.id;
               const canSuspend = onlineStatuses.has(item.status);
+              const canReactivate = item.status === "SUSPENDED";
               const canExtend = extendableStatuses.has(item.status);
               const canArchive = !["ARCHIVED", "TRASHED"].includes(item.status);
               return <article key={item.id} style={styles.offerCard}>
@@ -315,6 +318,7 @@ export default function PartnerPortalClient() {
                 {canExtend ? <div style={styles.extendRow}><label><span>Nuova scadenza</span><input style={styles.dateInput} type="date" value={extendDates[item.id] || item.validUntil} onChange={(event) => setExtendDates((current) => ({ ...current, [item.id]: event.target.value }))} /></label><button style={styles.secondaryButton} type="button" disabled={offerBusy} onClick={() => void manageOffer(item, "EXTEND")}><CalendarDays size={16} /> Aggiorna scadenza</button></div> : null}
                 <div style={styles.offerActions}>
                   {canSuspend ? <button style={styles.secondaryButton} type="button" disabled={offerBusy} onClick={() => void manageOffer(item, "SUSPEND")}><PauseCircle size={16} /> Sospendi</button> : null}
+                  {canReactivate ? <button style={styles.secondaryButton} type="button" disabled={offerBusy} onClick={() => void manageOffer(item, "REACTIVATE")}><CheckCircle2 size={16} /> Riattiva</button> : null}
                   {canArchive ? <button style={styles.dangerButton} type="button" disabled={offerBusy} onClick={() => void manageOffer(item, "ARCHIVE")}><Archive size={16} /> Archivia</button> : null}
                   {offerBusy ? <span style={styles.working}><Loader2 className="spin" size={16} /> Salvataggio…</span> : null}
                 </div>
@@ -327,7 +331,6 @@ export default function PartnerPortalClient() {
         {section === "practices" ? <section style={styles.panel}><div style={styles.sectionHead}><div><span style={styles.kicker}>LE TUE PRATICHE</span><h2 style={styles.panelTitle}>Richieste clienti</h2></div><span style={styles.countBadge}>{dashboard.leads.length}</span></div><div style={styles.practiceGrid}>{dashboard.leads.map((lead) => <article key={lead.id} style={styles.practiceCard}><div style={styles.cardTop}><span style={styles.code}>{lead.id}</span><span style={styles.statusBadge}>{lead.status.replaceAll("_", " ")}</span></div><h3 style={styles.cardTitle}>{lead.vehicle}</h3><p style={styles.muted}>Offerta {lead.offerNumber}</p><div style={styles.customer}><strong>{lead.customerName}</strong><span>{lead.province} · {lead.email}</span><span>{lead.phone}</span><small>{lead.documentCount} documenti</small></div><button style={styles.primaryButton} type="button" onClick={() => void openPractice(lead.id)} disabled={detailBusy}>{detailBusy ? <Loader2 className="spin" size={17} /> : <FileText size={17} />} Apri pratica</button></article>)}</div>{!dashboard.leads.length ? <p style={styles.muted}>Nessuna pratica associata alla tua società.</p> : null}</section> : null}
 
         {section === "commissions" ? <section style={styles.panel}><span style={styles.kicker}>LE TUE COMMISSIONI</span><h2 style={styles.panelTitle}>{money.format(dashboard.stats.commissionCents / 100)} maturato registrato</h2><p style={styles.muted}>La commissione matura alla consegna. Il dettaglio fatture e pagamenti sarà completato nel modulo Commissioni.</p></section> : null}
-
         {section === "team" && isAdmin ? <section style={styles.panel}><div style={styles.sectionHead}><div><span style={styles.kicker}>PARTNER ADMIN</span><h2 style={styles.panelTitle}>Collaboratori della tua società</h2></div><span style={styles.countBadge}>{session.team.length}</span></div><div style={styles.teamGrid}>{session.team.map((member) => <article key={member.email} style={styles.memberCard}><strong>{member.displayName}</strong><span>{member.email}</span><small>{member.role} · {member.active ? "ATTIVO" : "DISATTIVATO"}</small></article>)}</div><p style={styles.muted}>Invito e disattivazione collaboratori saranno il prossimo modulo operativo del Partner Admin.</p></section> : null}
       </div>
 
