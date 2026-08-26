@@ -3,9 +3,9 @@ import { getDb } from "../../../db";
 import { userPermissionGrants } from "../../../db/access-schema";
 import { users } from "../../../db/schema";
 import {
-  hasPermission,
   isInternalNoleggioRole,
   isNoleggioRole,
+  isPartnerNoleggioRole,
   resolvePermissions,
   type NoleggioPermission,
   type NoleggioRole,
@@ -32,7 +32,7 @@ export async function getActorForIdentity(emailValue: string, displayName: strin
   }
   const [record] = await getDb().select().from(users).where(and(eq(users.email, email), eq(users.active, true))).limit(1);
   if (!record || !isNoleggioRole(record.role)) return null;
-  if (record.role === "PARTNER" && !record.partnerId) return null;
+  if (isPartnerNoleggioRole(record.role) && !record.partnerId) return null;
   return { email: record.email, displayName: record.displayName, role: record.role, partnerId: record.partnerId };
 }
 
@@ -68,7 +68,7 @@ export async function getActor(request: Request): Promise<Actor | null> {
   const partnerSession = await readPartnerSession(request);
   if (partnerSession) {
     const actor = await getActorForIdentity(partnerSession.email, "Partner ECCOMI");
-    if (actor?.role === "PARTNER" && actor.partnerId === partnerSession.partnerId) return actor;
+    if (actor && isPartnerNoleggioRole(actor.role) && actor.partnerId === partnerSession.partnerId) return actor;
   }
   const localEmail = isLocalRequest(request) ? runtime.CEO_EMAIL || "ceo@eccomi.local" : "";
   const email = headerEmail || ceoSessionEmail || localEmail;
@@ -81,18 +81,14 @@ export async function getActor(request: Request): Promise<Actor | null> {
 
 export async function getActorPermissions(actor: Actor): Promise<Set<NoleggioPermission>> {
   if (actor.role === "CEO") return resolvePermissions("CEO");
-  const grants = await getDb()
-    .select({ permission: userPermissionGrants.permission })
+  const overrides = await getDb()
+    .select({ permission: userPermissionGrants.permission, enabled: userPermissionGrants.enabled })
     .from(userPermissionGrants)
-    .where(and(
-      eq(userPermissionGrants.userEmail, actor.email),
-      eq(userPermissionGrants.enabled, true),
-    ));
-  return resolvePermissions(actor.role, grants.map((grant) => grant.permission));
+    .where(eq(userPermissionGrants.userEmail, actor.email));
+  return resolvePermissions(actor.role, overrides);
 }
 
 export async function actorHasPermission(actor: Actor, permission: NoleggioPermission) {
-  if (hasPermission(actor.role, permission)) return true;
   const permissions = await getActorPermissions(actor);
   return permissions.has(permission);
 }
