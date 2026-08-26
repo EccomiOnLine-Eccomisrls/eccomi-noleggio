@@ -2,9 +2,9 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { auditLogs, partners, users } from "../../../../db/schema";
 import { isPartnerNoleggioRole, type NoleggioRole } from "../../../lib/permissions";
-import { createPartnerSession, partnerSessionCookie } from "../../../lib/server/partner-session";
-import { getSupabaseAuthUser, setSupabasePassword } from "../../../lib/server/partner-auth-provider";
 import { routeError } from "../../../lib/server/authz";
+import { verifyPartnerActivationToken, setSupabasePassword } from "../../../lib/server/partner-auth-provider";
+import { createPartnerSession, partnerSessionCookie } from "../../../lib/server/partner-session";
 
 function sameOrigin(request: Request) {
   const origin = request.headers.get("origin");
@@ -18,14 +18,15 @@ function clean(value: unknown, max: number) {
 export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) return Response.json({ error: "Richiesta non autorizzata." }, { status: 403 });
-    const body = await request.json().catch(() => ({})) as { accessToken?: unknown; password?: unknown };
-    const accessToken = clean(body.accessToken, 5000);
+    const body = await request.json().catch(() => ({})) as { tokenHash?: unknown; type?: unknown; password?: unknown };
+    const tokenHash = clean(body.tokenHash, 500);
+    const type = clean(body.type, 20) as "invite" | "recovery";
     const password = clean(body.password, 300);
-    if (!accessToken) return Response.json({ error: "Link di attivazione mancante o scaduto." }, { status: 401 });
+    if (!tokenHash || !["invite", "recovery"].includes(type)) return Response.json({ error: "Link di attivazione mancante o scaduto." }, { status: 401 });
     if (password.length < 12) return Response.json({ error: "La password deve contenere almeno 12 caratteri." }, { status: 422 });
 
-    const authUser = await getSupabaseAuthUser(accessToken);
-    const email = authUser.email?.trim().toLowerCase() || "";
+    const verified = await verifyPartnerActivationToken(tokenHash, type);
+    const email = verified.user.email?.trim().toLowerCase() || "";
     if (!email) return Response.json({ error: "Account Supabase non valido." }, { status: 403 });
 
     const db = getDb();
@@ -38,16 +39,16 @@ export async function POST(request: Request) {
       return Response.json({ error: "La società Partner non è attiva." }, { status: 403 });
     }
 
-    await setSupabasePassword(accessToken, password);
+    await setSupabasePassword(verified.accessToken, password);
     const now = new Date().toISOString();
     await db.update(users).set({ active: true, updatedAt: now }).where(eq(users.email, email));
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
       actorEmail: email,
-      action: "PARTNER_ACCOUNT_ACTIVATED",
+      action: type === "recovery" ? "PARTNER_ACCOUNT_REACTIVATED" : "PARTNER_ACCOUNT_ACTIVATED",
       entityType: "partner_user",
       entityId: email,
-      payloadJson: JSON.stringify({ partnerId: user.partnerId, role: user.role }),
+      payloadJson: JSON.stringify({ partnerId: user.partnerId, role: user.role, authType: type }),
       createdAt: now,
     });
 
@@ -56,6 +57,9 @@ export async function POST(request: Request) {
       headers: { "set-cookie": partnerSessionCookie(session) },
     });
   } catch (error) {
+    if (error instanceof Error && /expired|invalid|otp|token/i.test(error.message)) {
+      return Response.json({ error: "Link di attivazione non valido o scaduto. Chiedi a ECCOMI di reinviare l’invito." }, { status: 401 });
+    }
     return routeError(error);
   }
 }
