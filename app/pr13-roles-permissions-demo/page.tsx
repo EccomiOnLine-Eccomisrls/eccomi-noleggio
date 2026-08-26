@@ -11,7 +11,7 @@ const roles: Array<{
   scope: string;
 }> = [
   { role: "CEO", title: "CEO ECCOMI", subtitle: "Salvatore", scope: "Tutto ECCOMI NOLEGGIO + governance" },
-  { role: "NOLEGGIO_MANAGER", title: "Responsabile Noleggio", subtitle: "Tony oggi · Arcibaldo domani", scope: "Tutto il verticale operativo" },
+  { role: "NOLEGGIO_MANAGER", title: "Responsabile Noleggio", subtitle: "Robin oggi · Arcibaldo domani", scope: "Tutto il verticale operativo" },
   { role: "NOLEGGIO_DEPUTY", title: "Vice Responsabile", subtitle: "Ruolo scalabile", scope: "Tutto il verticale secondo delega" },
   { role: "NOLEGGIO_OPERATOR", title: "Operatore ECCOMI", subtitle: "Account interno", scope: "Operatività secondo permessi" },
   { role: "PARTNER", title: "Partner", subtitle: "Account separato", scope: "Solo il proprio perimetro" },
@@ -48,7 +48,7 @@ export default function RolesPermissionsPreviewPage() {
           </div>
           <h1 style={{ margin: "16px 0 8px", fontSize: 36 }}>Governance ECCOMI NOLEGGIO</h1>
           <p style={{ margin: 0, maxWidth: 850, color: "#dcecff", lineHeight: 1.55 }}>
-            Account separati, ruoli sostituibili e permessi controllati dal CEO. Nessuna persona è codificata nel software: Tony oggi, Arcibaldo domani, senza perdere storico o pratiche.
+            Account separati, ruoli sostituibili e permessi controllati dal CEO. Nessuna persona è codificata nel software: Robin oggi, Arcibaldo domani, senza perdere storico o pratiche.
           </p>
         </header>
 
@@ -95,13 +95,13 @@ export default function RolesPermissionsPreviewPage() {
         <section style={{ marginTop: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14 }}>
           <article style={{ background: "#fff", border: "1px solid #dce6f1", borderRadius: 20, padding: 20 }}>
             <small style={{ color: "#0c5597", fontWeight: 900 }}>STESSA PERSONA · DUE IDENTITÀ OPERATIVE</small>
-            <h2 style={{ margin: "7px 0 14px", fontSize: 22 }}>Tony resta separato</h2>
+            <h2 style={{ margin: "7px 0 14px", fontSize: 22 }}>Robin resta separato</h2>
             <div style={{ background: "#eff6ff", borderRadius: 14, padding: 14, marginBottom: 10 }}>
-              <strong>tony.responsabile@eccomi.local</strong>
+              <strong>robin.responsabile@eccomi.local</strong>
               <div style={{ marginTop: 4, color: "#475569" }}>Ruolo: Responsabile ECCOMI NOLEGGIO · vede il verticale.</div>
             </div>
             <div style={{ background: "#f8fafc", borderRadius: 14, padding: 14 }}>
-              <strong>tony.partner@partner.local</strong>
+              <strong>robin.partner@partner.local</strong>
               <div style={{ marginTop: 4, color: "#475569" }}>Ruolo: PARTNER · vede esclusivamente il proprio perimetro.</div>
             </div>
             <p style={{ color: "#64748b", lineHeight: 1.5, marginBottom: 0 }}>Nessun “cambia ruolo”. L'audit sa sempre quale account ha compiuto l'azione.</p>
@@ -109,10 +109,10 @@ export default function RolesPermissionsPreviewPage() {
 
           <article style={{ background: "#fff", border: "1px solid #dce6f1", borderRadius: 20, padding: 20 }}>
             <small style={{ color: "#0c5597", fontWeight: 900 }}>SUBENTRO</small>
-            <h2 style={{ margin: "7px 0 14px", fontSize: 22 }}>Tony → Arcibaldo</h2>
+            <h2 style={{ margin: "7px 0 14px", fontSize: 22 }}>Robin → Arcibaldo</h2>
             <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ padding: 13, borderRadius: 13, background: "#fff7ed" }}><strong>OGGI</strong> · Tony = Responsabile + altro account Partner</div>
-              <div style={{ padding: 13, borderRadius: 13, background: "#ecfdf3" }}><strong>DOMANI</strong> · Arcibaldo = Responsabile · Tony resta solo Partner</div>
+              <div style={{ padding: 13, borderRadius: 13, background: "#fff7ed" }}><strong>OGGI</strong> · Robin = Responsabile + altro account Partner</div>
+              <div style={{ padding: 13, borderRadius: 13, background: "#ecfdf3" }}><strong>DOMANI</strong> · Arcibaldo = Responsabile · Robin resta solo Partner</div>
             </div>
             <p style={{ color: "#64748b", lineHeight: 1.5, marginBottom: 0 }}>Le pratiche appartengono a ECCOMI NOLEGGIO, non alla persona che ricopre il ruolo.</p>
           </article>
