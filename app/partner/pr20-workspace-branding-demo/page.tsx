@@ -18,13 +18,19 @@ export default function Pr20WorkspaceBrandingDemo() {
   return (
     <main style={s.page}>
       <header style={s.header}>
-        <div style={s.brand}><span style={s.icon}>🚗</span><span><strong>ECCOMI NOLEGGIO</strong><small>AREA PARTNER · by Eccomi OnLine</small></span></div>
+        <div style={s.brand}>
+          <span style={s.icon}>🚗</span>
+          <span style={s.brandCopy}>
+            <strong>ECCOMI NOLEGGIO · AREA PARTNER</strong>
+            <small>by Eccomi OnLine</small>
+          </span>
+        </div>
         <strong style={s.secure}>🛡️ Perimetro protetto</strong>
       </header>
 
       <div style={s.content}>
         <section style={s.hero}>
-          <div><span style={s.kicker}>PARTNER ADMIN · PREVIEW SICURA PR20</span><h1 style={s.title}>Eccomi OnLine Test</h1><p style={s.muted}>Eccomi OnLine Test S.r.l. · Sasa</p></div>
+          <div><span style={s.kicker}>PARTNER ADMIN · AREA PARTNER</span><h1 style={s.title}>Eccomi OnLine Test</h1><p style={s.muted}>Eccomi OnLine Test S.r.l. · Sasa</p></div>
           <div style={s.scope}><strong>Area protetta</strong><small>Accesso riservato alla tua organizzazione</small></div>
         </section>
 
@@ -57,19 +63,19 @@ export default function Pr20WorkspaceBrandingDemo() {
         ) : null}
 
         {section === "offers" ? (
-          <section style={s.panel}><span style={s.kicker}>OFFERTE</span><h2>Le tue quotazioni e pubblicazioni</h2><p style={s.muted}>Qui il Partner carica le quotazioni, segue la verifica ECCOMI e gestisce disponibilità, sospensione, riattivazione, scadenza e archivio delle proprie offerte.</p><div style={s.info}>Modulo operativo reale introdotto con PR19.</div></section>
+          <section style={s.panel}><span style={s.kicker}>OFFERTE</span><h2>Le tue quotazioni e pubblicazioni</h2><p style={s.muted}>Qui il Partner carica le quotazioni, segue la verifica ECCOMI e gestisce disponibilità, sospensione, riattivazione, scadenza e archivio delle proprie offerte.</p><div style={s.info}>Gestisci qui le tue quotazioni e pubblicazioni.</div></section>
         ) : null}
 
         {section === "practices" ? (
-          <section style={s.panel}><span style={s.kicker}>PRATICHE</span><h2>Le tue richieste clienti</h2><p style={s.muted}>Qui compariranno esclusivamente le pratiche collegate alla tua organizzazione, con cliente, veicolo, documenti e stato di avanzamento.</p><div style={s.info}>Nessuna pratica presente nel profilo demo.</div></section>
+          <section style={s.panel}><span style={s.kicker}>PRATICHE</span><h2>Le tue richieste clienti</h2><p style={s.muted}>Qui compaiono esclusivamente le pratiche collegate alla tua organizzazione, con cliente, veicolo, documenti e stato di avanzamento.</p><div style={s.info}>Nessuna pratica presente.</div></section>
         ) : null}
 
         {section === "commissions" ? (
-          <section style={s.panel}><span style={s.kicker}>COMMISSIONI</span><h2>Il tuo maturato</h2><p style={s.muted}>La commissione matura alla consegna. Questa area conterrà maturate, da fatturare, fatturate, pagate e storico.</p><div style={s.info}>Maturato demo: 0,00 €.</div></section>
+          <section style={s.panel}><span style={s.kicker}>COMMISSIONI</span><h2>Il tuo maturato</h2><p style={s.muted}>La commissione matura alla consegna. Questa area conterrà maturate, da fatturare, fatturate, pagate e storico.</p><div style={s.info}>Maturato: 0,00 €.</div></section>
         ) : null}
 
         {section === "team" ? (
-          <section style={s.panel}><span style={s.kicker}>COLLABORATORI</span><h2>Persone della tua società</h2><p style={s.muted}>Il Partner Admin potrà invitare, vedere e disattivare i collaboratori della propria organizzazione.</p><div style={s.info}>1 Partner Admin nel profilo demo.</div></section>
+          <section style={s.panel}><span style={s.kicker}>COLLABORATORI</span><h2>Persone della tua società</h2><p style={s.muted}>Il Partner Admin può invitare, vedere e disattivare i collaboratori della propria organizzazione.</p><div style={s.info}>1 Partner Admin.</div></section>
         ) : null}
 
         <footer style={s.footer}><strong>ECCOMI NOLEGGIO</strong> · Ideato e progettato by Eccomi OnLine</footer>
@@ -82,6 +88,7 @@ const s: Record<string, React.CSSProperties> = {
   page: { minHeight: "100vh", background: "#f4f7fb", color: "#102033", fontFamily: "Arial, sans-serif" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 5vw", background: "#fff", borderBottom: "1px solid #dce6f1" },
   brand: { display: "flex", alignItems: "center", gap: 12 },
+  brandCopy: { display: "grid", gap: 3, color: "#073f73" },
   icon: { width: 46, height: 46, display: "grid", placeItems: "center", borderRadius: 12, background: "#1281c5" },
   secure: { color: "#25734f" },
   content: { maxWidth: 1320, margin: "0 auto", padding: "32px 24px 32px" },
