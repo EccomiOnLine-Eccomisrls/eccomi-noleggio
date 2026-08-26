@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { auditLogs, leads, partners, practiceDocuments, promotions } from "../../../../db/schema";
+import { isPartnerNoleggioRole } from "../../../lib/permissions";
 import { requireActor, routeError } from "../../../lib/server/authz";
 import { decryptSensitivePracticeData } from "../../../lib/server/credential-crypto";
 import { ensurePracticeSchema } from "../../../lib/server/practice-schema";
@@ -25,7 +26,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       .limit(1);
 
     if (!practice) return Response.json({ error: "Pratica non trovata." }, { status: 404 });
-    if (actor.role === "PARTNER" && actor.partnerId !== practice.lead.partnerId) {
+    if (isPartnerNoleggioRole(actor.role) && actor.partnerId !== practice.lead.partnerId) {
       return Response.json({ error: "Pratica non autorizzata." }, { status: 403 });
     }
 
