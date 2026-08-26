@@ -106,7 +106,6 @@ const BASE_PERMISSIONS: Record<NoleggioRole, readonly NoleggioPermission[]> = {
     "COMMISSION_VIEW_ALL",
   ],
   NOLEGGIO_DEPUTY: [
-    "NOLEGGIO_VIEW_ALL",
     "QUOTE_VIEW_ALL",
     "PRACTICE_VIEW_ALL",
     "DOCUMENT_VIEW_ALL",
