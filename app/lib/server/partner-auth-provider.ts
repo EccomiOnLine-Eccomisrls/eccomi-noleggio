@@ -8,8 +8,8 @@ type SupabaseAuthUser = {
 
 type GenerateLinkResponse = SupabaseAuthUser & {
   action_link?: string;
+  hashed_token?: string;
   verification_type?: string;
-  redirect_to?: string;
   msg?: string;
   message?: string;
   error_description?: string;
@@ -17,6 +17,7 @@ type GenerateLinkResponse = SupabaseAuthUser & {
 
 type PasswordTokenResponse = {
   access_token?: string;
+  refresh_token?: string;
   user?: SupabaseAuthUser;
   msg?: string;
   message?: string;
@@ -47,9 +48,8 @@ function responseMessage(payload: Record<string, unknown>, fallback: string) {
   return fallback;
 }
 
-export async function generatePartnerActivationLink(input: {
+export async function generatePartnerActivationToken(input: {
   email: string;
-  redirectTo: string;
   displayName: string;
   partnerId: string;
   existingAccount?: boolean;
@@ -62,7 +62,6 @@ export async function generatePartnerActivationLink(input: {
     body: JSON.stringify({
       type,
       email: input.email,
-      redirect_to: input.redirectTo,
       data: {
         display_name: input.displayName,
         eccomi_partner_id: input.partnerId,
@@ -71,10 +70,24 @@ export async function generatePartnerActivationLink(input: {
     }),
   });
   const payload = await response.json().catch(() => ({})) as GenerateLinkResponse;
-  if (!response.ok || !payload.action_link) {
-    throw new Error(responseMessage(payload as Record<string, unknown>, "Supabase non ha generato il link di attivazione."));
+  if (!response.ok || !payload.hashed_token) {
+    throw new Error(responseMessage(payload as Record<string, unknown>, "Supabase non ha generato il token di attivazione."));
   }
-  return { actionLink: payload.action_link, type };
+  return { tokenHash: payload.hashed_token, type };
+}
+
+export async function verifyPartnerActivationToken(tokenHash: string, type: "invite" | "recovery") {
+  const { url, serviceKey } = authConfig();
+  const response = await fetch(`${url}/auth/v1/verify`, {
+    method: "POST",
+    headers: authHeaders(serviceKey),
+    body: JSON.stringify({ token_hash: tokenHash, type }),
+  });
+  const payload = await response.json().catch(() => ({})) as PasswordTokenResponse;
+  if (!response.ok || !payload.access_token || !payload.user?.email) {
+    throw new Error(responseMessage(payload as Record<string, unknown>, "Link di attivazione non valido o scaduto."));
+  }
+  return { accessToken: payload.access_token, user: payload.user };
 }
 
 export async function authenticatePartnerPassword(email: string, password: string) {
@@ -89,19 +102,6 @@ export async function authenticatePartnerPassword(email: string, password: strin
     throw new Error(responseMessage(payload as Record<string, unknown>, "Email o password non corretti."));
   }
   return { accessToken: payload.access_token, user: payload.user };
-}
-
-export async function getSupabaseAuthUser(accessToken: string) {
-  const { url, serviceKey } = authConfig();
-  const response = await fetch(`${url}/auth/v1/user`, {
-    method: "GET",
-    headers: authHeaders(serviceKey, accessToken),
-  });
-  const payload = await response.json().catch(() => ({})) as SupabaseAuthUser & Record<string, unknown>;
-  if (!response.ok || !payload.email) {
-    throw new Error(responseMessage(payload, "Link di attivazione non valido o scaduto."));
-  }
-  return payload;
 }
 
 export async function setSupabasePassword(accessToken: string, password: string) {
@@ -132,7 +132,7 @@ export async function sendPartnerActivationEmail(input: {
   email: string;
   displayName: string;
   partnerName: string;
-  actionLink: string;
+  activationUrl: string;
   resend?: boolean;
 }) {
   const runtime = getRuntimeEnv();
@@ -153,9 +153,9 @@ export async function sendPartnerActivationEmail(input: {
         <h2 style="margin-top:0;color:#10253e">${input.resend ? "Imposta una nuova password" : "Il tuo accesso è pronto"}</h2>
         <p>Ciao ${escapeHtml(input.displayName)},</p>
         <p>ECCOMI ti ha abilitato come <strong>Partner Admin</strong> per <strong>${escapeHtml(input.partnerName)}</strong>.</p>
-        <p>Usa il pulsante qui sotto per verificare la tua email e scegliere la tua password personale.</p>
-        <p style="margin:26px 0"><a href="${escapeHtml(input.actionLink)}" style="display:inline-block;padding:13px 20px;border-radius:10px;background:#1478bd;color:#fff;text-decoration:none;font-weight:bold">Attiva Area Partner</a></p>
-        <p style="font-size:13px;color:#66768a">Il link è personale, monouso e soggetto alla scadenza configurata in Supabase Auth. Se scade, ECCOMI può reinviarlo dalla scheda Partner.</p>
+        <p>Usa il pulsante qui sotto per verificare il link e scegliere la tua password personale.</p>
+        <p style="margin:26px 0"><a href="${escapeHtml(input.activationUrl)}" style="display:inline-block;padding:13px 20px;border-radius:10px;background:#1478bd;color:#fff;text-decoration:none;font-weight:bold">Attiva Area Partner</a></p>
+        <p style="font-size:13px;color:#66768a">Il link è personale, monouso e soggetto alla scadenza configurata in Supabase Auth. Se scade, ECCOMI può reinviarlo dal Centro Accessi.</p>
       </div>
     </div>`;
 
