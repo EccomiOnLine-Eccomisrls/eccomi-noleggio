@@ -1,5 +1,5 @@
 import { isPartnerNoleggioRole } from "../../../lib/permissions";
-import { requireActor, routeError } from "../../../lib/server/authz";
+import { actorHasPermission, requireActor, routeError } from "../../../lib/server/authz";
 import { isRenderPullRequestPreview } from "../../../lib/server/preview-mode";
 import { POST as createPromotion } from "../../promotions/route";
 
@@ -11,6 +11,9 @@ export async function POST(request: Request) {
     const actor = await requireActor(request);
     if (!isPartnerNoleggioRole(actor.role) || !actor.partnerId) {
       return Response.json({ error: "Azione riservata agli account Partner." }, { status: 403 });
+    }
+    if (!(await actorHasPermission(actor, "QUOTE_CREATE_OWN"))) {
+      return Response.json({ error: "Permesso di inserimento quotazioni non abilitato." }, { status: 403 });
     }
     return createPromotion(request);
   } catch (error) {
