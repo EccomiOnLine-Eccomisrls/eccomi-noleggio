@@ -1,6 +1,15 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
+import { userPermissionGrants } from "../../../db/access-schema";
 import { users } from "../../../db/schema";
+import {
+  hasPermission,
+  isInternalNoleggioRole,
+  isNoleggioRole,
+  resolvePermissions,
+  type NoleggioPermission,
+  type NoleggioRole,
+} from "../permissions";
 import { readCeoSession } from "./ceo-session";
 import { readPartnerSession } from "./partner-session";
 import { isRenderPullRequestPreview } from "./preview-mode";
@@ -9,7 +18,7 @@ import { getRuntimeEnv } from "./runtime";
 export type Actor = {
   email: string;
   displayName: string;
-  role: "CEO" | "PARTNER";
+  role: NoleggioRole;
   partnerId: string | null;
 };
 
@@ -22,7 +31,8 @@ export async function getActorForIdentity(emailValue: string, displayName: strin
     return { email, displayName: displayName || "Salvatore Del Libano", role: "CEO", partnerId: null };
   }
   const [record] = await getDb().select().from(users).where(and(eq(users.email, email), eq(users.active, true))).limit(1);
-  if (!record || (record.role !== "CEO" && record.role !== "PARTNER")) return null;
+  if (!record || !isNoleggioRole(record.role)) return null;
+  if (record.role === "PARTNER" && !record.partnerId) return null;
   return { email: record.email, displayName: record.displayName, role: record.role, partnerId: record.partnerId };
 }
 
@@ -66,7 +76,25 @@ export async function getActor(request: Request): Promise<Actor | null> {
   if (!headerEmail && !ceoSessionEmail && isLocalRequest(request) && !runtime.CEO_EMAIL) {
     return { email, displayName: headerName(request) || "Salvatore Del Libano", role: "CEO", partnerId: null };
   }
-  return getActorForIdentity(email, headerName(request) || (ceoSessionEmail ? "Salvatore Del Libano" : "Utente ECCOMI"));
+  return getActorForIdentity(email, headerName(request) || (ceoSessionEmail ? "Utente ECCOMI NOLEGGIO" : "Utente ECCOMI"));
+}
+
+export async function getActorPermissions(actor: Actor): Promise<Set<NoleggioPermission>> {
+  if (actor.role === "CEO") return resolvePermissions("CEO");
+  const grants = await getDb()
+    .select({ permission: userPermissionGrants.permission })
+    .from(userPermissionGrants)
+    .where(and(
+      eq(userPermissionGrants.userEmail, actor.email),
+      eq(userPermissionGrants.enabled, true),
+    ));
+  return resolvePermissions(actor.role, grants.map((grant) => grant.permission));
+}
+
+export async function actorHasPermission(actor: Actor, permission: NoleggioPermission) {
+  if (hasPermission(actor.role, permission)) return true;
+  const permissions = await getActorPermissions(actor);
+  return permissions.has(permission);
 }
 
 export async function requireActor(request: Request): Promise<Actor> {
@@ -78,6 +106,22 @@ export async function requireActor(request: Request): Promise<Actor> {
 export async function requireCeo(request: Request): Promise<Actor> {
   const actor = await requireActor(request);
   if (actor.role !== "CEO") throw new Response(JSON.stringify({ error: "Azione riservata al CEO." }), { status: 403, headers: { "content-type": "application/json; charset=utf-8" } });
+  return actor;
+}
+
+export async function requireNoleggioStaff(request: Request): Promise<Actor> {
+  const actor = await requireActor(request);
+  if (!isInternalNoleggioRole(actor.role)) {
+    throw new Response(JSON.stringify({ error: "Azione riservata alla struttura ECCOMI NOLEGGIO." }), { status: 403, headers: { "content-type": "application/json; charset=utf-8" } });
+  }
+  return actor;
+}
+
+export async function requirePermission(request: Request, permission: NoleggioPermission): Promise<Actor> {
+  const actor = await requireActor(request);
+  if (!(await actorHasPermission(actor, permission))) {
+    throw new Response(JSON.stringify({ error: "Permesso non abilitato per questo account." }), { status: 403, headers: { "content-type": "application/json; charset=utf-8" } });
+  }
   return actor;
 }
 
