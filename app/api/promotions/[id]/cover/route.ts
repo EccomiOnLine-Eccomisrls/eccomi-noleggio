@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
 import { auditLogs, promotions } from "../../../../../db/schema";
+import { isPartnerNoleggioRole } from "../../../../lib/permissions";
 import { requireActor, routeError } from "../../../../lib/server/authz";
 import { storageDelete, storageGet, storagePut } from "../../../../lib/server/storage";
 
@@ -11,7 +12,7 @@ async function promotionForActor(request: Request, id: string) {
   const actor = await requireActor(request);
   const [promotion] = await getDb().select().from(promotions).where(eq(promotions.id, id)).limit(1);
   if (!promotion) throw new Response(JSON.stringify({ error: "Promozione non trovata." }), { status: 404, headers: { "content-type": "application/json" } });
-  if (actor.role === "PARTNER" && actor.partnerId !== promotion.partnerId) {
+  if (isPartnerNoleggioRole(actor.role) && actor.partnerId !== promotion.partnerId) {
     throw new Response(JSON.stringify({ error: "Promozione non autorizzata." }), { status: 403, headers: { "content-type": "application/json" } });
   }
   return { actor, promotion };
