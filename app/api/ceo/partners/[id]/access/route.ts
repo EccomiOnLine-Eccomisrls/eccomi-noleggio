@@ -21,7 +21,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const email = typeof form.get("email") === "string" ? String(form.get("email")).trim().toLowerCase().slice(0, 160) : "";
     const action = typeof form.get("action") === "string" ? String(form.get("action")).trim().toUpperCase() : "";
     if (!email || action !== "DISABLE") return redirectBack(request, id, { accessError: "Azione accesso non valida." });
-    if (isRenderPullRequestPreview(request)) return redirectBack(request, id, { accessPreview: "1" });
+    if (isRenderPullRequestPreview(request)) return redirectBack(request, id, { accessPreview: "1", accessEmail: email });
 
     const db = getDb();
     const [user] = await db.select().from(users).where(and(eq(users.email, email), eq(users.partnerId, id))).limit(1);
