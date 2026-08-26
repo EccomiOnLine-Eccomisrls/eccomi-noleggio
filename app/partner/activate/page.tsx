@@ -3,14 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 
-function tokenFromHash() {
-  if (typeof window === "undefined") return "";
-  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  return params.get("access_token") || "";
+function activationParams() {
+  if (typeof window === "undefined") return { tokenHash: "", type: "" };
+  const params = new URLSearchParams(window.location.search);
+  return { tokenHash: params.get("token_hash") || "", type: params.get("type") || "" };
 }
 
 export default function PartnerActivatePage() {
-  const [accessToken, setAccessToken] = useState("");
+  const [tokenHash, setTokenHash] = useState("");
+  const [type, setType] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -18,13 +19,15 @@ export default function PartnerActivatePage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    setAccessToken(tokenFromHash());
+    const params = activationParams();
+    setTokenHash(params.tokenHash);
+    setType(params.type);
   }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
-    if (!accessToken) return setError("Il link non contiene una sessione di attivazione valida. Chiedi a ECCOMI di reinviare l'invito.");
+    if (!tokenHash || !["invite", "recovery"].includes(type)) return setError("Il link di attivazione non è valido. Chiedi a ECCOMI di reinviare l'invito.");
     if (password.length < 12) return setError("La password deve contenere almeno 12 caratteri.");
     if (password !== confirm) return setError("Le due password non coincidono.");
     setBusy(true);
@@ -33,7 +36,7 @@ export default function PartnerActivatePage() {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ accessToken, password }),
+        body: JSON.stringify({ tokenHash, type, password }),
       });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Attivazione non riuscita.");
@@ -55,7 +58,7 @@ export default function PartnerActivatePage() {
           <div style={styles.success}><CheckCircle2 size={34} /><h1>Accesso attivato</h1><p>La password è stata impostata. Stai entrando nella tua Area Partner.</p></div>
         ) : (
           <>
-            <div><span style={styles.kicker}><ShieldCheck size={16} /> ATTIVAZIONE SICURA</span><h1 style={styles.title}>Scegli la tua password</h1><p style={styles.muted}>Questo link è personale. Dopo l’attivazione accederai con la tua email e questa password.</p></div>
+            <div><span style={styles.kicker}><ShieldCheck size={16} /> ATTIVAZIONE SICURA</span><h1 style={styles.title}>Scegli la tua password</h1><p style={styles.muted}>Questo link è personale e monouso. La verifica avviene server-side con Supabase Auth; la password non viene memorizzata da ECCOMI.</p></div>
             <form onSubmit={submit} style={styles.form}>
               <label style={styles.label}><span>Password</span><input style={styles.input} type="password" minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required /></label>
               <label style={styles.label}><span>Ripeti password</span><input style={styles.input} type="password" minLength={12} value={confirm} onChange={(event) => setConfirm(event.target.value)} autoComplete="new-password" required /></label>
