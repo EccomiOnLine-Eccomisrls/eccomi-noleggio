@@ -2,6 +2,8 @@ import {
   ceoSessionCookie,
   createCeoSession,
 } from "../../../lib/server/ceo-session";
+import { getActorForIdentity } from "../../../lib/server/authz";
+import type { NoleggioRole } from "../../../lib/permissions";
 import { getRuntimeEnv } from "../../../lib/server/runtime";
 
 const encoder = new TextEncoder();
@@ -20,6 +22,13 @@ type HubHandoff = {
   exp?: number;
   nonce?: string;
   next?: string;
+};
+
+const HUB_ROLE_TO_NOLEGGIO: Record<string, NoleggioRole> = {
+  ceo: "CEO",
+  noleggio_manager: "NOLEGGIO_MANAGER",
+  noleggio_deputy: "NOLEGGIO_DEPUTY",
+  noleggio_operator: "NOLEGGIO_OPERATOR",
 };
 
 function base64UrlToBytes(value: string): Uint8Array {
@@ -76,6 +85,13 @@ async function verifyHandoff(token: string): Promise<HubHandoff | null> {
   }
 }
 
+function hasNoleggioEcosystem(handoff: HubHandoff) {
+  return (handoff.ecosystems || []).some((value) => {
+    const normalized = value.trim().toUpperCase();
+    return normalized === "ECCOMI_NOLEGGIO" || normalized === "NOLEGGIO";
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -86,19 +102,30 @@ export async function GET(request: Request) {
       return Response.json({ error: "Accesso HUB non valido o scaduto." }, { status: 401 });
     }
 
-    if (handoff.role !== "ceo") {
-      return Response.json(
-        { error: "Accesso Responsabile via HUB non ancora abilitato in questa preview." },
-        { status: 403 },
-      );
+    const expectedRole = HUB_ROLE_TO_NOLEGGIO[handoff.role || ""];
+    if (!expectedRole) {
+      return Response.json({ error: "Ruolo HUB non abilitato per ECCOMI NOLEGGIO." }, { status: 403 });
     }
 
     const configuredCeo = getRuntimeEnv().CEO_EMAIL?.trim().toLowerCase();
     const email = handoff.email.trim().toLowerCase();
-    if (configuredCeo && email !== configuredCeo) {
-      return Response.json({ error: "Identità CEO HUB non riconosciuta da ECCOMI NOLEGGIO." }, { status: 403 });
+
+    if (expectedRole === "CEO") {
+      if (configuredCeo && email !== configuredCeo) {
+        return Response.json({ error: "Identità CEO HUB non riconosciuta da ECCOMI NOLEGGIO." }, { status: 403 });
+      }
+    } else {
+      if (!hasNoleggioEcosystem(handoff)) {
+        return Response.json({ error: "Account HUB non assegnato a ECCOMI NOLEGGIO." }, { status: 403 });
+      }
+      const actor = await getActorForIdentity(email, handoff.name || "Utente ECCOMI NOLEGGIO");
+      if (!actor || actor.role !== expectedRole || actor.role === "PARTNER") {
+        return Response.json({ error: "Ruolo ECCOMI NOLEGGIO non attivo per questo account." }, { status: 403 });
+      }
     }
 
+    // La firma HUB autentica l'identità, ma i permessi applicativi vengono sempre
+    // risolti da ECCOMI NOLEGGIO. Non accettiamo grants arbitrari dal token.
     const session = await createCeoSession(email);
     const redirectUrl = new URL(safeNext(handoff.next), url.origin);
 
