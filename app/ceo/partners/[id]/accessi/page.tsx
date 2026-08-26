@@ -45,14 +45,17 @@ export default async function PartnerAccessPage({ params, searchParams }: Props)
   const inviteSent = first(query.inviteSent) === "1";
   const invitePreview = first(query.invitePreview) === "1";
   const disabled = first(query.accessDisabled) === "1";
+  const disablePreview = first(query.accessPreview) === "1";
   const accessError = first(query.accessError);
   const eventEmail = first(query.inviteEmail) || first(query.accessEmail);
+  const simulatedInactive = detail.preview && Boolean(eventEmail) && (invitePreview || disablePreview);
+  const activeCount = internal ? "INTERNO" : Math.max(0, partner.activeUsers - (simulatedInactive ? 1 : 0));
 
   return <main className="ceo-server-page partner-premium-page">
     <header className="ceo-server-bar"><div className="ceo-server-bar__brand"><span>🚙</span><div><strong>ECCOMI</strong><small>NOLEGGIO</small></div></div><a href={`/ceo/partners/${encodeURIComponent(id)}#accessi`}>← Scheda Partner</a></header>
-    <section className="partner-premium-hero"><div className="partner-premium-identity"><div className="partner-premium-monogram">🔐</div><div><small>CEO · GESTIONE ACCESSI</small><h1>Accessi · {partner.name}</h1><p>{partner.legalName}</p></div></div><div className="partner-premium-state"><span className="partner-premium-eyebrow">ACCOUNT ATTIVI</span><span className="partner-pill partner-pill--active">{internal ? "INTERNO" : partner.activeUsers}</span></div></section>
+    <section className="partner-premium-hero"><div className="partner-premium-identity"><div className="partner-premium-monogram">🔐</div><div><small>CEO · GESTIONE ACCESSI</small><h1>Accessi · {partner.name}</h1><p>{partner.legalName}</p></div></div><div className="partner-premium-state"><span className="partner-premium-eyebrow">ACCOUNT ATTIVI</span><span className="partner-pill partner-pill--active">{activeCount}</span></div></section>
 
-    {inviteSent || invitePreview || disabled ? <section className="partner-attention-panel partner-attention-panel--regular"><div className="partner-attention-panel__icon">✓</div><div className="partner-attention-panel__copy"><small>OPERAZIONE COMPLETATA</small><strong>{invitePreview ? "Simulazione preview: invito pronto" : disabled ? "Accesso disattivato" : "Invito inviato con Resend"}</strong><span>{eventEmail || "Account Partner aggiornato"}</span></div></section> : null}
+    {inviteSent || invitePreview || disabled || disablePreview ? <section className="partner-attention-panel partner-attention-panel--regular"><div className="partner-attention-panel__icon">✓</div><div className="partner-attention-panel__copy"><small>OPERAZIONE COMPLETATA</small><strong>{invitePreview ? "Simulazione preview: invito pronto" : disablePreview ? "Simulazione preview: accesso disattivato" : disabled ? "Accesso disattivato" : "Invito inviato con Resend"}</strong><span>{eventEmail || "Account Partner aggiornato"}</span></div></section> : null}
     {accessError ? <section className="partner-attention-panel partner-attention-panel--intervention"><div className="partner-attention-panel__icon">!</div><div className="partner-attention-panel__copy"><small>OPERAZIONE NON COMPLETATA</small><strong>{accessError}</strong></div></section> : null}
 
     {internal ? <section className="partner-detail-section"><div className="partner-detail-section__head"><div><h2>Struttura interna ECCOMI</h2><p>Nessun account Area Partner necessario.</p></div></div></section> : <div className="partner-detail-stack">
@@ -66,7 +69,15 @@ export default async function PartnerAccessPage({ params, searchParams }: Props)
 
       <section className="partner-detail-section"><div className="partner-detail-section__head"><div><h2>Account della società</h2><p>Stato reale: INVITO INVIATO, ATTIVO o DISATTIVATO. L’ultimo accesso deriva dall’audit di login, non dalla semplice modifica dell’account.</p></div><span className="partner-premium-section-number">02</span></div>
         <div className="partner-table-wrap"><table className="partner-table"><thead><tr><th>Nome</th><th>Email</th><th>Stato</th><th>Ultimo accesso</th><th></th></tr></thead><tbody>
-          {detail.users.length ? detail.users.map((user) => { const state = accessState.get(user.email) || { status: user.active ? "ATTIVO" : "NON ATTIVO", lastLogin: null }; return <tr key={user.email}><td>{user.displayName}</td><td>{user.email}</td><td>{state.status}</td><td>{shortDate(state.lastLogin)}</td><td>{user.active ? <form method="post" action={`/api/ceo/partners/${encodeURIComponent(id)}/access`}><input type="hidden" name="email" value={user.email} /><input type="hidden" name="action" value="DISABLE" /><button type="submit" style={{ border: "1px solid #efb7b7", background: "#fff", color: "#9f1d1d", borderRadius: 9, padding: "8px 10px", fontWeight: 800 }}>Disattiva</button></form> : <span style={{ color: "#66768a" }}>Reinvia dal modulo sopra</span>}</td></tr>; }) : <tr><td className="partner-empty-row" colSpan={5}>Nessun account configurato. Invita il primo Partner Admin.</td></tr>}
+          {detail.users.length ? detail.users.map((user) => {
+            const state = accessState.get(user.email) || { status: user.active ? "ATTIVO" : "NON ATTIVO", lastLogin: null };
+            const matchesEvent = detail.preview && Boolean(eventEmail) && user.email.trim().toLowerCase() === eventEmail.trim().toLowerCase();
+            const previewInvited = matchesEvent && invitePreview;
+            const previewDisabled = matchesEvent && disablePreview;
+            const displayStatus = previewInvited ? "INVITO INVIATO" : previewDisabled ? "DISATTIVATO" : state.status;
+            const canDisable = user.active && !previewInvited && !previewDisabled;
+            return <tr key={user.email}><td>{user.displayName}</td><td>{user.email}</td><td>{displayStatus}</td><td>{shortDate(state.lastLogin)}</td><td>{canDisable ? <form method="post" action={`/api/ceo/partners/${encodeURIComponent(id)}/access`}><input type="hidden" name="email" value={user.email} /><input type="hidden" name="action" value="DISABLE" /><button type="submit" style={{ border: "1px solid #efb7b7", background: "#fff", color: "#9f1d1d", borderRadius: 9, padding: "8px 10px", fontWeight: 800 }}>Disattiva</button></form> : previewDisabled ? <span style={{ color: "#9f1d1d", fontWeight: 800 }}>Disattivato</span> : <span style={{ color: "#66768a" }}>Reinvia dal modulo sopra</span>}</td></tr>;
+          }) : <tr><td className="partner-empty-row" colSpan={5}>Nessun account configurato. Invita il primo Partner Admin.</td></tr>}
         </tbody></table></div>
       </section>
 
