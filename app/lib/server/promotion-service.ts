@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, lte, ne } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { partners, promotions } from "../../../db/schema";
+import { isPartnerNoleggioRole } from "../permissions";
 import type { Actor } from "./authz";
 
 export const promotionStatuses = [
@@ -77,7 +78,7 @@ export async function expireStalePromotions() {
 }
 
 function actorFilter(actor: Actor, includeTrash: boolean) {
-  const partnerFilter = actor.role === "PARTNER" && actor.partnerId
+  const partnerFilter = isPartnerNoleggioRole(actor.role) && actor.partnerId
     ? eq(promotions.partnerId, actor.partnerId)
     : undefined;
   const trashFilter = includeTrash
