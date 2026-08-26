@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../../db";
 import { auditLogs, partners, users } from "../../../../../../db/schema";
-import { requireCeo, routeError } from "../../../../../lib/server/authz";
+import { requireCeo } from "../../../../../lib/server/authz";
 import { isRenderPullRequestPreview } from "../../../../../lib/server/preview-mode";
-import { generatePartnerActivationLink, sendPartnerActivationEmail } from "../../../../../lib/server/partner-auth-provider";
+import { generatePartnerActivationToken, sendPartnerActivationEmail } from "../../../../../lib/server/partner-auth-provider";
 import { publicUrl } from "../../../../../lib/server/public-url";
 
 function sameOrigin(request: Request) {
@@ -20,9 +20,8 @@ function validEmail(value: string) {
 }
 
 function redirectBack(request: Request, id: string, params: Record<string, string>) {
-  const target = publicUrl(request, `/ceo/partners/${encodeURIComponent(id)}`);
+  const target = publicUrl(request, `/ceo/partners/${encodeURIComponent(id)}/accessi`);
   Object.entries(params).forEach(([key, value]) => target.searchParams.set(key, value));
-  target.hash = "accessi";
   return Response.redirect(target, 303);
 }
 
@@ -59,19 +58,21 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return redirectBack(request, id, { accessError: "L'account è già attivo. Disattivalo prima di inviare un nuovo link di attivazione." });
     }
 
-    const activationUrl = new URL("/partner/activate", request.url).toString();
-    const generated = await generatePartnerActivationLink({
+    const generated = await generatePartnerActivationToken({
       email,
-      redirectTo: activationUrl,
       displayName,
       partnerId: id,
       existingAccount: Boolean(existing),
     });
+    const activationUrl = publicUrl(request, "/partner/activate");
+    activationUrl.searchParams.set("token_hash", generated.tokenHash);
+    activationUrl.searchParams.set("type", generated.type);
+
     const emailResult = await sendPartnerActivationEmail({
       email,
       displayName,
       partnerName: partner.name,
-      actionLink: generated.actionLink,
+      activationUrl: activationUrl.toString(),
       resend: Boolean(existing),
     });
 
