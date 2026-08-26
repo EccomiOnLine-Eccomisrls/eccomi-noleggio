@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
-const [partnerPage, partnerAuthz, partnerSession, dashboard, promotionService, promotionsRoute, practiceRoute, documentRoute, actionRoute, coverRoute, quoteRoute, preview, authProvider, inviteRoute, activateRoute, loginRoute, accessCenter, ceoPartnerPage] = await Promise.all([
+const [partnerPage, partnerAuthz, partnerSession, dashboard, promotionService, promotionsRoute, practiceRoute, documentRoute, actionRoute, coverRoute, quoteRoute, preview, authProvider, inviteRoute, activateRoute, loginRoute, accessRoute, accessCenter, ceoPartnerPage] = await Promise.all([
   read("app/partner/page.tsx"),
   read("app/lib/server/partner-authz.ts"),
   read("app/api/partner/session/route.ts"),
@@ -20,6 +20,7 @@ const [partnerPage, partnerAuthz, partnerSession, dashboard, promotionService, p
   read("app/api/ceo/partners/[id]/invite/route.ts"),
   read("app/api/auth/partner-activate/route.ts"),
   read("app/api/auth/partner-login/route.ts"),
+  read("app/api/ceo/partners/[id]/access/route.ts"),
   read("app/ceo/partners/[id]/accessi/page.tsx"),
   read("app/ceo/partners/[id]/page.tsx"),
 ]);
@@ -84,6 +85,14 @@ test("PR14 Centro Accessi espone onboarding e stati reali", () => {
   assert.match(accessCenter, /PARTNER_LOGIN/);
   assert.match(accessCenter, /Nessuna password condivisa/);
   assert.match(ceoPartnerPage, /Apri Centro Accessi/);
+});
+
+test("PR14 preview mantiene coerenti invito e disattivazione senza scrivere dati", () => {
+  assert.match(accessRoute, /accessPreview: "1", accessEmail: email/);
+  assert.match(accessCenter, /Simulazione preview: invito pronto/);
+  assert.match(accessCenter, /Simulazione preview: accesso disattivato/);
+  assert.match(accessCenter, /previewInvited \? "INVITO INVIATO"/);
+  assert.match(accessCenter, /previewDisabled \? "DISATTIVATO"/);
 });
 
 test("PR14 preview è server-safe e documenta onboarding e 403 fuori perimetro", () => {
