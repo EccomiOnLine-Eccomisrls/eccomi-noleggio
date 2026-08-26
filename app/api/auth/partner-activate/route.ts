@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const type = clean(body.type, 20) as "invite" | "recovery";
     const password = clean(body.password, 300);
     if (!tokenHash || !["invite", "recovery"].includes(type)) return Response.json({ error: "Link di attivazione mancante o scaduto." }, { status: 401 });
-    if (password.length < 12) return Response.json({ error: "La password deve contenere almeno 12 caratteri." }, { status: 422 });
+    if (password.length < 8) return Response.json({ error: "La password deve contenere almeno 8 caratteri." }, { status: 422 });
 
     const verified = await verifyPartnerActivationToken(tokenHash, type);
     const email = verified.user.email?.trim().toLowerCase() || "";

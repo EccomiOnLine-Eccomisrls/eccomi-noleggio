@@ -28,7 +28,7 @@ export default function PartnerActivatePage() {
     event.preventDefault();
     setError("");
     if (!tokenHash || !["invite", "recovery"].includes(type)) return setError("Il link di attivazione non è valido. Chiedi a ECCOMI di reinviare l'invito.");
-    if (password.length < 12) return setError("La password deve contenere almeno 12 caratteri.");
+    if (password.length < 8) return setError("La password deve contenere almeno 8 caratteri.");
     if (password !== confirm) return setError("Le due password non coincidono.");
     setBusy(true);
     try {
@@ -53,16 +53,16 @@ export default function PartnerActivatePage() {
   return (
     <main style={styles.page}>
       <section style={styles.card}>
-        <div style={styles.brand}><span style={styles.icon}>🚙</span><div><strong>ECCOMI</strong><small>NOLEGGIO · AREA PARTNER</small></div></div>
+        <div style={styles.brand}><span style={styles.icon}>🚙</span><div><strong>ECCOMI </strong><small>NOLEGGIO · AREA PARTNER</small></div></div>
         {done ? (
           <div style={styles.success}><CheckCircle2 size={34} /><h1>Accesso attivato</h1><p>La password è stata impostata. Stai entrando nella tua Area Partner.</p></div>
         ) : (
           <>
             <div><span style={styles.kicker}><ShieldCheck size={16} /> ATTIVAZIONE SICURA</span><h1 style={styles.title}>Scegli la tua password</h1><p style={styles.muted}>Questo link è personale e monouso. La verifica avviene server-side con Supabase Auth; la password non viene memorizzata da ECCOMI.</p></div>
             <form onSubmit={submit} style={styles.form}>
-              <label style={styles.label}><span>Password</span><input style={styles.input} type="password" minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required /></label>
-              <label style={styles.label}><span>Ripeti password</span><input style={styles.input} type="password" minLength={12} value={confirm} onChange={(event) => setConfirm(event.target.value)} autoComplete="new-password" required /></label>
-              <small style={styles.help}>Minimo 12 caratteri. Evita password già utilizzate altrove.</small>
+              <label style={styles.label}><span>Password</span><input style={styles.input} type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required /></label>
+              <label style={styles.label}><span>Ripeti password</span><input style={styles.input} type="password" minLength={8} value={confirm} onChange={(event) => setConfirm(event.target.value)} autoComplete="new-password" required /></label>
+              <small style={styles.help}>Minimo 8 caratteri. Evita password già utilizzate altrove.</small>
               {error ? <div style={styles.error}>{error}</div> : null}
               <button style={styles.button} type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : <KeyRound size={18} />}{busy ? "Attivazione…" : "Attiva Area Partner"}</button>
             </form>
