@@ -31,14 +31,14 @@ Operatore interno ECCOMI NOLEGGIO. Può vedere e lavorare il verticale secondo l
 
 Account collegato a una organizzazione Partner. Vede soltanto il proprio perimetro. Può inserire quotazioni, lavorare le proprie pratiche e gestire la vita operativa delle proprie offerte. Non può approvare una quotazione.
 
-## Caso Tony
+## Caso Robin
 
-Tony Responsabile e Tony Partner sono due account diversi.
+Robin Responsabile e Robin Partner sono due account diversi.
 
 - account ECCOMI → `NOLEGGIO_MANAGER`
 - account Partner → `PARTNER` + `partner_id`
 
-Non esiste un comando “cambia ruolo”. Se domani Arcibaldo diventa Responsabile, il ruolo interno viene assegnato al nuovo account; Tony può restare Partner senza perdere offerte, pratiche o storico.
+Non esiste un comando “cambia ruolo”. Se domani Arcibaldo diventa Responsabile, il ruolo interno viene assegnato al nuovo account; Robin può restare Partner senza perdere offerte, pratiche o storico.
 
 ## Quotazioni
 
