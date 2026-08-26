@@ -24,7 +24,7 @@ const matrixRows: MatrixRow[] = [
   {
     area: "GOVERNANCE",
     label: "Vede tutto ECCOMI NOLEGGIO",
-    values: { CEO: "✓", NOLEGGIO_MANAGER: "✓", NOLEGGIO_DEPUTY: "✓", NOLEGGIO_OPERATOR: "✓", PARTNER_ADMIN: "—", PARTNER: "—" },
+    values: { CEO: "✓", NOLEGGIO_MANAGER: "✓", NOLEGGIO_DEPUTY: "CEO abilita", NOLEGGIO_OPERATOR: "✓", PARTNER_ADMIN: "—", PARTNER: "—" },
   },
   {
     area: "GOVERNANCE",
