@@ -1,6 +1,7 @@
 import { and, count, desc, eq, isNull, sum } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { commissions, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
+import { isPartnerNoleggioRole } from "../../lib/permissions";
 import { requireActor, routeError } from "../../lib/server/authz";
 import { getAiConnectionStatus } from "../../lib/server/ai";
 import { ensurePracticeSchema } from "../../lib/server/practice-schema";
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     const ai = await getAiConnectionStatus();
     const db = getDb();
     const partnerFilter =
-      actor.role === "PARTNER" && actor.partnerId
+      isPartnerNoleggioRole(actor.role) && actor.partnerId
         ? eq(leads.partnerId, actor.partnerId)
         : undefined;
 
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
         ),
       );
     const [commissionStats] = await db.select({ total: sum(commissions.amountCents) }).from(commissions).where(
-      actor.role === "PARTNER" && actor.partnerId ? eq(commissions.partnerId, actor.partnerId) : undefined,
+      isPartnerNoleggioRole(actor.role) && actor.partnerId ? eq(commissions.partnerId, actor.partnerId) : undefined,
     );
     const leadRows = await db
       .select({
