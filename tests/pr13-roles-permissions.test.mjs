@@ -62,6 +62,9 @@ test("PR13 congela le decisioni operative approvate", () => {
   assert.match(permissions, /"QUOTE_RESTORE_ARCHIVED_ANY"/);
   assert.match(permissions, /"DOCUMENT_REMOVE_OWN"/);
   assert.match(permissions, /NOLEGGIO_DEPUTY:[\s\S]*"PRACTICE_VIEW_ALL"/);
+  const deputyBase = permissions.match(/NOLEGGIO_DEPUTY:\s*\[[\s\S]*?\],\n  NOLEGGIO_OPERATOR:/)?.[0] || "";
+  assert.doesNotMatch(deputyBase, /"NOLEGGIO_VIEW_ALL"/);
+  assert.match(preview, /label: "Vede tutto ECCOMI NOLEGGIO"[\s\S]*NOLEGGIO_DEPUTY: "CEO abilita"/);
   assert.match(docs, /Responsabile propone la creazione\/disattivazione di un Operatore ECCOMI; il CEO approva/);
   assert.match(docs, /importo della commissione può essere impostato o corretto solo dal CEO/);
 });
