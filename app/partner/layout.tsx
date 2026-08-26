@@ -9,8 +9,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
     <div className="partner-route-branding">
       <style>{`
         /* Login Partner */
-        .partner-route-branding > main > section:first-child > div:first-child > span:last-child > strong::after,
-        .partner-route-branding > main > header:first-child > div:first-child > span:last-child > strong::after {
+        .partner-route-branding > main > section:first-child > div:first-child > span:last-child > strong::after {
           content: " ";
         }
 
@@ -48,8 +47,9 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
           line-height: 1.45;
         }
 
-        /* Dashboard autenticata: firma brand stabile, indipendente dal markup dei moduli */
-        .partner-route-branding > main > header > div:first-child > span:last-child::after {
+        /* Dashboard reale autenticata: applica il branding solo quando è presente il pulsante Esci.
+           Le preview demo hanno già il proprio markup e non devono ricevere duplicazioni. */
+        .partner-route-branding > main:has(header button) > header > div:first-child > span:last-child::after {
           content: "by Eccomi OnLine";
           display: block;
           margin-top: 3px;
@@ -60,8 +60,7 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
           line-height: 1.2;
         }
 
-        /* Le cinque aree sono il vero menu operativo del Partner. */
-        .partner-route-branding > main > div > nav::before {
+        .partner-route-branding > main:has(header button) > div > nav::before {
           content: "IL TUO SPAZIO DI LAVORO";
           display: block;
           flex: 0 0 100%;
@@ -74,7 +73,9 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
           line-height: 1.3;
         }
 
+        /* Firma prodotto: nascosta di default e mostrata una sola volta nella dashboard reale. */
         .partner-product-signature {
+          display: none;
           max-width: 1320px;
           margin: 0 auto;
           padding: 12px 24px 34px;
@@ -83,6 +84,10 @@ export default function PartnerLayout({ children }: PartnerLayoutProps) {
           font-weight: 700;
           letter-spacing: .015em;
           text-align: center;
+        }
+
+        .partner-route-branding > main:has(header button) + .partner-product-signature {
+          display: block;
         }
 
         .partner-product-signature strong {
