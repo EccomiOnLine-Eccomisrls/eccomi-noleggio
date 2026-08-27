@@ -14,11 +14,7 @@ function normalize(value: string | null | undefined) {
 export function isInternalEccomiPartner(partner: PartnerIdentity | null | undefined) {
   if (!partner) return false;
 
-  const name = normalize(partner.name);
-  const legalName = normalize(partner.legalName);
-
-  return name === "ECCOMI"
-    || name.startsWith("ECCOMI ")
-    || legalName === "ECCOMI SRLS"
-    || legalName.startsWith("ECCOMI SRLS ");
+  // Esiste una sola struttura interna: il record ECCOMI / eccomi-direct.
+  // La ragione sociale non deve trasformare altri Partner in strutture interne.
+  return normalize(partner.name) === "ECCOMI";
 }
