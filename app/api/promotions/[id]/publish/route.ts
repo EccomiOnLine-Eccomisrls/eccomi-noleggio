@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
-import { auditLogs, hubEvents, promotions } from "../../../../../db/schema";
-import { requireCeo, routeError } from "../../../../lib/server/authz";
+import { auditLogs, hubEvents, partners, promotions } from "../../../../../db/schema";
+import { isInternalEccomiPartner } from "../../../../lib/partner-identity";
+import { requirePermission, routeError } from "../../../../lib/server/authz";
+import { getPromotionEccomiCommission } from "../../../../lib/server/commission-service";
 import {
   isShopifyPublishingReady,
   publishPreparedPromotionToShopify,
@@ -11,28 +13,18 @@ import { publishProductToAllConfiguredShopifyChannels } from "../../../../lib/se
 
 async function prepareProductForAutomaticCollection(productId: string) {
   const tagResult = await shopifyAdminFetch<{
-    tagsAdd: {
-      userErrors: Array<{ message: string }>;
-    };
+    tagsAdd: { userErrors: Array<{ message: string }> };
   }>(
     `mutation AddEccomiNoleggioTag($id: ID!, $tags: [String!]!) {
       tagsAdd(id: $id, tags: $tags) {
-        userErrors {
-          field
-          message
-        }
+        userErrors { field message }
       }
     }`,
-    {
-      id: productId,
-      tags: ["eccomi-noleggio"],
-    },
+    { id: productId, tags: ["eccomi-noleggio"] },
   );
 
   if (tagResult.tagsAdd.userErrors.length) {
-    throw new Error(
-      tagResult.tagsAdd.userErrors.map((error) => error.message).join(" · "),
-    );
+    throw new Error(tagResult.tagsAdd.userErrors.map((error) => error.message).join(" · "));
   }
 
   const collectionData = await shopifyAdminFetch<{
@@ -40,11 +32,7 @@ async function prepareProductForAutomaticCollection(productId: string) {
       id: string;
       ruleSet: {
         appliedDisjunctively: boolean;
-        rules: Array<{
-          column: string;
-          relation: string;
-          condition: string;
-        }>;
+        rules: Array<{ column: string; relation: string; condition: string }>;
       } | null;
     } | null;
   }>(
@@ -53,11 +41,7 @@ async function prepareProductForAutomaticCollection(productId: string) {
         id
         ruleSet {
           appliedDisjunctively
-          rules {
-            column
-            relation
-            condition
-          }
+          rules { column relation condition }
         }
       }
     }`,
@@ -65,37 +49,20 @@ async function prepareProductForAutomaticCollection(productId: string) {
   );
 
   const collection = collectionData.collectionByHandle;
-
-  if (!collection?.ruleSet) {
-    return;
-  }
+  if (!collection?.ruleSet) return;
 
   const hasCorrectTagRule = collection.ruleSet.rules.some(
-    (rule) =>
-      rule.column === "TAG" &&
-      rule.relation === "EQUALS" &&
-      rule.condition.trim().toLowerCase() === "eccomi-noleggio",
+    (rule) => rule.column === "TAG" && rule.relation === "EQUALS" && rule.condition.trim().toLowerCase() === "eccomi-noleggio",
   );
-
-  const hasExtraRules = collection.ruleSet.rules.some(
-    (rule) => rule.column !== "TAG",
-  );
-
-  if (hasCorrectTagRule && !hasExtraRules) {
-    return;
-  }
+  const hasExtraRules = collection.ruleSet.rules.some((rule) => rule.column !== "TAG");
+  if (hasCorrectTagRule && !hasExtraRules) return;
 
   const updateResult = await shopifyAdminFetch<{
-    collectionUpdate: {
-      userErrors: Array<{ message: string }>;
-    };
+    collectionUpdate: { userErrors: Array<{ message: string }> };
   }>(
     `mutation NormalizeEccomiNoleggioCollection($input: CollectionInput!) {
       collectionUpdate(input: $input) {
-        userErrors {
-          field
-          message
-        }
+        userErrors { field message }
       }
     }`,
     {
@@ -103,24 +70,14 @@ async function prepareProductForAutomaticCollection(productId: string) {
         id: collection.id,
         ruleSet: {
           appliedDisjunctively: false,
-          rules: [
-            {
-              column: "TAG",
-              relation: "EQUALS",
-              condition: "eccomi-noleggio",
-            },
-          ],
+          rules: [{ column: "TAG", relation: "EQUALS", condition: "eccomi-noleggio" }],
         },
       },
     },
   );
 
   if (updateResult.collectionUpdate.userErrors.length) {
-    throw new Error(
-      updateResult.collectionUpdate.userErrors
-        .map((error) => error.message)
-        .join(" · "),
-    );
+    throw new Error(updateResult.collectionUpdate.userErrors.map((error) => error.message).join(" · "));
   }
 }
 
@@ -129,21 +86,18 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const actor = await requireCeo(request);
+    const actor = await requirePermission(request, "QUOTE_PUBLISH");
     const { id } = await context.params;
 
-    const [promotion] = await getDb()
-      .select()
+    const [row] = await getDb()
+      .select({ promotion: promotions, partnerName: partners.name, partnerLegalName: partners.legalName })
       .from(promotions)
+      .innerJoin(partners, eq(promotions.partnerId, partners.id))
       .where(eq(promotions.id, id))
       .limit(1);
 
-    if (!promotion) {
-      return Response.json(
-        { error: "Promozione non trovata." },
-        { status: 404 },
-      );
-    }
+    if (!row) return Response.json({ error: "Promozione non trovata." }, { status: 404 });
+    const promotion = row.promotion;
 
     if (promotion.status === "ONLINE" && promotion.shopifyUrl) {
       return Response.json({
@@ -155,67 +109,49 @@ export async function POST(
     }
 
     if (!["PENDING_APPROVAL", "APPROVED"].includes(promotion.status)) {
-      return Response.json(
-        { error: "La promozione non è pronta per la pubblicazione." },
-        { status: 409 },
-      );
+      return Response.json({ error: "La promozione non è pronta per la pubblicazione." }, { status: 409 });
+    }
+
+    const internalEccomi = isInternalEccomiPartner({ name: row.partnerName, legalName: row.partnerLegalName });
+    const eccomiCommissionCents = await getPromotionEccomiCommission(id);
+    if (!internalEccomi && eccomiCommissionCents === null) {
+      return Response.json({
+        error: "Definisci prima la provvigione ECCOMI prevista a contratto concluso.",
+      }, { status: 409 });
     }
 
     if (!(await isShopifyPublishingReady())) {
-      return Response.json(
-        {
-          error:
-            "Shopify è collegato, ma la pagina ECCOMI NOLEGGIO deve essere completata prima della pubblicazione.",
-        },
-        { status: 409 },
-      );
+      return Response.json({
+        error: "Shopify è collegato, ma la pagina ECCOMI NOLEGGIO deve essere completata prima della pubblicazione.",
+      }, { status: 409 });
     }
 
-    const today = new Date().toLocaleDateString("sv-SE", {
-      timeZone: "Europe/Rome",
-    });
-
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
     if (promotion.validUntil <= today) {
-      return Response.json(
-        { error: "La quotazione è scaduta e non può essere pubblicata." },
-        { status: 409 },
-      );
+      return Response.json({ error: "La quotazione è scaduta e non può essere pubblicata." }, { status: 409 });
     }
-
     if (!promotion.shopifyProductId) {
-      return Response.json(
-        { error: "Crea prima la bozza Shopify e controllala." },
-        { status: 409 },
-      );
+      return Response.json({ error: "Crea prima la bozza Shopify e controllala." }, { status: 409 });
     }
 
     await prepareProductForAutomaticCollection(promotion.shopifyProductId);
-
-    const result = await publishPreparedPromotionToShopify(
-      promotion.shopifyProductId,
-    );
-
-    const channels =
-      await publishProductToAllConfiguredShopifyChannels(result.productId);
-
+    const result = await publishPreparedPromotionToShopify(promotion.shopifyProductId);
+    const channels = await publishProductToAllConfiguredShopifyChannels(result.productId);
     const now = new Date().toISOString();
 
-    await getDb()
-      .update(promotions)
-      .set({
-        status: "ONLINE",
-        shopifyProductId: result.productId,
-        shopifyHandle: result.handle,
-        shopifyUrl: result.url,
-        shopifyCollectionId: result.collectionId,
-        automationStatus: "ONLINE",
-        automationError: null,
-        approvedBy: actor.email,
-        approvedAt: promotion.approvedAt || now,
-        publishedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(promotions.id, id));
+    await getDb().update(promotions).set({
+      status: "ONLINE",
+      shopifyProductId: result.productId,
+      shopifyHandle: result.handle,
+      shopifyUrl: result.url,
+      shopifyCollectionId: result.collectionId,
+      automationStatus: "ONLINE",
+      automationError: null,
+      approvedBy: actor.email,
+      approvedAt: promotion.approvedAt || now,
+      publishedAt: now,
+      updatedAt: now,
+    }).where(eq(promotions.id, id));
 
     await getDb().insert(auditLogs).values({
       id: crypto.randomUUID(),
@@ -230,11 +166,13 @@ export async function POST(
         collectionHandle: result.collectionHandle,
         status: "ONLINE",
         channels,
+        eccomiCommissionCents: eccomiCommissionCents ?? 0,
+        internalEccomi,
+        actorRole: actor.role,
       }),
     });
 
     const hubEventId = crypto.randomUUID();
-
     await getDb().insert(hubEvents).values({
       id: hubEventId,
       eventType: "NOLEGGIO_PROMOTION_PUBLISHED_ONLINE",
@@ -250,6 +188,7 @@ export async function POST(
         collectionHandle: result.collectionHandle,
         status: "ONLINE",
         channels,
+        eccomiCommissionCents: eccomiCommissionCents ?? 0,
       }),
       actorEmail: actor.email,
     });
@@ -263,6 +202,7 @@ export async function POST(
       channels,
       hubEventId,
       visibleInShowroom: true,
+      eccomiCommissionCents: eccomiCommissionCents ?? 0,
     });
   } catch (error) {
     return routeError(error);
