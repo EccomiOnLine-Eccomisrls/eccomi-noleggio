@@ -150,7 +150,10 @@ export default async function CeoPromotionEditPage({
   const title = publicTitle(values.brand, values.model, values.version);
   const preview = payload.preview === true || isRenderPullRequestPreview(request);
   const saved = queryValue(query, "saved") === "1";
+  const prepared = queryValue(query, "prepared");
   const error = queryValue(query, "error");
+  const prepareError = queryValue(query, "prepareError");
+  const canPrepareShopify = !promotion.shopifyProductId && ["PENDING_APPROVAL", "APPROVED"].includes(promotion.status);
 
   return (
     <main className="ceo-server-page" data-server-editor-ready="true">
@@ -189,10 +192,17 @@ export default async function CeoPromotionEditPage({
         {saved ? (
           <div className="ceo-server-result">
             <strong>{preview ? "SIMULAZIONE COMPLETATA" : "SALVATAGGIO COMPLETATO"}</strong>
-            <div>{preview ? "Nessuna scrittura esterna eseguita." : "Promozione e prodotto Shopify sincronizzati."}</div>
+            <div>{preview ? "Nessuna scrittura esterna eseguita." : promotion.shopifyProductId ? "Promozione e prodotto Shopify sincronizzati." : "Promozione aggiornata. Il prodotto Shopify non è ancora stato creato."}</div>
+          </div>
+        ) : null}
+        {prepared ? (
+          <div className="ceo-server-result">
+            <strong>{prepared === "preview" ? "SIMULAZIONE PREPARAZIONE COMPLETATA" : "BOZZA SHOPIFY PREPARATA"}</strong>
+            <div>{prepared === "preview" ? "Preview sicura: nessuna scrittura su Supabase o Shopify." : "La bozza Shopify è pronta ma resta invisibile al pubblico fino all’approvazione ECCOMI."}</div>
           </div>
         ) : null}
         {error ? <div className="ceo-server-result--error">{error}</div> : null}
+        {prepareError ? <div className="ceo-server-result--error">{prepareError}</div> : null}
 
         <section>
           <fieldset>
@@ -264,6 +274,16 @@ export default async function CeoPromotionEditPage({
 
         <footer className="ceo-server-actions">
           <a className="ceo-server-secondary" href="/ceo/promotions">Annulla</a>
+          {canPrepareShopify ? (
+            <button
+              className="ceo-server-secondary"
+              type="submit"
+              formMethod="post"
+              formAction={`/api/promotions/${encodeURIComponent(id)}/prepare-form`}
+            >
+              {preview ? "SIMULA PREPARAZIONE SHOPIFY" : "PREPARA BOZZA SHOPIFY"}
+            </button>
+          ) : null}
           <button className="ceo-server-primary" type="submit">
             {preview ? "SIMULA SALVATAGGIO" : reactivate ? "SALVA E RIATTIVA" : "SALVA MODIFICHE"}
           </button>
