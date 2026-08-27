@@ -10,7 +10,7 @@ const DEMO_DOCUMENTS: Record<string, DemoDocument> = {
     filename: "documento-identita-demo.pdf",
     description: "Documento dimostrativo per il collaudo dell'Area Partner.",
   },
-  tax-code: {
+  "tax-code": {
     title: "Codice fiscale",
     filename: "codice-fiscale-demo.pdf",
     description: "Documento dimostrativo per il collaudo dell'Area Partner.",
