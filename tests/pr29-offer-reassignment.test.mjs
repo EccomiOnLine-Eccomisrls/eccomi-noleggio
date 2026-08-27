@@ -49,3 +49,13 @@ test("PR29 CEO UI exposes Partner and ECCOMI DIRETTO destinations", async () => 
   assert.match(editor, /RIASSEGNA OFFERTA/);
   assert.match(editor, /\/assignment/);
 });
+
+test("PR29 preview supports the inverse ECCOMI DIRETTO to Partner flow", async () => {
+  const route = await read("app/api/ceo/promotions/[id]/reassign/route.ts");
+  const page = await read("app/ceo/promotions/[id]/assignment/page.tsx");
+  assert.match(route, /id === "preview-ducato-direct"/);
+  assert.match(route, /direct \? previewPartners\[0\] : previewPartners\[1\]/);
+  assert.match(route, /previousPartnerIncrementCents: direct \? 0 : 15000/);
+  assert.match(page, /id === "preview-ducato-direct"/);
+  assert.match(page, /extraCents: direct \? 0 : 15000/);
+});
