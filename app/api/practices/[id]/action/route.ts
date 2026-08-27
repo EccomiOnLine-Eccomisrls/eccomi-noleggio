@@ -1,9 +1,15 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
-import { auditLogs, hubEvents, leads, partners } from "../../../../../db/schema";
+import { auditLogs, commissions, hubEvents, leads, partners } from "../../../../../db/schema";
 import { isPartnerNoleggioRole } from "../../../../lib/permissions";
 import { isInternalEccomiPartner } from "../../../../lib/partner-identity";
 import { requireActor, routeError } from "../../../../lib/server/authz";
+import {
+  clearCommissionRule,
+  commissionSourceLabel,
+  resolveCommissionForLead,
+  setCommissionRule,
+} from "../../../../lib/server/commission-service";
 import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
 
 const allowedTransitions: Record<string, string[]> = {
@@ -54,6 +60,8 @@ export async function POST(
       assignedTo?: unknown;
       trashAction?: unknown;
       deleteReason?: unknown;
+      commissionOverrideCents?: unknown;
+      clearCommissionOverride?: unknown;
     };
 
     const nextStatus = typeof body.status === "string"
@@ -75,6 +83,8 @@ export async function POST(
     const deleteReason = typeof body.deleteReason === "string"
       ? body.deleteReason.trim().slice(0, 500)
       : "";
+    const hasCommissionOverrideRequest = Object.prototype.hasOwnProperty.call(body, "commissionOverrideCents")
+      || body.clearCommissionOverride === true;
 
     const db = getDb();
 
@@ -212,6 +222,48 @@ export async function POST(
       return Response.json({ ok: true, priority: requestedPriority });
     }
 
+    if (hasCommissionOverrideRequest) {
+      if (actor.role !== "CEO") {
+        return Response.json({ error: "Solo il CEO può impostare l'override commissione della pratica." }, { status: 403 });
+      }
+
+      const clearing = body.clearCommissionOverride === true;
+      let amountCents: number | null = null;
+      if (clearing) {
+        await clearCommissionRule("LEAD", id);
+      } else {
+        const parsed = Number(body.commissionOverrideCents);
+        if (!Number.isInteger(parsed) || parsed < 0 || parsed > 10_000_000) {
+          return Response.json({ error: "Importo commissione pratica non valido." }, { status: 422 });
+        }
+        amountCents = await setCommissionRule("LEAD", id, parsed, actor.email);
+      }
+
+      const now = new Date().toISOString();
+      await db.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        actorEmail: actor.email,
+        action: clearing ? "COMMISSION_RULE_LEAD_CLEARED" : "COMMISSION_RULE_LEAD_UPDATED",
+        entityType: "lead",
+        entityId: id,
+        payloadJson: JSON.stringify({ amountCents, actorRole: actor.role }),
+      });
+      await db.insert(hubEvents).values({
+        id: crypto.randomUUID(),
+        eventType: clearing ? "NOLEGGIO_COMMISSION_RULE_CLEARED" : "NOLEGGIO_COMMISSION_RULE_UPDATED",
+        ecosystem: "ECCOMI_NOLEGGIO",
+        entityType: "lead",
+        entityId: id,
+        title: clearing ? `${id} · override commissione pratica rimosso` : `${id} · override commissione pratica aggiornato`,
+        payloadJson: JSON.stringify({ scope: "LEAD", amountCents }),
+        actorEmail: actor.email,
+        createdAt: now,
+      });
+
+      const resolution = await resolveCommissionForLead(id);
+      return Response.json({ ok: true, commissionRuleUpdated: true, amountCents, resolution });
+    }
+
     if (!nextStatus) {
       if (!note) return Response.json({ error: "Inserisci una nota operativa." }, { status: 422 });
       await db.insert(auditLogs).values({
@@ -244,27 +296,138 @@ export async function POST(
       return Response.json({ error: "Descrivi nella nota quali informazioni o documenti mancano." }, { status: 422 });
     }
 
+    const commissionResolution = nextStatus === "DELIVERED"
+      ? await resolveCommissionForLead(id)
+      : null;
+
+    if (nextStatus === "DELIVERED" && (!commissionResolution || !commissionResolution.configured || commissionResolution.amountCents === null)) {
+      return Response.json({
+        error: "Commissione non configurata. Imposta prima la commissione base Partner, l'override offerta oppure l'override pratica.",
+      }, { status: 409 });
+    }
+
     const now = new Date().toISOString();
-    await db.update(leads).set({
+    let deliveredCommission: {
+      id: string;
+      amountCents: number;
+      status: string;
+      created: boolean;
+      source: string;
+    } | null = null;
+
+    await db.transaction(async (tx) => {
+      await tx.update(leads).set({
+        status: nextStatus,
+        sentToPartnerAt: nextStatus === "SENT_TO_PARTNER" ? now : practice.sentToPartnerAt,
+        completedAt: nextStatus === "DELIVERED" ? now : practice.completedAt,
+        updatedAt: now,
+      }).where(eq(leads.id, id));
+
+      if (nextStatus === "DELIVERED" && commissionResolution?.amountCents !== null && commissionResolution?.amountCents !== undefined) {
+        const commissionId = crypto.randomUUID();
+        const inserted = await tx
+          .insert(commissions)
+          .values({
+            id: commissionId,
+            leadId: id,
+            partnerId: practice.partnerId,
+            amountCents: commissionResolution.amountCents,
+            status: "ACCRUED",
+            accruedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoNothing()
+          .returning({ id: commissions.id, amountCents: commissions.amountCents, status: commissions.status });
+
+        const created = inserted.length > 0;
+        const [commission] = created
+          ? inserted
+          : await tx
+              .select({ id: commissions.id, amountCents: commissions.amountCents, status: commissions.status })
+              .from(commissions)
+              .where(eq(commissions.leadId, id))
+              .limit(1);
+
+        if (!commission) throw new Error("Commissione non registrata alla consegna.");
+
+        deliveredCommission = {
+          id: commission.id,
+          amountCents: commission.amountCents,
+          status: commission.status,
+          created,
+          source: commissionResolution.source,
+        };
+
+        if (created) {
+          await tx.insert(auditLogs).values({
+            id: crypto.randomUUID(),
+            actorEmail: actor.email,
+            action: "COMMISSION_ACCRUED_ON_DELIVERY",
+            entityType: "commission",
+            entityId: commission.id,
+            payloadJson: JSON.stringify({
+              leadId: id,
+              partnerId: practice.partnerId,
+              amountCents: commission.amountCents,
+              source: commissionResolution.source,
+              sourceLabel: commissionSourceLabel(commissionResolution.source),
+            }),
+          });
+          await tx.insert(hubEvents).values({
+            id: crypto.randomUUID(),
+            eventType: "NOLEGGIO_COMMISSION_ACCRUED",
+            ecosystem: "ECCOMI_NOLEGGIO",
+            entityType: "commission",
+            entityId: commission.id,
+            title: `${id} · commissione maturata alla consegna`,
+            payloadJson: JSON.stringify({
+              leadId: id,
+              partnerId: practice.partnerId,
+              amountCents: commission.amountCents,
+              source: commissionResolution.source,
+            }),
+            actorEmail: actor.email,
+            createdAt: now,
+          });
+        }
+      }
+
+      await tx.insert(auditLogs).values({
+        id: crypto.randomUUID(), actorEmail: actor.email, action: `PRACTICE_STATUS_${nextStatus}`,
+        entityType: "lead", entityId: id,
+        payloadJson: JSON.stringify({
+          from: practice.status,
+          to: nextStatus,
+          note,
+          actorRole: actor.role,
+          internalEccomi,
+          commission: deliveredCommission,
+        }),
+      });
+
+      await tx.insert(hubEvents).values({
+        id: crypto.randomUUID(), eventType: `NOLEGGIO_PRACTICE_${nextStatus}`, ecosystem: "ECCOMI_NOLEGGIO",
+        entityType: "lead", entityId: id, title: `${id} · ${statusLabels[nextStatus] || nextStatus}`,
+        payloadJson: JSON.stringify({
+          from: practice.status,
+          to: nextStatus,
+          note: note || null,
+          actorRole: actor.role,
+          internalEccomi,
+          commission: deliveredCommission,
+        }),
+        actorEmail: actor.email,
+        createdAt: now,
+      });
+    });
+
+    return Response.json({
+      ok: true,
       status: nextStatus,
-      sentToPartnerAt: nextStatus === "SENT_TO_PARTNER" ? now : practice.sentToPartnerAt,
-      updatedAt: now,
-    }).where(eq(leads.id, id));
-
-    await db.insert(auditLogs).values({
-      id: crypto.randomUUID(), actorEmail: actor.email, action: `PRACTICE_STATUS_${nextStatus}`,
-      entityType: "lead", entityId: id,
-      payloadJson: JSON.stringify({ from: practice.status, to: nextStatus, note, actorRole: actor.role, internalEccomi }),
+      label: statusLabels[nextStatus] || nextStatus,
+      commission: deliveredCommission,
     });
-
-    await db.insert(hubEvents).values({
-      id: crypto.randomUUID(), eventType: `NOLEGGIO_PRACTICE_${nextStatus}`, ecosystem: "ECCOMI_NOLEGGIO",
-      entityType: "lead", entityId: id, title: `${id} · ${statusLabels[nextStatus] || nextStatus}`,
-      payloadJson: JSON.stringify({ from: practice.status, to: nextStatus, note: note || null, actorRole: actor.role, internalEccomi }),
-      actorEmail: actor.email,
-    });
-
-    return Response.json({ ok: true, status: nextStatus, label: statusLabels[nextStatus] || nextStatus });
   } catch (error) {
     return routeError(error);
   }
