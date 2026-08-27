@@ -25,6 +25,8 @@ type SafeShopifyUpdateOptions = {
   status?: "ACTIVE" | "DRAFT" | "ARCHIVED";
 };
 
+const BENEFITS_VISIBILITY_STYLE = `<style data-eccomi-noleggio-benefits-fix>.multicolumn-card__info h3,.multicolumn-card__info h3 *,.multicolumn-card__info .rte,.multicolumn-card__info .rte *{color:#10253e!important;opacity:1!important;visibility:visible!important}</style>`;
+
 function escapeHtml(value: string) {
   return value.replace(
     /[&<>'\"]/g,
@@ -105,6 +107,7 @@ function descriptionFor(
   const publicTitle = publicPromotionTitle(promotion);
 
   return [
+    BENEFITS_VISIBILITY_STYLE,
     `<h2>${escapeHtml(publicTitle)}</h2>`,
     `<p><strong>${euro(promotion.monthlyGrossCents)} al mese IVA inclusa</strong></p>`,
     `<p><strong>Anticipo:</strong> ${euro(promotion.depositGrossCents)} · <strong>Durata:</strong> ${promotion.durationMonths} mesi · <strong>Chilometri:</strong> ${promotion.totalKm.toLocaleString("it-IT")} km</p>`,
