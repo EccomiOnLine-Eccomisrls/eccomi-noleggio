@@ -129,11 +129,11 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
       {preview ? (
         <section className="ceo-server-panel">
           <article className="ceo-server-promotion">
-            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong>500 € + IVA → 650 € + IVA</strong><em className="ceo-server-status ceo-server-status--online">CONSENTITO</em></div>
+            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong><span style={{ whiteSpace: "nowrap" }}>500 € + IVA</span> → <span style={{ whiteSpace: "nowrap" }}>650 € + IVA</span></strong><em className="ceo-server-status ceo-server-status--online">CONSENTITO</em></div>
             <div className="ceo-server-promotion__copy"><small>TEST REGOLA</small><h2>Aumento Partner +150 € imponibili</h2><p>Base imponibile ECCOMI 500 € + extra imponibile Partner 150 € = totale imponibile 650 €, IVA esclusa. Una nuova pratica congelerà 650 € + IVA.</p></div>
           </article>
           <article className="ceo-server-promotion">
-            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong>650 € + IVA → 450 € + IVA</strong><em className="ceo-server-status">BLOCCATO</em></div>
+            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong><span style={{ whiteSpace: "nowrap" }}>650 € + IVA</span> → <span style={{ whiteSpace: "nowrap" }}>450 € + IVA</span></strong><em className="ceo-server-status">BLOCCATO</em></div>
             <div className="ceo-server-promotion__copy"><small>ANTI-RIBASSO</small><h2>Riduzione non consentita</h2><p>Il Partner non può scendere sotto l’imponibile totale già riconosciuto. Il controllo è server-side, non solo grafico.</p></div>
           </article>
         </section>
