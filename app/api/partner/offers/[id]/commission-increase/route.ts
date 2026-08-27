@@ -53,7 +53,7 @@ export async function POST(
     const form = await request.formData();
     const requestedTotalCents = euroToCents(form.get("total"));
     if (!Number.isInteger(requestedTotalCents) || requestedTotalCents < 0 || requestedTotalCents > 10_000_000) {
-      return redirectBack(request, "error", "Importo non valido.");
+      return redirectBack(request, "error", "Importo imponibile non valido.");
     }
 
     const [promotion] = await getDb()
@@ -79,13 +79,13 @@ export async function POST(
 
     const current = await getEffectivePromotionEccomiCommission(id);
     if (!current) {
-      return redirectBack(request, "error", "ECCOMI deve prima definire la provvigione base dell'offerta.");
+      return redirectBack(request, "error", "ECCOMI deve prima definire la provvigione base imponibile dell'offerta.");
     }
     if (requestedTotalCents <= current.totalCents) {
       return redirectBack(
         request,
         "error",
-        `Puoi solo aumentare la provvigione. Il totale attuale è ${(current.totalCents / 100).toFixed(2).replace(".", ",")} €.`
+        `Puoi solo aumentare la provvigione. Il totale imponibile attuale è ${(current.totalCents / 100).toFixed(2).replace(".", ",")} € + IVA.`
       );
     }
 
@@ -107,6 +107,7 @@ export async function POST(
         previousTotalCents: current.totalCents,
         incrementCents: newIncrementCents,
         totalCents: requestedTotalCents,
+        vatExcluded: true,
         actorRole: actor.role,
       }),
       createdAt: now,
@@ -124,6 +125,7 @@ export async function POST(
         fromCents: current.totalCents,
         toCents: requestedTotalCents,
         partnerIncrementCents: newIncrementCents,
+        vatExcluded: true,
       }),
       actorEmail: actor.email,
       createdAt: now,
@@ -132,7 +134,7 @@ export async function POST(
     return redirectBack(
       request,
       "saved",
-      `Provvigione aumentata a ${(requestedTotalCents / 100).toFixed(2).replace(".", ",")} €. Le pratiche già nate non cambiano.`
+      `Provvigione imponibile aumentata a ${(requestedTotalCents / 100).toFixed(2).replace(".", ",")} € + IVA. Le pratiche già nate non cambiano.`
     );
   } catch (error) {
     return routeError(error);
