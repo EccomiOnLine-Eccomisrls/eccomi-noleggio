@@ -110,9 +110,9 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
         <div className="ceo-server-bar__brand">
           <span>🚙</span>
           <div>
-            <strong>ECCOMI NOLEGGIO</strong>
-            <small style={{ display: "block", fontWeight: 700, letterSpacing: 0 }}>by Eccomi OnLine</small>
-            <small style={{ display: "block", fontWeight: 800, letterSpacing: ".12em" }}>AREA PARTNER</small>
+            <div style={{ color: "#073f73", fontWeight: 900, letterSpacing: ".04em" }}>ECCOMI NOLEGGIO</div>
+            <div style={{ color: "#073f73", fontSize: 10, fontWeight: 700, lineHeight: 1.25 }}>by Eccomi OnLine</div>
+            <div style={{ color: "#073f73", fontSize: 10, fontWeight: 800, letterSpacing: ".12em", lineHeight: 1.25 }}>AREA PARTNER</div>
           </div>
         </div>
         <a href={backHref}>← Area Partner</a>
