@@ -48,6 +48,43 @@ export function ensurePracticeSchema() {
       await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS commission_rules_scope_entity_idx ON commission_rules(scope, entity_id)`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS commission_rules_scope_idx ON commission_rules(scope)`);
       await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS commissions_lead_unique_idx ON commissions(lead_id)`);
+
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION eccomi_snapshot_commission_on_lead_insert()
+        RETURNS trigger AS $$
+        BEGIN
+          INSERT INTO commission_rules (
+            id, scope, entity_id, amount_cents, updated_by, created_at, updated_at
+          )
+          SELECT
+            'LEAD:' || NEW.id,
+            'LEAD',
+            NEW.id,
+            rule.amount_cents,
+            'system-lead-snapshot@eccomi.local',
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+          FROM commission_rules rule
+          WHERE rule.scope = 'PROMOTION'
+            AND rule.entity_id = NEW.promotion_id
+          ON CONFLICT (id) DO NOTHING;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await db.execute(sql`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_trigger WHERE tgname = 'eccomi_snapshot_commission_lead_insert'
+          ) THEN
+            CREATE TRIGGER eccomi_snapshot_commission_lead_insert
+            AFTER INSERT ON leads
+            FOR EACH ROW
+            EXECUTE FUNCTION eccomi_snapshot_commission_on_lead_insert();
+          END IF;
+        END $$
+      `);
     })().catch((error) => {
       ready = null;
       throw error;
