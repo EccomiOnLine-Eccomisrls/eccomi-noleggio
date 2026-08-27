@@ -34,6 +34,21 @@ test("shared preparation creates a draft and keeps CEO approval required", async
   assert.doesNotMatch(helper, /status:\s*"ONLINE"/);
 });
 
+test("CEO iPad editor exposes Shopify preparation only when product is missing", async () => {
+  const page = await read("app/ceo/promotions/[id]/page.tsx");
+  assert.match(page, /canPrepareShopify = !promotion\.shopifyProductId/);
+  assert.match(page, /PREPARA BOZZA SHOPIFY/);
+  assert.match(page, /prepare-form/);
+});
+
+test("CEO prepare form is same-origin, CEO-only and preview-safe", async () => {
+  const route = await read("app/api/promotions/[id]/prepare-form/route.ts");
+  assert.match(route, /sameOrigin/);
+  assert.match(route, /requireCeo/);
+  assert.match(route, /isRenderPullRequestPreview/);
+  assert.match(route, /preparePromotionDraft/);
+});
+
 test("partner upload explains expired quotation instead of generic internal error", async () => {
   const route = await read("app/api/partner/offers/route.ts");
   assert.match(route, /promotion\.status === "EXPIRED"/);
