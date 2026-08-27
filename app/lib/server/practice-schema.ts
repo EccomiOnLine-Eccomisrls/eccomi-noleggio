@@ -36,6 +36,18 @@ export function ensurePracticeSchema() {
       )`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS practice_documents_lead_idx ON practice_documents(lead_id)`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS practice_documents_type_idx ON practice_documents(document_type)`);
+      await db.execute(sql`CREATE TABLE IF NOT EXISTS commission_rules (
+        id text PRIMARY KEY,
+        scope text NOT NULL,
+        entity_id text NOT NULL,
+        amount_cents integer NOT NULL,
+        updated_by text NOT NULL,
+        created_at text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at text NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`);
+      await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS commission_rules_scope_entity_idx ON commission_rules(scope, entity_id)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS commission_rules_scope_idx ON commission_rules(scope)`);
+      await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS commissions_lead_unique_idx ON commissions(lead_id)`);
     })().catch((error) => {
       ready = null;
       throw error;
