@@ -14,6 +14,8 @@ type EditorialPromotion = {
   services: string[];
 };
 
+const BENEFITS_VISIBILITY_STYLE = `<style data-eccomi-noleggio-benefits-fix>.multicolumn-card__info h3,.multicolumn-card__info h3 *,.multicolumn-card__info .rte,.multicolumn-card__info .rte *{color:#10253e!important;opacity:1!important;visibility:visible!important}</style>`;
+
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => ({
     "&": "&amp;",
@@ -75,6 +77,7 @@ function descriptionFor(promotion: EditorialPromotion) {
   const requestUrl = requestUrlFor(promotion.id);
 
   return [
+    BENEFITS_VISIBILITY_STYLE,
     commercialIntro(promotion),
     requestUrl
       ? `<p><a href="${escapeHtml(requestUrl)}" style="display:block;padding:16px 20px;border-radius:12px;background:#075392;color:#ffffff;font-weight:800;text-align:center;text-decoration:none;">AVVIA LA RICHIESTA DI NOLEGGIO →</a></p>`
