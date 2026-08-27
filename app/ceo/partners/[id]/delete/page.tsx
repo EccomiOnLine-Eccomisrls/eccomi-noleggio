@@ -62,7 +62,7 @@ export default async function CeoPartnerDeletePage({ params, searchParams }: Pag
   ];
 
   return (
-    <main className="ceo-server-page" data-pr30-partner-delete="true">
+    <main className="ceo-server-page" data-pr32-partner-delete="true">
       <header className="ceo-server-bar">
         <div className="ceo-server-bar__brand">
           <span>🚙</span>
@@ -72,7 +72,7 @@ export default async function CeoPartnerDeletePage({ params, searchParams }: Pag
       </header>
 
       <section className="ceo-server-heading">
-        <small>{preview ? "PR30 · PREVIEW SICURA · NESSUNA CANCELLAZIONE REALE" : "SOLO CEO · CONTROLLO CANCELLAZIONE"}</small>
+        <small>{preview ? "PR32 · PREVIEW SICURA · NESSUNA CANCELLAZIONE REALE" : "SOLO CEO · CONTROLLO CANCELLAZIONE"}</small>
         <h1>Elimina Partner</h1>
         <p>La cancellazione è consentita solo quando la struttura non ha più alcun collegamento operativo o storico.</p>
       </section>

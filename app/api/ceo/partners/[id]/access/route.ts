@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../../../db";
+import { userPermissionGrants } from "../../../../../../db/access-schema";
 import { auditLogs, users } from "../../../../../../db/schema";
 import { requireCeo, routeError } from "../../../../../lib/server/authz";
 import { isRenderPullRequestPreview } from "../../../../../lib/server/preview-mode";
@@ -20,15 +21,33 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const form = await request.formData();
     const email = typeof form.get("email") === "string" ? String(form.get("email")).trim().toLowerCase().slice(0, 160) : "";
     const action = typeof form.get("action") === "string" ? String(form.get("action")).trim().toUpperCase() : "";
-    if (!email || action !== "DISABLE") return redirectBack(request, id, { accessError: "Azione accesso non valida." });
-    if (isRenderPullRequestPreview(request)) return redirectBack(request, id, { accessPreview: "1", accessEmail: email });
+    if (!email || !["DISABLE", "DELETE"].includes(action)) return redirectBack(request, id, { accessError: "Azione accesso non valida." });
+
+    if (isRenderPullRequestPreview(request)) {
+      return redirectBack(request, id, action === "DELETE"
+        ? { accessDeletePreview: "1", accessEmail: email }
+        : { accessPreview: "1", accessEmail: email });
+    }
 
     const db = getDb();
     const [user] = await db.select().from(users).where(and(eq(users.email, email), eq(users.partnerId, id))).limit(1);
     if (!user || !["PARTNER", "PARTNER_ADMIN"].includes(user.role)) return redirectBack(request, id, { accessError: "Account Partner non trovato." });
-    if (!user.active) return redirectBack(request, id, { accessError: "L'account è già disattivato o in attesa di attivazione." });
 
     const now = new Date().toISOString();
+
+    if (action === "DELETE") {
+      if (user.active) return redirectBack(request, id, { accessError: "Disattiva prima l'accesso, poi potrai eliminarlo definitivamente dalla società Partner." });
+      await db.delete(userPermissionGrants).where(eq(userPermissionGrants.userEmail, email));
+      await db.delete(users).where(and(eq(users.email, email), eq(users.partnerId, id)));
+      await db.insert(auditLogs).values({
+        id: crypto.randomUUID(), actorEmail: actor.email, action: "PARTNER_ACCESS_DELETED",
+        entityType: "partner_user", entityId: email,
+        payloadJson: JSON.stringify({ partnerId: id, role: user.role, previousActive: user.active }), createdAt: now,
+      });
+      return redirectBack(request, id, { accessDeleted: "1", accessEmail: email });
+    }
+
+    if (!user.active) return redirectBack(request, id, { accessError: "L'account è già disattivato o in attesa di attivazione." });
     await db.update(users).set({ active: false, updatedAt: now }).where(eq(users.email, email));
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(), actorEmail: actor.email, action: "PARTNER_ACCESS_DISABLED",
@@ -40,7 +59,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (error instanceof Response) return error;
     const { id } = await context.params;
     const response = routeError(error);
-    if (response.status >= 500) return redirectBack(request, id, { accessError: "Disattivazione non riuscita. Controlla i log del server." });
+    if (response.status >= 500) return redirectBack(request, id, { accessError: "Gestione accesso non riuscita. Controlla i log del server." });
     return response;
   }
 }
