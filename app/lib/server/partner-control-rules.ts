@@ -54,10 +54,10 @@ export function isClosedPractice(status: string) {
   return CLOSED_STATUSES.has(status);
 }
 
-export function isInternalEccomiPartner(name: string, legalName?: string | null) {
-  const normalizedName = name.trim().toUpperCase();
-  const normalizedLegalName = (legalName || "").trim().toUpperCase();
-  return normalizedName === "ECCOMI" || normalizedLegalName === "ECCOMI SRLS" || normalizedLegalName === "ECCOMI S.R.L.S.";
+export function isInternalEccomiPartner(name: string, _legalName?: string | null) {
+  // Una sola struttura interna: ECCOMI (record tecnico eccomi-direct).
+  // La ragione sociale non deve rendere interni altri Partner.
+  return name.trim().toUpperCase() === "ECCOMI";
 }
 
 export function internalSummaryHealth(input: {
