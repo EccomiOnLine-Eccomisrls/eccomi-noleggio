@@ -77,6 +77,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
   const query = await searchParams;
   const q = (queryValue(query, "q") || "").trim().toLocaleLowerCase("it");
   const status = (queryValue(query, "status") || "ALL").trim().toUpperCase();
+  const deletedPartner = (queryValue(query, "deleted") || "").trim();
   const overview = await getCeoPartnerOverview(request);
   const effectivePartners = overview.partners;
   const pausedPartners = effectivePartners.filter((partner) => partner.status === "PAUSED").length;
@@ -114,6 +115,13 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
           <a className="ceo-server-primary" href="/ceo/partners/new">＋ Nuovo Partner</a>
         </div>
       </section>
+
+      {deletedPartner ? (
+        <section className="ceo-server-result">
+          <strong>PARTNER ELIMINATO</strong>
+          <div>{deletedPartner} è stato rimosso dalla rete Partner.</div>
+        </section>
+      ) : null}
 
       <section className="partner-network-summary" aria-label="Stato executive della rete">
         <div>
@@ -196,6 +204,7 @@ export default async function CeoPartnersPage({ searchParams }: PartnerPageProps
 
               <div className="partner-card__actions">
                 <a className="ceo-server-primary" href={`/ceo/partners/${encodeURIComponent(partner.id)}`}>Apri scheda partner</a>
+                {!internalEccomi ? <a className="ceo-server-secondary" href={`/ceo/partners/${encodeURIComponent(partner.id)}/delete`}>Elimina / verifica</a> : null}
               </div>
             </article>
           );
