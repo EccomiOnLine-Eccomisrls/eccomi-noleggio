@@ -160,7 +160,7 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
                               type="number"
                               min={((total || base) + 1) / 100}
                               step="0.01"
-                              placeholder={`Più di ${((total || base) / 100).toFixed(2)}`}
+                              placeholder={`Più di ${((total || base) / 100).toFixed(2).replace(".", ",")}`}
                               disabled={preview || !canIncrease || ["ARCHIVED", "TRASHED"].includes(offer.status)}
                               style={{ width: 150 }}
                               required
