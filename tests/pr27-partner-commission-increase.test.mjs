@@ -37,11 +37,23 @@ test("Partner increase never rewrites already frozen lead snapshots", async () =
 
 test("PR27 preview exposes allowed increase and blocked reduction", async () => {
   const page = await read("app/partner/provvigioni/page.tsx");
-  assert.match(page, /500 € → 650 €/);
+  assert.match(page, /500 € \+ IVA → 650 € \+ IVA/);
   assert.match(page, /CONSENTITO/);
-  assert.match(page, /650 € → 450 €/);
+  assert.match(page, /650 € \+ IVA → 450 € \+ IVA/);
   assert.match(page, /BLOCCATO/);
   assert.match(page, /La provvigione può solo aumentare, mai diminuire/);
+});
+
+test("commission amounts are explicitly taxable base with VAT excluded", async () => {
+  const partnerPage = await read("app/partner/provvigioni/page.tsx");
+  const ceoPage = await read("app/ceo/commissions/page.tsx");
+  const route = await read("app/api/partner/offers/[id]/commission-increase/route.ts");
+  assert.match(partnerPage, /imponibili, IVA esclusa/);
+  assert.match(partnerPage, /Aumenta imponibile a/);
+  assert.match(ceoPage, /MATURATE · IMPONIBILE/);
+  assert.match(ceoPage, /Imponibile € a contratto/);
+  assert.match(route, /Provvigione imponibile aumentata/);
+  assert.match(route, /vatExcluded: true/);
 });
 
 test("real writes are disabled in Render PR previews", async () => {
