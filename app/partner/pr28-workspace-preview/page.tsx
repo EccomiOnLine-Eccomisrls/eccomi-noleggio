@@ -19,7 +19,11 @@ export default async function Pr28WorkspacePreview({ searchParams }: PageProps) 
       <header style={{ minHeight: 76, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px clamp(22px,5vw,72px)", background: "#fff", borderBottom: "1px solid #e4eaf0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ width: 48, height: 48, borderRadius: 14, display: "grid", placeItems: "center", background: "#0c74bb", color: "#fff", fontSize: 24 }}>🚙</span>
-          <span><strong style={{ display: "block", color: "#073f73", fontSize: 18 }}>ECCOMI</strong><small style={{ color: "#073f73", letterSpacing: ".12em" }}>NOLEGGIO · AREA PARTNER</small></span>
+          <span>
+            <strong style={{ display: "block", color: "#073f73", fontSize: 18 }}>ECCOMI NOLEGGIO</strong>
+            <small style={{ display: "block", color: "#073f73", fontWeight: 700 }}>by Eccomi OnLine</small>
+            <small style={{ display: "block", color: "#073f73", letterSpacing: ".12em", fontSize: 10, fontWeight: 800 }}>AREA PARTNER</small>
+          </span>
         </div>
         <span style={{ color: "#267352", fontWeight: 800 }}>🛡 Perimetro protetto</span>
       </header>
