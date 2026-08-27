@@ -4,6 +4,10 @@ function text(value: FormDataEntryValue | null, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function money(cents: number) {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(cents / 100);
+}
+
 function redirectBack(request: Request, id: string, ok: boolean, message: string) {
   const target = new URL(`/ceo/practices/${encodeURIComponent(id)}`, request.url);
   target.searchParams.set("ceoAction", ok ? "ok" : "error");
@@ -62,17 +66,10 @@ export async function POST(
 
     const forwarded = new Request(
       new URL(`/api/practices/${encodeURIComponent(id)}/action`, request.url),
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      },
+      { method: "POST", headers, body: JSON.stringify(body) },
     );
 
-    const response = await performPracticeAction(forwarded, {
-      params: Promise.resolve({ id }),
-    });
-
+    const response = await performPracticeAction(forwarded, { params: Promise.resolve({ id }) });
     const payload = await response.json().catch(() => ({})) as {
       error?: string;
       label?: string;
@@ -80,51 +77,31 @@ export async function POST(
       priority?: string;
       trashed?: boolean;
       noteAdded?: boolean;
+      commission?: { amountCents?: number; created?: boolean } | null;
     };
 
     if (!response.ok) {
-      const sameStatus = operation === "status"
-        ? sameStatusAlreadyApplied(payload.error)
-        : null;
-
+      const sameStatus = operation === "status" ? sameStatusAlreadyApplied(payload.error) : null;
       if (sameStatus) {
         const label = statusLabels[sameStatus] || sameStatus.replaceAll("_", " ");
-        return redirectBack(
-          request,
-          id,
-          true,
-          `Stato già aggiornato: ${label}. Nessuna seconda modifica eseguita.`,
-        );
+        return redirectBack(request, id, true, `Stato già aggiornato: ${label}. Nessuna seconda modifica eseguita.`);
       }
-
-      return redirectBack(
-        request,
-        id,
-        false,
-        payload.error || "Operazione non riuscita.",
-      );
+      return redirectBack(request, id, false, payload.error || "Operazione non riuscita.");
     }
 
-    let message = payload.label
-      ? `Operazione completata: ${payload.label}.`
-      : "Operazione completata.";
-
+    let message = payload.label ? `Operazione completata: ${payload.label}.` : "Operazione completata.";
     if (payload.noteAdded) message = "Nota operativa salvata.";
     if (payload.trashed) message = "Pratica spostata nel cestino.";
     if (operation === "priority") message = "Priorità aggiornata.";
     if (operation === "assignment") {
-      message = payload.assignedTo
-        ? `Pratica assegnata a ${payload.assignedTo}.`
-        : "Assegnazione rimossa.";
+      message = payload.assignedTo ? `Pratica assegnata a ${payload.assignedTo}.` : "Assegnazione rimossa.";
+    }
+    if (payload.commission && typeof payload.commission.amountCents === "number") {
+      message = `Contratto acquisito · provvigione ECCOMI maturata ${money(payload.commission.amountCents)}.`;
     }
 
     return redirectBack(request, id, true, message);
   } catch (error) {
-    return redirectBack(
-      request,
-      id,
-      false,
-      error instanceof Error ? error.message : "Operazione non riuscita.",
-    );
+    return redirectBack(request, id, false, error instanceof Error ? error.message : "Operazione non riuscita.");
   }
 }

@@ -32,6 +32,10 @@ export async function GET(request: Request) {
       isPartnerNoleggioRole(actor.role) && actor.partnerId
         ? eq(leads.partnerId, actor.partnerId)
         : undefined;
+    const commissionPartnerFilter =
+      isPartnerNoleggioRole(actor.role) && actor.partnerId
+        ? eq(commissions.partnerId, actor.partnerId)
+        : undefined;
 
     const activePracticeFilter = partnerFilter
       ? and(partnerFilter, isNull(leads.deletedAt))
@@ -51,9 +55,22 @@ export async function GET(request: Request) {
           eq(leads.status, "NEW"),
         ),
       );
-    const [commissionStats] = await db.select({ total: sum(commissions.amountCents) }).from(commissions).where(
-      isPartnerNoleggioRole(actor.role) && actor.partnerId ? eq(commissions.partnerId, actor.partnerId) : undefined,
-    );
+    const [commissionStats] = await db.select({ total: sum(commissions.amountCents) }).from(commissions).where(commissionPartnerFilter);
+    const commissionRows = await db
+      .select({
+        id: commissions.id,
+        leadId: commissions.leadId,
+        partnerId: commissions.partnerId,
+        amountCents: commissions.amountCents,
+        status: commissions.status,
+        accruedAt: commissions.accruedAt,
+        invoicedAt: commissions.invoicedAt,
+        paidAt: commissions.paidAt,
+      })
+      .from(commissions)
+      .where(commissionPartnerFilter)
+      .orderBy(desc(commissions.accruedAt))
+      .limit(100);
     const leadRows = await db
       .select({
         id: leads.id,
@@ -99,6 +116,7 @@ export async function GET(request: Request) {
       readOnly: false,
       user: actor,
       promotions: promotionRows,
+      commissions: commissionRows,
       leads: leadRows.map((lead) => ({
         id: lead.id,
         promotionId: lead.promotionId,

@@ -43,6 +43,7 @@ export const NOLEGGIO_PERMISSIONS = [
   "COMMISSION_VIEW_ALL",
   "COMMISSION_VIEW_OWN",
   "COMMISSION_EDIT_ANY",
+  "COMMISSION_SET_ECCOMI",
 ] as const;
 
 export type NoleggioPermission = (typeof NOLEGGIO_PERMISSIONS)[number];
@@ -55,6 +56,7 @@ export type PermissionOverride = {
 export const SENSITIVE_DELEGABLE_PERMISSIONS = [
   "QUOTE_APPROVE",
   "QUOTE_PUBLISH",
+  "COMMISSION_SET_ECCOMI",
 ] as const satisfies readonly NoleggioPermission[];
 
 export const ORDINARY_OPERATOR_DELEGABLE_PERMISSIONS = [
@@ -83,6 +85,7 @@ export const CEO_GRANTABLE_INTERNAL_PERMISSIONS = [
   "DOCUMENT_VIEW_ALL",
   "DOCUMENT_MANAGE_ALL",
   "COMMISSION_VIEW_ALL",
+  "COMMISSION_SET_ECCOMI",
 ] as const satisfies readonly NoleggioPermission[];
 
 const BASE_PERMISSIONS: Record<NoleggioRole, readonly NoleggioPermission[]> = {
@@ -190,6 +193,9 @@ export function canCeoGrantPermission(
   permission: NoleggioPermission,
 ) {
   if (targetRole === "CEO" || isPartnerNoleggioRole(targetRole)) return false;
+  if (permission === "COMMISSION_SET_ECCOMI") {
+    return targetRole === "NOLEGGIO_MANAGER" || targetRole === "NOLEGGIO_DEPUTY";
+  }
   return (CEO_GRANTABLE_INTERNAL_PERMISSIONS as readonly NoleggioPermission[]).includes(permission);
 }
 
