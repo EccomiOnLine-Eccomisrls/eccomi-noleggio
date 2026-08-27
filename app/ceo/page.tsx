@@ -134,7 +134,7 @@ function CeoServerSafeDashboard({
           <div className="ceo-server-promotion__copy">
             <small>GESTIONE RETE</small>
             <h2>Gestione Partner CEO</h2>
-            <p>Controlla rete, pratiche, offerte, accessi e commissioni senza entrare nell’Area Partner.</p>
+            <p>Controlla rete, pratiche, offerte, accessi e provvigioni senza entrare nell’Area Partner.</p>
           </div>
           <div className="ceo-server-promotion__actions">
             <a className="ceo-server-secondary" href="/ceo/partners">Apri gestione partner</a>
@@ -143,17 +143,17 @@ function CeoServerSafeDashboard({
 
         <article className="ceo-server-promotion">
           <div className="ceo-server-promotion__vehicle">
-            <small>ECONOMIA PARTNER</small>
-            <strong>Commissioni</strong>
-            <em className="ceo-server-status ceo-server-status--online">DELIVERY</em>
+            <small>RICAVI ECCOMI</small>
+            <strong>Provvigioni</strong>
+            <em className="ceo-server-status ceo-server-status--online">CONTRATTO</em>
           </div>
           <div className="ceo-server-promotion__copy">
-            <small>MATURAZIONE AUTOMATICA</small>
-            <h2>Centro Commissioni</h2>
-            <p>Configura base Partner e override, poi gestisci maturate, fatturate e pagate.</p>
+            <small>COMPENSO A PERFORMANCE</small>
+            <h2>Centro Provvigioni ECCOMI</h2>
+            <p>Definisci il compenso sull’offerta e gestisci maturate, fatturate e pagate.</p>
           </div>
           <div className="ceo-server-promotion__actions">
-            <a className="ceo-server-secondary" href="/ceo/commissions">Apri commissioni</a>
+            <a className="ceo-server-secondary" href="/ceo/commissions">Apri provvigioni</a>
           </div>
         </article>
       </section>
