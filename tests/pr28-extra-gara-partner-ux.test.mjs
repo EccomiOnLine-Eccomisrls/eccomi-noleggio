@@ -31,11 +31,26 @@ test("PR28 clarifies commissions owed by the Partner", async () => {
   assert.doesNotMatch(client, /matura alla consegna/);
 });
 
-test("PR28 Extra Gara uses the authenticated Partner name", async () => {
+test("PR28 keeps the Partner-facing Extra Gara page minimal", async () => {
   const page = await read("app/partner/provvigioni/page.tsx");
-  assert.match(page, /partners, promotions/);
-  assert.match(page, /where\(eq\(partners\.id, actor\.partnerId\)\)/);
-  assert.match(page, /partnerName = partner\?\.name/);
   assert.match(page, /<h1>Extra Gara<\/h1>/);
-  assert.match(page, /PR28 · PREVIEW SICURA · NESSUNA SCRITTURA REALE/);
+  assert.match(page, /Aumenta il compenso riconosciuto su una singola offerta\./);
+  assert.match(page, /<h2>Le tue offerte<\/h2>/);
+  assert.doesNotMatch(page, /BASE ECCOMI<\/small><strong>PROTETTA/);
+  assert.doesNotMatch(page, /PRATICHE ESISTENTI/);
+  assert.doesNotMatch(page, /COLLAUDO PR28/);
+  assert.doesNotMatch(page, /ANTI-RIBASSO/);
+});
+
+test("PR28 shows four clean columns and opens Extra Gara from the offer row", async () => {
+  const table = await read("app/partner/provvigioni/extra-gara-offers.tsx");
+  assert.match(table, /<th>Offerta<\/th>/);
+  assert.match(table, /<th>Base ECCOMI<\/th>/);
+  assert.match(table, /<th>Extra Gara<\/th>/);
+  assert.match(table, /<th>Totale<\/th>/);
+  assert.doesNotMatch(table, /<th>Aumenta imponibile a<\/th>/);
+  assert.match(table, /onClick=\{\(\) => setSelected\(offer\)\}/);
+  assert.match(table, /Nuovo totale imponibile/);
+  assert.match(table, /Conferma Extra Gara/);
+  assert.match(table, /commission-increase/);
 });
