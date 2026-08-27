@@ -19,6 +19,10 @@ function money(cents: number) {
   return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(cents / 100);
 }
 
+function moneyPlusVat(cents: number) {
+  return `${money(cents)} + IVA`;
+}
+
 function queryValue(query: Record<string, string | string[] | undefined> | undefined, key: string) {
   const value = query?.[key];
   return Array.isArray(value) ? value[0] : value;
@@ -106,7 +110,7 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
       <section className="ceo-server-heading">
         <small>{preview ? "PR27 · PREVIEW SICURA · NESSUNA SCRITTURA REALE" : "PARTNER · CONDIZIONI ECONOMICHE"}</small>
         <h1>Aumenta la provvigione ECCOMI</h1>
-        <p><strong>{partnerName}</strong> può riconoscere a ECCOMI un compenso maggiore sulla singola offerta. <strong>La provvigione può solo aumentare, mai diminuire.</strong></p>
+        <p><strong>{partnerName}</strong> può riconoscere a ECCOMI un compenso maggiore sulla singola offerta. <strong>La provvigione può solo aumentare, mai diminuire.</strong> Tutti gli importi sono <strong>imponibili, IVA esclusa.</strong></p>
       </section>
 
       {feedback && message ? (
@@ -117,30 +121,30 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
       ) : null}
 
       <section className="ceo-server-kpis" aria-label="Regole provvigione Partner">
-        <article><small>BASE ECCOMI</small><strong>PROTETTA</strong><span>il Partner non può modificarla</span></article>
-        <article><small>AZIONE PARTNER</small><strong>SOLO +</strong><span>può aumentare il totale</span></article>
+        <article><small>BASE ECCOMI</small><strong>PROTETTA</strong><span>imponibile + IVA · il Partner non può modificarla</span></article>
+        <article><small>AZIONE PARTNER</small><strong>SOLO +</strong><span>può aumentare l’imponibile totale</span></article>
         <article><small>PRATICHE ESISTENTI</small><strong>CONGELATE</strong><span>nessuna modifica retroattiva</span></article>
       </section>
 
       {preview ? (
         <section className="ceo-server-panel">
           <article className="ceo-server-promotion">
-            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong>500 € → 650 €</strong><em className="ceo-server-status ceo-server-status--online">CONSENTITO</em></div>
-            <div className="ceo-server-promotion__copy"><small>TEST REGOLA</small><h2>Aumento Partner +150 €</h2><p>Base ECCOMI 500 € + extra Partner 150 € = totale 650 €. Una nuova pratica congelerà 650 €.</p></div>
+            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong>500 € + IVA → 650 € + IVA</strong><em className="ceo-server-status ceo-server-status--online">CONSENTITO</em></div>
+            <div className="ceo-server-promotion__copy"><small>TEST REGOLA</small><h2>Aumento Partner +150 € imponibili</h2><p>Base imponibile ECCOMI 500 € + extra imponibile Partner 150 € = totale imponibile 650 €, IVA esclusa. Una nuova pratica congelerà 650 € + IVA.</p></div>
           </article>
           <article className="ceo-server-promotion">
-            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong>650 € → 450 €</strong><em className="ceo-server-status">BLOCCATO</em></div>
-            <div className="ceo-server-promotion__copy"><small>ANTI-RIBASSO</small><h2>Riduzione non consentita</h2><p>Il Partner non può scendere sotto il totale già riconosciuto. Il controllo è server-side, non solo grafico.</p></div>
+            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong>650 € + IVA → 450 € + IVA</strong><em className="ceo-server-status">BLOCCATO</em></div>
+            <div className="ceo-server-promotion__copy"><small>ANTI-RIBASSO</small><h2>Riduzione non consentita</h2><p>Il Partner non può scendere sotto l’imponibile totale già riconosciuto. Il controllo è server-side, non solo grafico.</p></div>
           </article>
         </section>
       ) : null}
 
       <section className="partner-detail-stack">
         <article className="partner-detail-section">
-          <div className="partner-detail-section__head"><div><h2>Le tue offerte</h2><p>Gli aumenti valgono solo per le nuove pratiche create dopo il salvataggio.</p></div></div>
+          <div className="partner-detail-section__head"><div><h2>Le tue offerte</h2><p>Tutti gli importi sono imponibili, IVA esclusa. Gli aumenti valgono solo per le nuove pratiche create dopo il salvataggio.</p></div></div>
           <div className="partner-table-wrap">
             <table className="partner-table">
-              <thead><tr><th>Offerta</th><th>Base ECCOMI</th><th>Extra Partner</th><th>Totale attuale</th><th>Aumenta a</th></tr></thead>
+              <thead><tr><th>Offerta</th><th>Base ECCOMI imponibile</th><th>Extra Partner imponibile</th><th>Totale imponibile</th><th>Aumenta imponibile a</th></tr></thead>
               <tbody>
                 {offers.map((offer) => {
                   const base = baseByOffer.get(offer.id) ?? null;
@@ -149,9 +153,9 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
                   return (
                     <tr key={offer.id}>
                       <td><strong>{offer.offerNumber}</strong><br /><small>{offer.brand} {offer.model} · {offer.status.replaceAll("_", " ")}</small></td>
-                      <td><strong>{base === null ? "DA DEFINIRE DA ECCOMI" : money(base)}</strong></td>
-                      <td>{base === null ? "—" : extra > 0 ? <strong>+ {money(extra)}</strong> : money(0)}</td>
-                      <td><strong>{total === null ? "—" : money(total)}</strong></td>
+                      <td><strong>{base === null ? "DA DEFINIRE DA ECCOMI" : moneyPlusVat(base)}</strong></td>
+                      <td>{base === null ? "—" : extra > 0 ? <strong>+ {money(extra)}</strong> : money(0)}<br /><small>IVA esclusa</small></td>
+                      <td><strong>{total === null ? "—" : moneyPlusVat(total)}</strong></td>
                       <td>
                         {base === null ? <small>Attendi la validazione economica ECCOMI.</small> : (
                           <form method="post" action={`/api/partner/offers/${offer.id}/commission-increase`} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -165,6 +169,7 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
                               style={{ width: 150 }}
                               required
                             />
+                            <span style={{ fontSize: 12, fontWeight: 700 }}>€ + IVA</span>
                             <button type="submit" disabled={preview || !canIncrease || ["ARCHIVED", "TRASHED"].includes(offer.status)}>Aumenta provvigione</button>
                           </form>
                         )}
