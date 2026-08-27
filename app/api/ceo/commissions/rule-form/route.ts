@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const amountCents = euroToCents(form.get("amount"));
 
     if (!promotionId || Number.isNaN(amountCents) || amountCents > 10_000_000) {
-      return Response.json({ error: "Provvigione ECCOMI non valida." }, { status: 422 });
+      return Response.json({ error: "Provvigione ECCOMI imponibile non valida." }, { status: 422 });
     }
 
     const [promotion] = await getDb()
@@ -73,6 +73,7 @@ export async function POST(request: Request) {
         offerNumber: promotion.offerNumber,
         previousAmountCents,
         amountCents: savedAmountCents,
+        vatExcluded: true,
         actorRole: actor.role,
       }),
       createdAt: now,
@@ -83,8 +84,8 @@ export async function POST(request: Request) {
       ecosystem: "ECCOMI_NOLEGGIO",
       entityType: "promotion",
       entityId: promotionId,
-      title: `${promotion.brand} ${promotion.model} · provvigione ECCOMI definita`,
-      payloadJson: JSON.stringify({ offerNumber: promotion.offerNumber, previousAmountCents, amountCents: savedAmountCents, actorRole: actor.role }),
+      title: `${promotion.brand} ${promotion.model} · provvigione ECCOMI imponibile definita`,
+      payloadJson: JSON.stringify({ offerNumber: promotion.offerNumber, previousAmountCents, amountCents: savedAmountCents, vatExcluded: true, actorRole: actor.role }),
       actorEmail: actor.email,
       createdAt: now,
     });
