@@ -53,4 +53,5 @@ test("PR28 shows four clean columns and opens Extra Gara from the offer row", as
   assert.match(table, /Nuovo totale imponibile/);
   assert.match(table, /Conferma Extra Gara/);
   assert.match(table, /commission-increase/);
+  assert.doesNotMatch(table, /placeholder=\{`Più di/);
 });
