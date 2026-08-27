@@ -51,19 +51,21 @@ function previewAssignment(id: string): AssignmentData {
     { id: "preview-goal-rent", name: "Goal Rent SRL", legalName: "Goal Rent SRL", status: "ACTIVE" },
     { id: "preview-partner-b", name: "Partner B", legalName: "Partner B S.r.l.", status: "ACTIVE" },
   ];
+  const direct = id === "preview-ducato-direct";
+  const currentPartner = direct ? partnerOptions[0] : partnerOptions[1];
   return {
     promotion: {
       id,
       offerNumber: "4022223739",
       brand: "FIAT",
       model: "Ducato 3",
-      partnerId: "preview-goal-rent",
+      partnerId: currentPartner.id,
       shopifyProductId: "gid://shopify/Product/15400462942531",
     },
-    currentPartner: partnerOptions[1],
+    currentPartner,
     partnerOptions,
     baseCents: 50000,
-    extraCents: 15000,
+    extraCents: direct ? 0 : 15000,
   };
 }
 
