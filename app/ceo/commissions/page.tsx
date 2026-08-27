@@ -24,6 +24,9 @@ function queryValue(query: Record<string, string | string[] | undefined> | undef
 function money(cents: number) {
   return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(cents / 100);
 }
+function moneyPlusVat(cents: number) {
+  return `${money(cents)} + IVA`;
+}
 function amountValue(cents: number | null) {
   return cents === null ? "" : (cents / 100).toFixed(2);
 }
@@ -99,15 +102,15 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
       <section className="ceo-server-heading">
         <small>{preview ? "PR26 · PREVIEW SICURA · NESSUNA SCRITTURA REALE" : "ECCOMI · CONTROLLO ECONOMICO"}</small>
         <h1>Provvigioni ECCOMI</h1>
-        <p>ECCOMI definisce il compenso durante la validazione dell'offerta. La pratica lo eredita e lo congela. <strong>Contratto acquisito = provvigione maturata.</strong></p>
+        <p>ECCOMI definisce il compenso durante la validazione dell'offerta. La pratica lo eredita e lo congela. <strong>Contratto acquisito = provvigione maturata.</strong> Tutti gli importi sono <strong>imponibili, IVA esclusa.</strong></p>
       </section>
 
       {feedback ? <div className="ceo-server-result"><strong>OPERAZIONE COMPLETATA</strong><div>Provvigioni aggiornate.</div></div> : null}
 
       <section className="ceo-server-kpis" aria-label="Riepilogo provvigioni ECCOMI">
-        <article><small>MATURATE</small><strong>{money(accrued)}</strong><span>crediti ECCOMI da fatturare</span></article>
-        <article><small>FATTURATE</small><strong>{money(invoiced)}</strong><span>da incassare</span></article>
-        <article><small>PAGATE</small><strong>{money(paid)}</strong><span>incassate</span></article>
+        <article><small>MATURATE · IMPONIBILE</small><strong>{money(accrued)}</strong><span>IVA esclusa · crediti ECCOMI da fatturare</span></article>
+        <article><small>FATTURATE · IMPONIBILE</small><strong>{money(invoiced)}</strong><span>IVA esclusa · da incassare</span></article>
+        <article><small>PAGATE · IMPONIBILE</small><strong>{money(paid)}</strong><span>IVA esclusa · incassate</span></article>
       </section>
 
       {preview ? (
@@ -116,8 +119,8 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
             <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR26</small><strong>OFFERTA → PRATICA → CONTRATTO</strong><em className="ceo-server-status ceo-server-status--online">SAFE</em></div>
             <div className="ceo-server-promotion__copy">
               <small>FIAT DUCATO 3 · 4022223739</small>
-              <h2>Provvigione ECCOMI: {money(45000)}</h2>
-              <p>Impostata da ECCOMI in validazione. La pratica nasce con snapshot €450,00; modifiche future all'offerta non cambiano la pratica già creata.</p>
+              <h2>Provvigione ECCOMI: {moneyPlusVat(45000)}</h2>
+              <p>Impostata da ECCOMI in validazione come imponibile. La pratica nasce con snapshot 450,00 € + IVA; modifiche future all'offerta non cambiano la pratica già creata.</p>
             </div>
             <div className="ceo-server-promotion__actions"><a className="ceo-server-primary" href="/ceo/commissions/pr26-idempotenza">SIMULA CONTRATTO DOPPIO CLICK</a></div>
           </article>
@@ -126,22 +129,23 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
 
       <section className="partner-detail-stack">
         <article className="partner-detail-section" id="offerte">
-          <div className="partner-detail-section__head"><div><h2>01 · Provvigione per offerta</h2><p>Definita da CEO oppure Responsabile/Referente ECCOMI abilitato. Il Partner non può modificarla.</p></div></div>
-          <div className="partner-table-wrap"><table className="partner-table"><thead><tr><th>Offerta</th><th>Partner</th><th>Stato</th><th>Provvigione ECCOMI</th><th>Gestione</th></tr></thead><tbody>
+          <div className="partner-detail-section__head"><div><h2>01 · Provvigione per offerta</h2><p>Definita da CEO oppure Responsabile/Referente ECCOMI abilitato. Importo imponibile, IVA esclusa. Il Partner non può ridurre la base ECCOMI.</p></div></div>
+          <div className="partner-table-wrap"><table className="partner-table"><thead><tr><th>Offerta</th><th>Partner</th><th>Stato</th><th>Provvigione ECCOMI imponibile</th><th>Gestione</th></tr></thead><tbody>
             {data.promotionsRows.map((promotion) => {
               const current = promotionTerms.get(promotion.id) ?? null;
               return <tr key={promotion.id}>
                 <td><strong>{promotion.offerNumber}</strong><br /><small>{promotion.brand} {promotion.model}</small></td>
                 <td>{data.partnerNames.get(promotion.partnerId) || promotion.partnerId}</td>
                 <td>{statusLabel(promotion.status)}</td>
-                <td><strong>{current === null ? "DA DEFINIRE" : money(current)}</strong></td>
+                <td><strong>{current === null ? "DA DEFINIRE" : moneyPlusVat(current)}</strong></td>
                 <td>
                   <form method="post" action="/api/ceo/commissions/rule-form" style={{ display: "flex", alignItems: "end", gap: 12, flexWrap: "wrap" }}>
                     <input type="hidden" name="promotionId" value={promotion.id} />
                     <input type="hidden" name="returnTo" value="/ceo/commissions#offerte" />
-                    <label style={{ display: "grid", gap: 6, minWidth: 150 }}>
-                      <span>€ a contratto</span>
-                      <input name="amount" type="number" min="0" step="0.01" defaultValue={amountValue(current)} placeholder="Es. 450,00" disabled={preview || !canSet} />
+                    <label style={{ display: "grid", gap: 6, minWidth: 170 }}>
+                      <span>Imponibile € a contratto</span>
+                      <input name="amount" type="number" min="0" step="0.01" defaultValue={amountValue(current)} placeholder="Es. 500,00" disabled={preview || !canSet} />
+                      <small>IVA esclusa</small>
                     </label>
                     <button type="submit" disabled={preview || !canSet}>Salva provvigione</button>
                   </form>
@@ -153,20 +157,20 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
         </article>
 
         <article className="partner-detail-section" id="pratiche">
-          <div className="partner-detail-section__head"><div><h2>02 · Importo congelato nelle pratiche</h2><p>Ogni nuova pratica conserva la provvigione presente sull'offerta al momento della sua nascita.</p></div></div>
-          <div className="partner-table-wrap"><table className="partner-table"><thead><tr><th>Pratica</th><th>Partner</th><th>Stato</th><th>Snapshot ECCOMI</th></tr></thead><tbody>
+          <div className="partner-detail-section__head"><div><h2>02 · Importo congelato nelle pratiche</h2><p>Ogni nuova pratica conserva l'imponibile della provvigione presente sull'offerta al momento della sua nascita. IVA esclusa.</p></div></div>
+          <div className="partner-table-wrap"><table className="partner-table"><thead><tr><th>Pratica</th><th>Partner</th><th>Stato</th><th>Snapshot ECCOMI imponibile</th></tr></thead><tbody>
             {data.leadRows.map((lead) => {
               const snapshot = leadSnapshots.get(lead.id) ?? null;
-              return <tr key={lead.id}><td><strong>{lead.id}</strong><br /><small>{lead.firstName} {lead.lastName}</small></td><td>{data.partnerNames.get(lead.partnerId) || lead.partnerId}</td><td>{statusLabel(lead.status)}</td><td><strong>{snapshot === null ? "LEGACY · DA ALLINEARE" : money(snapshot)}</strong></td></tr>;
+              return <tr key={lead.id}><td><strong>{lead.id}</strong><br /><small>{lead.firstName} {lead.lastName}</small></td><td>{data.partnerNames.get(lead.partnerId) || lead.partnerId}</td><td>{statusLabel(lead.status)}</td><td><strong>{snapshot === null ? "LEGACY · DA ALLINEARE" : moneyPlusVat(snapshot)}</strong></td></tr>;
             })}
           </tbody></table></div>
         </article>
 
         <article className="partner-detail-section" id="crediti">
-          <div className="partner-detail-section__head"><div><h2>03 · Crediti ECCOMI</h2><p>Nascono una sola volta quando la pratica passa a Contratto acquisito.</p></div></div>
-          <div className="partner-table-wrap"><table className="partner-table"><thead><tr><th>Pratica</th><th>Partner</th><th>Importo</th><th>Stato</th><th>Maturata</th><th>Azioni CEO</th></tr></thead><tbody>
+          <div className="partner-detail-section__head"><div><h2>03 · Crediti ECCOMI</h2><p>Nascono una sola volta quando la pratica passa a Contratto acquisito. Gli importi sono imponibili e verranno fatturati con IVA applicabile.</p></div></div>
+          <div className="partner-table-wrap"><table className="partner-table"><thead><tr><th>Pratica</th><th>Partner</th><th>Importo imponibile</th><th>Stato</th><th>Maturata</th><th>Azioni CEO</th></tr></thead><tbody>
             {data.commissionRows.length ? data.commissionRows.map((commission) => <tr key={commission.id}>
-              <td>{commission.leadId}</td><td>{data.partnerNames.get(commission.partnerId) || commission.partnerId}</td><td><strong>{money(commission.amountCents)}</strong></td><td>{statusLabel(commission.status)}</td><td>{shortDate(commission.accruedAt)}</td><td>
+              <td>{commission.leadId}</td><td>{data.partnerNames.get(commission.partnerId) || commission.partnerId}</td><td><strong>{moneyPlusVat(commission.amountCents)}</strong></td><td>{statusLabel(commission.status)}</td><td>{shortDate(commission.accruedAt)}</td><td>
                 {actor.role === "CEO" && commission.status === "ACCRUED" ? <form method="post" action={`/api/ceo/commissions/${commission.id}/status-form`}><input type="hidden" name="status" value="INVOICED" /><input type="hidden" name="returnTo" value="/ceo/commissions#crediti" /><button type="submit" disabled={preview}>Segna fatturata</button></form> : null}
                 {actor.role === "CEO" && commission.status === "INVOICED" ? <form method="post" action={`/api/ceo/commissions/${commission.id}/status-form`}><input type="hidden" name="status" value="PAID" /><input type="hidden" name="returnTo" value="/ceo/commissions#crediti" /><button type="submit" disabled={preview}>Segna pagata</button></form> : null}
               </td>
