@@ -5,6 +5,7 @@ import { isPartnerNoleggioRole, type NoleggioPermission } from "../../../../lib/
 import { actorHasPermission, requireActor, routeError } from "../../../../lib/server/authz";
 import { decryptCredential } from "../../../../lib/server/credential-crypto";
 import { partnerCanManageOffer, statusAfterPartnerExtension, statusAfterPartnerReactivation, type PartnerOfferAction } from "../../../../lib/server/partner-offer-policy";
+import { preparePromotionDraft } from "../../../../lib/server/promotion-preparation";
 import { isRenderPullRequestPreview } from "../../../../lib/server/preview-mode";
 import { getRuntimeEnv } from "../../../../lib/server/runtime";
 
@@ -139,6 +140,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const now = new Date().toISOString();
     let nextStatus: string | null = null;
     let nextValidUntil = promotion.validUntil;
+    let preparedAfterExtension = false;
 
     if (action === "PURGE") {
       if (body.confirm !== "ELIMINA") return Response.json({ error: "Conferma eliminazione non valida." }, { status: 400 });
@@ -182,17 +184,31 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const days = remainingDays(validUntil);
       nextStatus = statusAfterPartnerExtension({ currentStatus: promotion.status, remainingDays: days, wasPublished: Boolean(promotion.publishedAt) });
       nextValidUntil = validUntil;
+      const needsPreparation = nextStatus === "PENDING_APPROVAL" && !promotion.shopifyProductId && !promotion.publishedAt;
+
       if (promotion.shopifyProductId) {
         if (nextStatus === "SUSPENDED" || nextStatus === "PENDING_APPROVAL") await setProductStatus(promotion.shopifyProductId, "DRAFT");
         else await setProductStatus(promotion.shopifyProductId, "ACTIVE");
       }
+
       await getDb().update(promotions).set({
         validUntil,
         status: nextStatus,
-        automationStatus: nextStatus === "SUSPENDED" ? "SUSPENDED" : nextStatus === "PENDING_APPROVAL" ? "READY_FOR_CEO" : "ONLINE",
+        automationStatus: needsPreparation
+          ? "PROCESSING"
+          : nextStatus === "SUSPENDED"
+            ? "SUSPENDED"
+            : nextStatus === "PENDING_APPROVAL"
+              ? "READY_FOR_CEO"
+              : "ONLINE",
         automationError: null,
         updatedAt: now,
       }).where(eq(promotions.id, id));
+
+      if (needsPreparation) {
+        await preparePromotionDraft({ request, promotionId: id, actorEmail: actor.email });
+        preparedAfterExtension = true;
+      }
     }
 
     const label = action === "SUSPEND"
@@ -212,17 +228,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     await getDb().insert(auditLogs).values({
       id: crypto.randomUUID(), actorEmail: actor.email,
       action: `PROMOTION_${action}`, entityType: "promotion", entityId: id,
-      payloadJson: JSON.stringify({ action, partnerId: promotion.partnerId, previousStatus: promotion.status, status: nextStatus, previousValidUntil: promotion.validUntil, validUntil: nextValidUntil, shopifyProductId: promotion.shopifyProductId }),
+      payloadJson: JSON.stringify({ action, partnerId: promotion.partnerId, previousStatus: promotion.status, status: nextStatus, previousValidUntil: promotion.validUntil, validUntil: nextValidUntil, shopifyProductId: promotion.shopifyProductId, preparedAfterExtension }),
     });
     await getDb().insert(hubEvents).values({
       id: crypto.randomUUID(), eventType: `NOLEGGIO_PROMOTION_${action}`,
       ecosystem: "ECCOMI_NOLEGGIO", entityType: "promotion", entityId: id,
       title: `${promotion.brand} ${promotion.model} ${label}`,
-      payloadJson: JSON.stringify({ action, offerNumber: promotion.offerNumber, partnerId: promotion.partnerId, status: nextStatus, validUntil: nextValidUntil }),
+      payloadJson: JSON.stringify({ action, offerNumber: promotion.offerNumber, partnerId: promotion.partnerId, status: nextStatus, validUntil: nextValidUntil, preparedAfterExtension }),
       actorEmail: actor.email, createdAt: now,
     });
 
-    return Response.json({ ok: true, action, status: nextStatus, validUntil: nextValidUntil, reactivated: action === "REACTIVATE", trashed: action === "DELETE", deleted: action === "PURGE", restored: action === "RESTORE" });
+    return Response.json({ ok: true, action, status: nextStatus, validUntil: nextValidUntil, preparedAfterExtension, reactivated: action === "REACTIVATE", trashed: action === "DELETE", deleted: action === "PURGE", restored: action === "RESTORE" });
   } catch (error) {
     return routeError(error);
   }

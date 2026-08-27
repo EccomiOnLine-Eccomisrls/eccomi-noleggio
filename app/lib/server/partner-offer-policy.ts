@@ -1,7 +1,7 @@
 export type PartnerOfferAction = "SUSPEND" | "ARCHIVE" | "EXTEND" | "REACTIVATE";
 
 const onlineStatuses = new Set(["ONLINE", "ACTIVE", "EXPIRING"]);
-const extendableStatuses = new Set(["ONLINE", "ACTIVE", "EXPIRING", "EXPIRED", "SUSPENDED"]);
+const extendableStatuses = new Set(["ONLINE", "ACTIVE", "EXPIRING", "EXPIRED", "SUSPENDED", "PENDING_APPROVAL"]);
 
 export function partnerOfferStatusLabel(status: string) {
   return ({
@@ -31,7 +31,9 @@ export function statusAfterPartnerExtension(input: {
   wasPublished: boolean;
 }) {
   if (input.currentStatus === "SUSPENDED") return "SUSPENDED";
-  if (input.currentStatus === "EXPIRED" && !input.wasPublished) return "PENDING_APPROVAL";
+  if (!input.wasPublished && ["EXPIRED", "PENDING_APPROVAL"].includes(input.currentStatus)) {
+    return "PENDING_APPROVAL";
+  }
   return input.remainingDays <= 7 ? "EXPIRING" : "ONLINE";
 }
 
