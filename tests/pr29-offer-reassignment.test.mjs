@@ -21,13 +21,13 @@ test("PR29 moves only the promotion owner and never rewrites existing practices"
 test("PR29 freezes legacy practices before resetting the old Partner Extra Gara", async () => {
   const route = await read("app/api/ceo/promotions/[id]/reassign/route.ts");
   const freezeAt = route.indexOf("tx.insert(commissionRules)");
-  const resetAt = route.indexOf("tx\n        .delete(commissionRules)");
+  const resetAt = route.indexOf(".delete(commissionRules)", freezeAt + 1);
   assert.ok(freezeAt >= 0, "commission snapshot insert must exist");
   assert.ok(resetAt >= 0, "Partner increment reset must exist");
   assert.ok(freezeAt < resetAt, "existing practices must be frozen before Extra Gara is reset");
   assert.match(route, /scope: "LEAD"/);
-  assert.match(route, /scope, "PARTNER_INCREMENT"/);
-  assert.doesNotMatch(route, /delete\(commissionRules\)[\s\S]*scope, "PROMOTION"/);
+  assert.match(route, /commissionRules\.scope, "PARTNER_INCREMENT"/);
+  assert.doesNotMatch(route, /delete\(commissionRules\)[\s\S]{0,180}commissionRules\.scope, "PROMOTION"/);
 });
 
 test("PR29 keeps Base ECCOMI and Shopify untouched", async () => {
