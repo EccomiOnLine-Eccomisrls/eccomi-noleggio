@@ -58,13 +58,34 @@ test("PR28 shows four clean columns and opens Extra Gara from the offer row", as
 
 test("PR28 keeps the by Eccomi OnLine signature across Partner views", async () => {
   const polish = await read("app/partner/partner-portal-polish.module.css");
-  const extraGara = await read("app/partner/provvigioni/extra-gara-offers.tsx");
+  const extraGara = await read("app/partner/provvigioni/page.tsx");
   const preview = await read("app/partner/pr28-workspace-preview/page.tsx");
   assert.match(polish, /by Eccomi OnLine/);
   assert.match(polish, /AREA PARTNER/);
+  assert.match(extraGara, /ECCOMI NOLEGGIO/);
   assert.match(extraGara, /by Eccomi OnLine/);
   assert.match(extraGara, /AREA PARTNER/);
   assert.match(preview, /ECCOMI NOLEGGIO/);
   assert.match(preview, /by Eccomi OnLine/);
   assert.match(preview, /AREA PARTNER/);
+});
+
+test("PR28 preview navigation uses distinct working views", async () => {
+  const preview = await read("app/partner/pr28-workspace-preview/page.tsx");
+  assert.match(preview, /href\(\"overview\"\)/);
+  assert.match(preview, /href\(\"offers\"\)/);
+  assert.match(preview, /href\(\"practices\"\)/);
+  assert.match(preview, /href\(\"commissions\"\)/);
+  assert.match(preview, /href\(\"team\"\)/);
+  assert.match(preview, /view === \"overview\"/);
+  assert.match(preview, /view === \"offers\"/);
+  assert.match(preview, /view === \"practices\"/);
+  assert.match(preview, /view === \"commissions\"/);
+  assert.match(preview, /view === \"team\"/);
+});
+
+test("PR28 Extra Gara returns to Partner preview when running on Render PR", async () => {
+  const page = await read("app/partner/provvigioni/page.tsx");
+  assert.match(page, /const backHref = preview \? \"\/partner\/pr28-workspace-preview\?view=offers\" : \"\/partner\"/);
+  assert.match(page, /<a href=\{backHref\}>← Area Partner<\/a>/);
 });
