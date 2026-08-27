@@ -3,6 +3,7 @@ import { getDb } from "../../../../../../db";
 import { commissionRules } from "../../../../../../db/commission-rules";
 import { auditLogs, hubEvents, leads, partners, promotions } from "../../../../../../db/schema";
 import { requireCeo, routeError } from "../../../../../lib/server/authz";
+import { ensurePracticeSchema } from "../../../../../lib/server/practice-schema";
 import { isRenderPullRequestPreview } from "../../../../../lib/server/preview-mode";
 
 type ReassignPayload = { partnerId?: string };
@@ -42,8 +43,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         fromPartner: partnerLabel(current),
         toPartnerId: target.id,
         toPartner: partnerLabel(target),
-        baseCommissionPreserved: true,
+        baseCommissionCents: 50000,
+        previousPartnerIncrementCents: 15000,
         partnerIncrementReset: true,
+        existingPractices: 2,
+        newlyFrozenPractices: 0,
         existingPracticesFrozen: true,
         existingPracticesReassigned: false,
         shopifyChanged: false,
@@ -52,6 +56,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const actor = await requireCeo(request);
+    await ensurePracticeSchema();
     const db = getDb();
     const [promotion] = await db
       .select({ id: promotions.id, offerNumber: promotions.offerNumber, brand: promotions.brand, model: promotions.model, partnerId: promotions.partnerId, shopifyProductId: promotions.shopifyProductId })
