@@ -3,3 +3,32 @@
 .portal :global(span + strong) {
   margin-left: 0.35rem;
 }
+
+/* PR28: firma brand costante nel workspace Partner */
+.portal :global(header > div:first-child > span:last-child > strong)::after {
+  content: " NOLEGGIO";
+}
+
+.portal :global(header > div:first-child > span:last-child > small) {
+  display: block;
+  font-size: 0;
+  line-height: 1.25;
+}
+
+.portal :global(header > div:first-child > span:last-child > small)::before {
+  content: "by Eccomi OnLine";
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal :global(header > div:first-child > span:last-child > small)::after {
+  content: "AREA PARTNER";
+  display: block;
+  margin-top: 1px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}

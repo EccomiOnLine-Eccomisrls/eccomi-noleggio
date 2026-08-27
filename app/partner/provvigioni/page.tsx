@@ -8,20 +8,13 @@ import { getActor } from "../../lib/server/authz";
 import { currentRequest } from "../../lib/server/current-request";
 import { ensurePracticeSchema } from "../../lib/server/practice-schema";
 import { isRenderPullRequestPreview } from "../../lib/server/preview-mode";
+import ExtraGaraOffers from "./extra-gara-offers";
 import "../../ceo/ceo-server.css";
 import "../../ceo/partners/partners.css";
 
 type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
 type OfferRow = { id: string; offerNumber: string; brand: string; model: string; status: string };
 type RuleRow = { scope: string; entityId: string; amountCents: number };
-
-function money(cents: number) {
-  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(cents / 100);
-}
-
-function moneyPlusVat(cents: number) {
-  return `${money(cents)} + IVA`;
-}
 
 function queryValue(query: Record<string, string | string[] | undefined> | undefined, key: string) {
   const value = query?.[key];
@@ -30,7 +23,6 @@ function queryValue(query: Record<string, string | string[] | undefined> | undef
 
 function previewData() {
   return {
-    partnerName: "GOAL RENT",
     actorRole: "PARTNER_ADMIN",
     offers: [
       { id: "preview-ducato", offerNumber: "4022223739", brand: "FIAT", model: "Ducato 3", status: "ONLINE" },
@@ -49,14 +41,12 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
   const request = await currentRequest("/partner/provvigioni");
   const preview = isRenderPullRequestPreview(request);
 
-  let partnerName = "Partner ECCOMI";
   let actorRole = "PARTNER_ADMIN";
   let offers: OfferRow[] = [];
   let rules: RuleRow[] = [];
 
   if (preview) {
     const fixture = previewData();
-    partnerName = fixture.partnerName;
     actorRole = fixture.actorRole;
     offers = fixture.offers;
     rules = fixture.rules;
@@ -73,9 +63,11 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
         </main>
       );
     }
+
     actorRole = actor.role;
     await ensurePracticeSchema();
     const db = getDb();
+
     offers = await db
       .select({
         id: promotions.id,
@@ -99,89 +91,51 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
   const canIncrease = actorRole === "PARTNER_ADMIN";
   const feedback = queryValue(query, "partnerIncrease");
   const message = queryValue(query, "message");
+  const backHref = preview ? "/partner/pr28-workspace-preview?view=offers" : "/partner";
+
+  const offerItems = offers.map((offer) => {
+    const baseCents = baseByOffer.get(offer.id) ?? null;
+    const extraCents = extraByOffer.get(offer.id) ?? 0;
+    return {
+      ...offer,
+      baseCents,
+      extraCents,
+      totalCents: baseCents === null ? null : baseCents + extraCents,
+    };
+  });
 
   return (
-    <main className="ceo-server-page" data-pr27-partner-commission="true">
+    <main className="ceo-server-page" data-pr28-extra-gara="true">
       <header className="ceo-server-bar">
-        <div className="ceo-server-bar__brand"><span>🚙</span><div><strong>ECCOMI</strong><small>NOLEGGIO · AREA PARTNER</small></div></div>
-        <a href="/partner">← Area Partner</a>
+        <div className="ceo-server-bar__brand">
+          <span>🚙</span>
+          <div>
+            <div style={{ color: "#073f73", fontWeight: 900, letterSpacing: ".04em" }}>ECCOMI NOLEGGIO</div>
+            <div style={{ color: "#073f73", fontSize: 10, fontWeight: 700, lineHeight: 1.25 }}>by Eccomi OnLine</div>
+            <div style={{ color: "#073f73", fontSize: 10, fontWeight: 800, letterSpacing: ".12em", lineHeight: 1.25 }}>AREA PARTNER</div>
+          </div>
+        </div>
+        <a href={backHref}>← Area Partner</a>
       </header>
 
       <section className="ceo-server-heading">
-        <small>{preview ? "PR27 · PREVIEW SICURA · NESSUNA SCRITTURA REALE" : "PARTNER · CONDIZIONI ECONOMICHE"}</small>
-        <h1>Aumenta la provvigione ECCOMI</h1>
-        <p><strong>{partnerName}</strong> può riconoscere a ECCOMI un compenso maggiore sulla singola offerta. <strong>La provvigione può solo aumentare, mai diminuire.</strong> Tutti gli importi sono <strong>imponibili, IVA esclusa.</strong></p>
+        {preview ? <small>PR28 · PREVIEW SICURA · NESSUNA SCRITTURA REALE</small> : null}
+        <h1>Extra Gara</h1>
+        <p>Aumenta il compenso riconosciuto su una singola offerta.</p>
       </section>
 
       {feedback && message ? (
         <div className={feedback === "saved" ? "ceo-server-result" : "ceo-server-result ceo-server-result--error"}>
-          <strong>{feedback === "saved" ? "AUMENTO REGISTRATO" : "OPERAZIONE BLOCCATA"}</strong>
+          <strong>{feedback === "saved" ? "EXTRA GARA REGISTRATO" : "OPERAZIONE BLOCCATA"}</strong>
           <div>{message}</div>
         </div>
       ) : null}
 
-      <section className="ceo-server-kpis" aria-label="Regole provvigione Partner">
-        <article><small>BASE ECCOMI</small><strong>PROTETTA</strong><span>imponibile + IVA · il Partner non può modificarla</span></article>
-        <article><small>AZIONE PARTNER</small><strong>SOLO +</strong><span>può aumentare l’imponibile totale</span></article>
-        <article><small>PRATICHE ESISTENTI</small><strong>CONGELATE</strong><span>nessuna modifica retroattiva</span></article>
-      </section>
-
-      {preview ? (
-        <section className="ceo-server-panel">
-          <article className="ceo-server-promotion">
-            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong><span style={{ whiteSpace: "nowrap" }}>500 € + IVA</span> → <span style={{ whiteSpace: "nowrap" }}>650 € + IVA</span></strong><em className="ceo-server-status ceo-server-status--online">CONSENTITO</em></div>
-            <div className="ceo-server-promotion__copy"><small>TEST REGOLA</small><h2>Aumento Partner +150 € imponibili</h2><p>Base imponibile ECCOMI 500 € + extra imponibile Partner 150 € = totale imponibile 650 €, IVA esclusa. Una nuova pratica congelerà 650 € + IVA.</p></div>
-          </article>
-          <article className="ceo-server-promotion">
-            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong><span style={{ whiteSpace: "nowrap" }}>650 € + IVA</span> → <span style={{ whiteSpace: "nowrap" }}>450 € + IVA</span></strong><em className="ceo-server-status">BLOCCATO</em></div>
-            <div className="ceo-server-promotion__copy"><small>ANTI-RIBASSO</small><h2>Riduzione non consentita</h2><p>Il Partner non può scendere sotto l’imponibile totale già riconosciuto. Il controllo è server-side, non solo grafico.</p></div>
-          </article>
-        </section>
-      ) : null}
-
       <section className="partner-detail-stack">
         <article className="partner-detail-section">
-          <div className="partner-detail-section__head"><div><h2>Le tue offerte</h2><p>Tutti gli importi sono imponibili, IVA esclusa. Gli aumenti valgono solo per le nuove pratiche create dopo il salvataggio.</p></div></div>
-          <div className="partner-table-wrap">
-            <table className="partner-table">
-              <thead><tr><th>Offerta</th><th>Base ECCOMI imponibile</th><th>Extra Partner imponibile</th><th>Totale imponibile</th><th>Aumenta imponibile a</th></tr></thead>
-              <tbody>
-                {offers.map((offer) => {
-                  const base = baseByOffer.get(offer.id) ?? null;
-                  const extra = extraByOffer.get(offer.id) ?? 0;
-                  const total = base === null ? null : base + extra;
-                  return (
-                    <tr key={offer.id}>
-                      <td><strong>{offer.offerNumber}</strong><br /><small>{offer.brand} {offer.model} · {offer.status.replaceAll("_", " ")}</small></td>
-                      <td><strong>{base === null ? "DA DEFINIRE DA ECCOMI" : moneyPlusVat(base)}</strong></td>
-                      <td>{base === null ? "—" : extra > 0 ? <strong>+ {money(extra)}</strong> : money(0)}<br /><small>IVA esclusa</small></td>
-                      <td><strong>{total === null ? "—" : moneyPlusVat(total)}</strong></td>
-                      <td>
-                        {base === null ? <small>Attendi la validazione economica ECCOMI.</small> : (
-                          <form method="post" action={`/api/partner/offers/${offer.id}/commission-increase`} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                            <input
-                              name="total"
-                              type="number"
-                              min={((total || base) + 1) / 100}
-                              step="0.01"
-                              placeholder={`Più di ${((total || base) / 100).toFixed(2).replace(".", ",")}`}
-                              disabled={preview || !canIncrease || ["ARCHIVED", "TRASHED"].includes(offer.status)}
-                              style={{ width: 150 }}
-                              required
-                            />
-                            <span style={{ fontSize: 12, fontWeight: 700 }}>€ + IVA</span>
-                            <button type="submit" disabled={preview || !canIncrease || ["ARCHIVED", "TRASHED"].includes(offer.status)}>Aumenta provvigione</button>
-                          </form>
-                        )}
-                        {!canIncrease ? <small>Solo il Partner Admin può assumere questo impegno economico.</small> : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {!offers.length ? <p>Nessuna offerta disponibile.</p> : null}
+          <div className="partner-detail-section__head"><div><h2>Le tue offerte</h2></div></div>
+          <ExtraGaraOffers offers={offerItems} canIncrease={canIncrease} preview={preview} />
+          {!offerItems.length ? <p>Nessuna offerta disponibile.</p> : null}
         </article>
       </section>
     </main>
