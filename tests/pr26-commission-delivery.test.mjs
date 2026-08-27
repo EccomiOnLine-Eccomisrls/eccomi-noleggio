@@ -60,6 +60,7 @@ test("partner commission totals remain server-side partner filtered", async () =
 test("PR26 preview explains offer to practice snapshot and contract accrual", async () => {
   const page = await read("app/ceo/commissions/page.tsx");
   assert.match(page, /Provvigioni ECCOMI/);
+  assert.match(page, /Definita da CEO oppure Responsabile\/Referente ECCOMI abilitato/);
   assert.match(page, /Contratto acquisito = provvigione maturata/);
   assert.match(page, /SIMULA CONTRATTO DOPPIO CLICK/);
   assert.match(page, /CONTRATTO = 1 PROVVIGIONE/);
