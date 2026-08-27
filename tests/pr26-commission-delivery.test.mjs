@@ -30,11 +30,13 @@ test("setting the ECCOMI commission requires the dedicated economic permission",
   assert.doesNotMatch(route, /scope === "PARTNER"/);
 });
 
-test("offer approval and publication require an ECCOMI commission", async () => {
+test("offer approval and publication require delegated permissions and an ECCOMI commission", async () => {
   const approve = await read("app/api/promotions/[id]/approve/route.ts");
   const publish = await read("app/api/promotions/[id]/publish/route.ts");
+  assert.match(approve, /requirePermission\(request, "QUOTE_APPROVE"\)/);
   assert.match(approve, /getPromotionEccomiCommission/);
   assert.match(approve, /Definisci prima la provvigione ECCOMI/);
+  assert.match(publish, /requirePermission\(request, "QUOTE_PUBLISH"\)/);
   assert.match(publish, /getPromotionEccomiCommission/);
   assert.match(publish, /Definisci prima la provvigione ECCOMI/);
 });
