@@ -41,6 +41,33 @@ export default function ExtraGaraOffers({ offers, canIncrease, preview }: Props)
 
   return (
     <>
+      <style>{`
+        main[data-pr28-extra-gara="true"] .ceo-server-bar__brand strong::after {
+          content: " NOLEGGIO";
+        }
+        main[data-pr28-extra-gara="true"] .ceo-server-bar__brand small {
+          display: block;
+          font-size: 0;
+          line-height: 1.25;
+        }
+        main[data-pr28-extra-gara="true"] .ceo-server-bar__brand small::before {
+          content: "by Eccomi OnLine";
+          display: block;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0;
+          text-transform: none;
+        }
+        main[data-pr28-extra-gara="true"] .ceo-server-bar__brand small::after {
+          content: "AREA PARTNER";
+          display: block;
+          margin-top: 1px;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: .12em;
+        }
+      `}</style>
+
       <div className="partner-table-wrap">
         <table className="partner-table">
           <thead>
