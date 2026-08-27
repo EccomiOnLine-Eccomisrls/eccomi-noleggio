@@ -57,13 +57,17 @@ test("partner commission totals remain server-side partner filtered", async () =
   assert.match(dashboard, /commissions: commissionRows/);
 });
 
-test("PR26 preview explains offer to practice snapshot and contract accrual", async () => {
+test("PR26 preview explains offer to practice snapshot and links to deterministic idempotency test", async () => {
   const page = await read("app/ceo/commissions/page.tsx");
+  const idempotency = await read("app/ceo/commissions/pr26-idempotenza/page.tsx");
   assert.match(page, /Provvigioni ECCOMI/);
   assert.match(page, /Definita da CEO oppure Responsabile\/Referente ECCOMI abilitato/);
   assert.match(page, /Contratto acquisito = provvigione maturata/);
+  assert.match(page, /\/ceo\/commissions\/pr26-idempotenza/);
   assert.match(page, /SIMULA CONTRATTO DOPPIO CLICK/);
-  assert.match(page, /CONTRATTO = 1 PROVVIGIONE/);
+  assert.match(idempotency, /TEST COMPLETATO: CONTRATTO = 1 PROVVIGIONE/);
+  assert.match(idempotency, /CREDITI TOTALI/);
+  assert.match(idempotency, /NESSUNA SCRITTURA REALE/);
   assert.match(page, /MATURATE/);
   assert.match(page, /FATTURATE/);
   assert.match(page, /PAGATE/);
