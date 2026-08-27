@@ -30,7 +30,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!targetPartnerId) return Response.json({ error: "Seleziona la nuova assegnazione." }, { status: 400 });
 
     if (isRenderPullRequestPreview(request)) {
-      const current = previewPartners[1];
+      const direct = id === "preview-ducato-direct";
+      const current = direct ? previewPartners[0] : previewPartners[1];
       const target = previewPartners.find((partner) => partner.id === targetPartnerId);
       if (!target || target.status !== "ACTIVE") return Response.json({ error: "Destinazione non valida." }, { status: 400 });
       if (target.id === current.id) return Response.json({ error: "L’offerta è già assegnata a questa destinazione." }, { status: 409 });
@@ -44,9 +45,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         toPartnerId: target.id,
         toPartner: partnerLabel(target),
         baseCommissionCents: 50000,
-        previousPartnerIncrementCents: 15000,
+        previousPartnerIncrementCents: direct ? 0 : 15000,
         partnerIncrementReset: true,
-        existingPractices: 2,
+        existingPractices: direct ? 1 : 2,
         newlyFrozenPractices: 0,
         existingPracticesFrozen: true,
         existingPracticesReassigned: false,
