@@ -272,6 +272,16 @@ export default async function CeoPromotionEditPage({
           <code>{promotion.shopifyProductId || "Prodotto non ancora creato"}</code>
         </div>
 
+        <section>
+          <fieldset>
+            <legend>05 · Assegnazione offerta</legend>
+            <p style={{ marginTop: 0, color: "#65768b" }}>Sposta l’offerta tra Partner attivi ed ECCOMI DIRETTO. Shopify e lo storico restano invariati.</p>
+            <a className="ceo-server-secondary" href={`/ceo/promotions/${encodeURIComponent(id)}/assignment`} style={{ display: "inline-flex", alignItems: "center" }}>
+              RIASSEGNA OFFERTA
+            </a>
+          </fieldset>
+        </section>
+
         <footer className="ceo-server-actions">
           <a className="ceo-server-secondary" href="/ceo/promotions">Annulla</a>
           {canPrepareShopify ? (
