@@ -84,7 +84,6 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
 
   const promotionTerms = new Map(data.terms.filter((term) => term.scope === "PROMOTION").map((term) => [term.entityId, term.amountCents]));
   const leadSnapshots = new Map(data.terms.filter((term) => term.scope === "LEAD").map((term) => [term.entityId, term.amountCents]));
-  const simulate = preview && queryValue(query, "simulate") === "1";
   const feedback = queryValue(query, "commissionRule") || queryValue(query, "commissionStatus");
   const accrued = data.commissionRows.filter((item) => item.status === "ACCRUED").reduce((sum, item) => sum + item.amountCents, 0);
   const invoiced = data.commissionRows.filter((item) => item.status === "INVOICED").reduce((sum, item) => sum + item.amountCents, 0);
@@ -119,9 +118,8 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
               <small>FIAT DUCATO 3 · 4022223739</small>
               <h2>Provvigione ECCOMI: {money(45000)}</h2>
               <p>Impostata da ECCOMI in validazione. La pratica nasce con snapshot €450,00; modifiche future all'offerta non cambiano la pratica già creata.</p>
-              {simulate ? <div className="ceo-server-result"><strong>TEST COMPLETATO: CONTRATTO = 1 PROVVIGIONE</strong><div>Prima richiesta: credito ECCOMI creato €450,00. Secondo invio/riprova: stessa provvigione riutilizzata. Nessun duplicato.</div></div> : null}
             </div>
-            <div className="ceo-server-promotion__actions"><a className="ceo-server-primary" href="/ceo/commissions?simulate=1#collaudo">SIMULA CONTRATTO DOPPIO CLICK</a></div>
+            <div className="ceo-server-promotion__actions"><a className="ceo-server-primary" href="/ceo/commissions/pr26-idempotenza">SIMULA CONTRATTO DOPPIO CLICK</a></div>
           </article>
         </section>
       ) : null}
@@ -138,10 +136,13 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
                 <td>{statusLabel(promotion.status)}</td>
                 <td><strong>{current === null ? "DA DEFINIRE" : money(current)}</strong></td>
                 <td>
-                  <form method="post" action="/api/ceo/commissions/rule-form" className="ceo-server-expiry">
+                  <form method="post" action="/api/ceo/commissions/rule-form" style={{ display: "flex", alignItems: "end", gap: 12, flexWrap: "wrap" }}>
                     <input type="hidden" name="promotionId" value={promotion.id} />
                     <input type="hidden" name="returnTo" value="/ceo/commissions#offerte" />
-                    <label><span>€ a contratto</span><input name="amount" type="number" min="0" step="0.01" defaultValue={amountValue(current)} placeholder="Es. 450,00" disabled={preview || !canSet} /></label>
+                    <label style={{ display: "grid", gap: 6, minWidth: 150 }}>
+                      <span>€ a contratto</span>
+                      <input name="amount" type="number" min="0" step="0.01" defaultValue={amountValue(current)} placeholder="Es. 450,00" disabled={preview || !canSet} />
+                    </label>
                     <button type="submit" disabled={preview || !canSet}>Salva provvigione</button>
                   </form>
                   {!canSet ? <small>Permesso economico non abilitato.</small> : null}
