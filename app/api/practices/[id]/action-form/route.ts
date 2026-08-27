@@ -4,6 +4,17 @@ function text(value: FormDataEntryValue | null, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function euroToCents(value: FormDataEntryValue | null) {
+  const raw = typeof value === "string" ? value.trim().replace(",", ".") : "";
+  if (!raw) return null;
+  const amount = Number(raw);
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : Number.NaN;
+}
+
+function money(cents: number) {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(cents / 100);
+}
+
 function redirectBack(request: Request, id: string, ok: boolean, message: string) {
   const target = new URL(`/ceo/practices/${encodeURIComponent(id)}`, request.url);
   target.searchParams.set("ceoAction", ok ? "ok" : "error");
@@ -47,6 +58,17 @@ export async function POST(
       body.priority = text(form.get("priority"), 20);
     } else if (operation === "assignment") {
       body.assignedTo = text(form.get("assignedTo"), 160);
+    } else if (operation === "commission") {
+      const clear = form.get("clearCommission") === "true";
+      if (clear) {
+        body.clearCommissionOverride = true;
+      } else {
+        const amountCents = euroToCents(form.get("commissionOverride"));
+        if (amountCents === null || Number.isNaN(amountCents)) {
+          return redirectBack(request, id, false, "Inserisci un importo commissione valido oppure usa Rimuovi override.");
+        }
+        body.commissionOverrideCents = amountCents;
+      }
     } else if (operation === "note") {
       body.note = text(form.get("note"), 2000);
     } else if (operation === "trash") {
@@ -80,6 +102,9 @@ export async function POST(
       priority?: string;
       trashed?: boolean;
       noteAdded?: boolean;
+      commissionRuleUpdated?: boolean;
+      amountCents?: number | null;
+      commission?: { amountCents?: number; created?: boolean } | null;
     };
 
     if (!response.ok) {
@@ -116,6 +141,14 @@ export async function POST(
       message = payload.assignedTo
         ? `Pratica assegnata a ${payload.assignedTo}.`
         : "Assegnazione rimossa.";
+    }
+    if (operation === "commission") {
+      message = payload.amountCents === null
+        ? "Override commissione pratica rimosso: torna valida la regola superiore."
+        : `Override commissione pratica salvato: ${money(payload.amountCents || 0)}.`;
+    }
+    if (payload.commission && typeof payload.commission.amountCents === "number") {
+      message = `Veicolo consegnato · commissione maturata ${money(payload.commission.amountCents)}.`;
     }
 
     return redirectBack(request, id, true, message);
