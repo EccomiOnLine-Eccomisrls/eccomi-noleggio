@@ -81,6 +81,8 @@ export default async function CeoPromotionsPage() {
             : ["ONLINE", "ACTIVE"].includes(promotion.status)
               ? "online"
               : "";
+          const canPublish = Boolean(promotion.shopifyProductId)
+            && ["PENDING_APPROVAL", "APPROVED"].includes(promotion.status);
 
           return (
             <article className="ceo-server-promotion" key={promotion.id}>
@@ -104,6 +106,11 @@ export default async function CeoPromotionsPage() {
                 <a className="ceo-server-primary" href={`/ceo/promotions/${encodeURIComponent(promotion.id)}`}>
                   Modifica offerta
                 </a>
+                {canPublish ? (
+                  <a className="ceo-server-secondary" href={`/ceo/promotions/${encodeURIComponent(promotion.id)}/publish`}>
+                    🚀 Pubblica online
+                  </a>
+                ) : null}
               </div>
             </article>
           );
