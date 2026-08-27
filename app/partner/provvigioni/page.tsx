@@ -2,7 +2,7 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { commissionRules } from "../../../db/commission-rules";
-import { promotions } from "../../../db/schema";
+import { partners, promotions } from "../../../db/schema";
 import { isPartnerNoleggioRole } from "../../lib/permissions";
 import { getActor } from "../../lib/server/authz";
 import { currentRequest } from "../../lib/server/current-request";
@@ -49,7 +49,7 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
   const request = await currentRequest("/partner/provvigioni");
   const preview = isRenderPullRequestPreview(request);
 
-  let partnerName = "Partner ECCOMI";
+  let partnerName = "Partner";
   let actorRole = "PARTNER_ADMIN";
   let offers: OfferRow[] = [];
   let rules: RuleRow[] = [];
@@ -76,6 +76,14 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
     actorRole = actor.role;
     await ensurePracticeSchema();
     const db = getDb();
+
+    const [partner] = await db
+      .select({ name: partners.name })
+      .from(partners)
+      .where(eq(partners.id, actor.partnerId))
+      .limit(1);
+    partnerName = partner?.name || "Partner";
+
     offers = await db
       .select({
         id: promotions.id,
@@ -101,50 +109,50 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
   const message = queryValue(query, "message");
 
   return (
-    <main className="ceo-server-page" data-pr27-partner-commission="true">
+    <main className="ceo-server-page" data-pr28-extra-gara="true">
       <header className="ceo-server-bar">
         <div className="ceo-server-bar__brand"><span>🚙</span><div><strong>ECCOMI</strong><small>NOLEGGIO · AREA PARTNER</small></div></div>
         <a href="/partner">← Area Partner</a>
       </header>
 
       <section className="ceo-server-heading">
-        <small>{preview ? "PR27 · PREVIEW SICURA · NESSUNA SCRITTURA REALE" : "PARTNER · CONDIZIONI ECONOMICHE"}</small>
-        <h1>Aumenta la provvigione ECCOMI</h1>
-        <p><strong>{partnerName}</strong> può riconoscere a ECCOMI un compenso maggiore sulla singola offerta. <strong>La provvigione può solo aumentare, mai diminuire.</strong> Tutti gli importi sono <strong>imponibili, IVA esclusa.</strong></p>
+        <small>{preview ? "PR28 · PREVIEW SICURA · NESSUNA SCRITTURA REALE" : "PARTNER · EXTRA GARA"}</small>
+        <h1>Extra Gara</h1>
+        <p><strong>{partnerName}</strong>, puoi riconoscere a ECCOMI un compenso aggiuntivo sulla singola offerta. <strong>La provvigione base è protetta e il totale può solo aumentare, mai diminuire.</strong> Tutti gli importi sono <strong>imponibili, IVA esclusa.</strong></p>
       </section>
 
       {feedback && message ? (
         <div className={feedback === "saved" ? "ceo-server-result" : "ceo-server-result ceo-server-result--error"}>
-          <strong>{feedback === "saved" ? "AUMENTO REGISTRATO" : "OPERAZIONE BLOCCATA"}</strong>
+          <strong>{feedback === "saved" ? "EXTRA GARA REGISTRATO" : "OPERAZIONE BLOCCATA"}</strong>
           <div>{message}</div>
         </div>
       ) : null}
 
-      <section className="ceo-server-kpis" aria-label="Regole provvigione Partner">
-        <article><small>BASE ECCOMI</small><strong>PROTETTA</strong><span>imponibile + IVA · il Partner non può modificarla</span></article>
-        <article><small>AZIONE PARTNER</small><strong>SOLO +</strong><span>può aumentare l’imponibile totale</span></article>
+      <section className="ceo-server-kpis" aria-label="Regole Extra Gara">
+        <article><small>BASE ECCOMI</small><strong>PROTETTA</strong><span>imponibile + IVA · non modificabile dal Partner</span></article>
+        <article><small>EXTRA GARA</small><strong>SOLO +</strong><span>puoi aumentare l’imponibile totale</span></article>
         <article><small>PRATICHE ESISTENTI</small><strong>CONGELATE</strong><span>nessuna modifica retroattiva</span></article>
       </section>
 
       {preview ? (
         <section className="ceo-server-panel">
           <article className="ceo-server-promotion">
-            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong><span style={{ whiteSpace: "nowrap" }}>500 € + IVA</span> → <span style={{ whiteSpace: "nowrap" }}>650 € + IVA</span></strong><em className="ceo-server-status ceo-server-status--online">CONSENTITO</em></div>
-            <div className="ceo-server-promotion__copy"><small>TEST REGOLA</small><h2>Aumento Partner +150 € imponibili</h2><p>Base imponibile ECCOMI 500 € + extra imponibile Partner 150 € = totale imponibile 650 €, IVA esclusa. Una nuova pratica congelerà 650 € + IVA.</p></div>
+            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR28</small><strong><span style={{ whiteSpace: "nowrap" }}>500 € + IVA</span> → <span style={{ whiteSpace: "nowrap" }}>650 € + IVA</span></strong><em className="ceo-server-status ceo-server-status--online">CONSENTITO</em></div>
+            <div className="ceo-server-promotion__copy"><small>EXTRA GARA</small><h2>Aumento +150 € imponibili</h2><p>Base imponibile ECCOMI 500 € + Extra Gara 150 € = totale imponibile 650 €, IVA esclusa. Una nuova pratica congelerà 650 € + IVA.</p></div>
           </article>
           <article className="ceo-server-promotion">
-            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR27</small><strong><span style={{ whiteSpace: "nowrap" }}>650 € + IVA</span> → <span style={{ whiteSpace: "nowrap" }}>450 € + IVA</span></strong><em className="ceo-server-status">BLOCCATO</em></div>
-            <div className="ceo-server-promotion__copy"><small>ANTI-RIBASSO</small><h2>Riduzione non consentita</h2><p>Il Partner non può scendere sotto l’imponibile totale già riconosciuto. Il controllo è server-side, non solo grafico.</p></div>
+            <div className="ceo-server-promotion__vehicle"><small>COLLAUDO PR28</small><strong><span style={{ whiteSpace: "nowrap" }}>650 € + IVA</span> → <span style={{ whiteSpace: "nowrap" }}>450 € + IVA</span></strong><em className="ceo-server-status">BLOCCATO</em></div>
+            <div className="ceo-server-promotion__copy"><small>ANTI-RIBASSO</small><h2>Riduzione non consentita</h2><p>Non puoi scendere sotto l’imponibile totale già riconosciuto. Il controllo resta server-side.</p></div>
           </article>
         </section>
       ) : null}
 
       <section className="partner-detail-stack">
         <article className="partner-detail-section">
-          <div className="partner-detail-section__head"><div><h2>Le tue offerte</h2><p>Tutti gli importi sono imponibili, IVA esclusa. Gli aumenti valgono solo per le nuove pratiche create dopo il salvataggio.</p></div></div>
+          <div className="partner-detail-section__head"><div><h2>Le tue offerte</h2><p>Scegli una singola offerta e, se vuoi, aumenta il compenso riconosciuto. Gli aumenti valgono solo per le nuove pratiche create dopo il salvataggio.</p></div></div>
           <div className="partner-table-wrap">
             <table className="partner-table">
-              <thead><tr><th>Offerta</th><th>Base ECCOMI imponibile</th><th>Extra Partner imponibile</th><th>Totale imponibile</th><th>Aumenta imponibile a</th></tr></thead>
+              <thead><tr><th>Offerta</th><th>Base ECCOMI imponibile</th><th>Extra Gara imponibile</th><th>Totale imponibile</th><th>Aumenta imponibile a</th></tr></thead>
               <tbody>
                 {offers.map((offer) => {
                   const base = baseByOffer.get(offer.id) ?? null;
@@ -170,7 +178,7 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
                               required
                             />
                             <span style={{ fontSize: 12, fontWeight: 700 }}>€ + IVA</span>
-                            <button type="submit" disabled={preview || !canIncrease || ["ARCHIVED", "TRASHED"].includes(offer.status)}>Aumenta provvigione</button>
+                            <button type="submit" disabled={preview || !canIncrease || ["ARCHIVED", "TRASHED"].includes(offer.status)}>Aumenta Extra Gara</button>
                           </form>
                         )}
                         {!canIncrease ? <small>Solo il Partner Admin può assumere questo impegno economico.</small> : null}
