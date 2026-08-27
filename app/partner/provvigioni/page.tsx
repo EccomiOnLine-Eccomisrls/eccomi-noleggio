@@ -91,6 +91,7 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
   const canIncrease = actorRole === "PARTNER_ADMIN";
   const feedback = queryValue(query, "partnerIncrease");
   const message = queryValue(query, "message");
+  const backHref = preview ? "/partner/pr28-workspace-preview?view=offers" : "/partner";
 
   const offerItems = offers.map((offer) => {
     const baseCents = baseByOffer.get(offer.id) ?? null;
@@ -106,8 +107,15 @@ export default async function PartnerProvvigioniPage({ searchParams }: PageProps
   return (
     <main className="ceo-server-page" data-pr28-extra-gara="true">
       <header className="ceo-server-bar">
-        <div className="ceo-server-bar__brand"><span>🚙</span><div><strong>ECCOMI</strong><small>NOLEGGIO · AREA PARTNER</small></div></div>
-        <a href="/partner">← Area Partner</a>
+        <div className="ceo-server-bar__brand">
+          <span>🚙</span>
+          <div>
+            <strong>ECCOMI NOLEGGIO</strong>
+            <small style={{ display: "block", fontWeight: 700, letterSpacing: 0 }}>by Eccomi OnLine</small>
+            <small style={{ display: "block", fontWeight: 800, letterSpacing: ".12em" }}>AREA PARTNER</small>
+          </div>
+        </div>
+        <a href={backHref}>← Area Partner</a>
       </header>
 
       <section className="ceo-server-heading">
