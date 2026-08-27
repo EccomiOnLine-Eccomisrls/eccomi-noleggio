@@ -5,61 +5,59 @@ import { leads, partners, promotions } from "../../../db/schema";
 import { isInternalEccomiPartner } from "../partner-identity";
 import { ensurePracticeSchema } from "./practice-schema";
 
-export type CommissionRuleScope = "PARTNER" | "PROMOTION" | "LEAD";
-export type CommissionResolutionSource = CommissionRuleScope | "INTERNAL_ECCOMI" | "UNCONFIGURED";
+export type EccomiCommissionSource = "LEAD_SNAPSHOT" | "PROMOTION" | "INTERNAL_ECCOMI" | "UNCONFIGURED";
 
-export type CommissionResolution = {
+export type EccomiCommissionResolution = {
   configured: boolean;
   amountCents: number | null;
-  source: CommissionResolutionSource;
+  source: EccomiCommissionSource;
   partnerId: string;
   promotionId: string;
   leadId: string;
 };
 
-function ruleId(scope: CommissionRuleScope, entityId: string) {
-  return `${scope}:${entityId}`;
+function cleanId(value: string) {
+  const id = value.trim();
+  if (!id) throw new Error("Identificativo provvigione mancante.");
+  return id;
 }
 
-function cleanEntityId(value: string) {
-  const entityId = value.trim();
-  if (!entityId) throw new Error("Identificativo commissione mancante.");
-  return entityId;
-}
-
-function cleanAmountCents(value: number) {
+function cleanAmount(value: number) {
   if (!Number.isInteger(value) || value < 0 || value > 10_000_000) {
-    throw new Error("Importo commissione non valido.");
+    throw new Error("Importo provvigione ECCOMI non valido.");
   }
   return value;
 }
 
-export async function getCommissionRule(scope: CommissionRuleScope, entityId: string) {
+function termId(scope: "PROMOTION" | "LEAD", entityId: string) {
+  return `${scope}:${entityId}`;
+}
+
+async function getTerm(scope: "PROMOTION" | "LEAD", entityId: string) {
   await ensurePracticeSchema();
-  const id = cleanEntityId(entityId);
-  const [rule] = await getDb()
+  const id = cleanId(entityId);
+  const [row] = await getDb()
     .select({ amountCents: commissionRules.amountCents })
     .from(commissionRules)
     .where(and(eq(commissionRules.scope, scope), eq(commissionRules.entityId, id)))
     .limit(1);
-  return rule?.amountCents ?? null;
+  return row?.amountCents ?? null;
 }
 
-export async function setCommissionRule(
-  scope: CommissionRuleScope,
+async function setTerm(
+  scope: "PROMOTION" | "LEAD",
   entityId: string,
   amountCents: number,
   actorEmail: string,
 ) {
   await ensurePracticeSchema();
-  const id = cleanEntityId(entityId);
-  const amount = cleanAmountCents(amountCents);
+  const id = cleanId(entityId);
+  const amount = cleanAmount(amountCents);
   const now = new Date().toISOString();
-
   await getDb()
     .insert(commissionRules)
     .values({
-      id: ruleId(scope, id),
+      id: termId(scope, id),
       scope,
       entityId: id,
       amountCents: amount,
@@ -69,25 +67,40 @@ export async function setCommissionRule(
     })
     .onConflictDoUpdate({
       target: commissionRules.id,
-      set: {
-        amountCents: amount,
-        updatedBy: actorEmail,
-        updatedAt: now,
-      },
+      set: { amountCents: amount, updatedBy: actorEmail, updatedAt: now },
     });
-
   return amount;
 }
 
-export async function clearCommissionRule(scope: CommissionRuleScope, entityId: string) {
-  await ensurePracticeSchema();
-  const id = cleanEntityId(entityId);
-  await getDb()
-    .delete(commissionRules)
-    .where(and(eq(commissionRules.scope, scope), eq(commissionRules.entityId, id)));
+export async function getPromotionEccomiCommission(promotionId: string) {
+  return getTerm("PROMOTION", promotionId);
 }
 
-export async function resolveCommissionForLead(leadId: string): Promise<CommissionResolution | null> {
+export async function setPromotionEccomiCommission(
+  promotionId: string,
+  amountCents: number,
+  actorEmail: string,
+) {
+  return setTerm("PROMOTION", promotionId, amountCents, actorEmail);
+}
+
+export async function getLeadEccomiCommissionSnapshot(leadId: string) {
+  return getTerm("LEAD", leadId);
+}
+
+export async function snapshotEccomiCommissionForLead(input: {
+  leadId: string;
+  promotionId: string;
+  actorEmail?: string;
+}) {
+  const existing = await getLeadEccomiCommissionSnapshot(input.leadId);
+  if (existing !== null) return existing;
+  const offerAmount = await getPromotionEccomiCommission(input.promotionId);
+  if (offerAmount === null) return null;
+  return setTerm("LEAD", input.leadId, offerAmount, input.actorEmail || "system@eccomi.local");
+}
+
+export async function resolveEccomiCommissionForLead(leadId: string): Promise<EccomiCommissionResolution | null> {
   await ensurePracticeSchema();
   const db = getDb();
   const [row] = await db
@@ -103,35 +116,33 @@ export async function resolveCommissionForLead(leadId: string): Promise<Commissi
     .innerJoin(partners, eq(leads.partnerId, partners.id))
     .where(eq(leads.id, leadId))
     .limit(1);
-
   if (!row) return null;
 
-  const [leadRule, promotionRule, partnerRule] = await Promise.all([
-    getCommissionRule("LEAD", row.leadId),
-    getCommissionRule("PROMOTION", row.promotionId),
-    getCommissionRule("PARTNER", row.partnerId),
-  ]);
+  const snapshot = await getLeadEccomiCommissionSnapshot(row.leadId);
+  if (snapshot !== null) {
+    return { configured: true, amountCents: snapshot, source: "LEAD_SNAPSHOT", ...row };
+  }
 
-  if (leadRule !== null) {
-    return { configured: true, amountCents: leadRule, source: "LEAD", leadId: row.leadId, promotionId: row.promotionId, partnerId: row.partnerId };
+  const promotionAmount = await getPromotionEccomiCommission(row.promotionId);
+  if (promotionAmount !== null) {
+    const frozen = await snapshotEccomiCommissionForLead({
+      leadId: row.leadId,
+      promotionId: row.promotionId,
+      actorEmail: "system-contract@eccomi.local",
+    });
+    return { configured: true, amountCents: frozen, source: "PROMOTION", ...row };
   }
-  if (promotionRule !== null) {
-    return { configured: true, amountCents: promotionRule, source: "PROMOTION", leadId: row.leadId, promotionId: row.promotionId, partnerId: row.partnerId };
-  }
-  if (partnerRule !== null) {
-    return { configured: true, amountCents: partnerRule, source: "PARTNER", leadId: row.leadId, promotionId: row.promotionId, partnerId: row.partnerId };
-  }
+
   if (isInternalEccomiPartner({ name: row.partnerName, legalName: row.partnerLegalName })) {
-    return { configured: true, amountCents: 0, source: "INTERNAL_ECCOMI", leadId: row.leadId, promotionId: row.promotionId, partnerId: row.partnerId };
+    return { configured: true, amountCents: 0, source: "INTERNAL_ECCOMI", ...row };
   }
 
-  return { configured: false, amountCents: null, source: "UNCONFIGURED", leadId: row.leadId, promotionId: row.promotionId, partnerId: row.partnerId };
+  return { configured: false, amountCents: null, source: "UNCONFIGURED", ...row };
 }
 
-export function commissionSourceLabel(source: CommissionResolutionSource) {
-  if (source === "LEAD") return "Override pratica";
-  if (source === "PROMOTION") return "Override offerta";
-  if (source === "PARTNER") return "Commissione base Partner";
+export function eccomiCommissionSourceLabel(source: EccomiCommissionSource) {
+  if (source === "LEAD_SNAPSHOT") return "Importo congelato nella pratica";
+  if (source === "PROMOTION") return "Provvigione dell'offerta";
   if (source === "INTERNAL_ECCOMI") return "Struttura interna ECCOMI";
-  return "Non configurata";
+  return "Provvigione non configurata";
 }
