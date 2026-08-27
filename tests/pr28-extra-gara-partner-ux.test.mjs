@@ -55,3 +55,16 @@ test("PR28 shows four clean columns and opens Extra Gara from the offer row", as
   assert.match(table, /commission-increase/);
   assert.doesNotMatch(table, /placeholder=\{`Più di/);
 });
+
+test("PR28 keeps the by Eccomi OnLine signature across Partner views", async () => {
+  const polish = await read("app/partner/partner-portal-polish.module.css");
+  const extraGara = await read("app/partner/provvigioni/extra-gara-offers.tsx");
+  const preview = await read("app/partner/pr28-workspace-preview/page.tsx");
+  assert.match(polish, /by Eccomi OnLine/);
+  assert.match(polish, /AREA PARTNER/);
+  assert.match(extraGara, /by Eccomi OnLine/);
+  assert.match(extraGara, /AREA PARTNER/);
+  assert.match(preview, /ECCOMI NOLEGGIO/);
+  assert.match(preview, /by Eccomi OnLine/);
+  assert.match(preview, /AREA PARTNER/);
+});
