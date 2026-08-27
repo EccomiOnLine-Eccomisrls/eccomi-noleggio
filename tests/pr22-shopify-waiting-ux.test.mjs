@@ -22,3 +22,11 @@ test("dedicated PR22 preview route exists", async () => {
   assert.match(page, /PREVIEW SICURA/);
   assert.match(page, /SIMULA PREPARA BOZZA SHOPIFY/);
 });
+
+test("PR22 preview simulates a realistic wait without external writes", async () => {
+  const route = await read("app/api/promotions/preview-pr22-waiting/prepare-form/route.ts");
+  assert.match(route, /isRenderPullRequestPreview/);
+  assert.match(route, /10_500/);
+  assert.match(route, /prepared/);
+  assert.doesNotMatch(route, /Supabase|Shopify|preparePromotionDraft/);
+});
