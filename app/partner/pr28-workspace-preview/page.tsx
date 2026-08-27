@@ -1,8 +1,14 @@
 type PageProps = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
 
+type PreviewView = "overview" | "offers" | "practices" | "commissions" | "team";
+
 function queryValue(query: Record<string, string | string[] | undefined> | undefined, key: string) {
   const value = query?.[key];
   return Array.isArray(value) ? value[0] : value;
+}
+
+function resolveView(value: string | undefined): PreviewView {
+  return value === "offers" || value === "practices" || value === "commissions" || value === "team" ? value : "overview";
 }
 
 const shell: React.CSSProperties = { minHeight: "100vh", background: "#f4f7fb", color: "#102033", fontFamily: "Arial, sans-serif" };
@@ -12,11 +18,12 @@ const activePill: React.CSSProperties = { ...pill, background: "#0c5597", color:
 
 export default async function Pr28WorkspacePreview({ searchParams }: PageProps) {
   const query = await searchParams;
-  const view = queryValue(query, "view") === "commissions" ? "commissions" : "offers";
+  const view = resolveView(queryValue(query, "view"));
+  const href = (target: PreviewView) => `/partner/pr28-workspace-preview?view=${target}`;
 
   return (
     <main style={shell}>
-      <header style={{ minHeight: 76, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px clamp(22px,5vw,72px)", background: "#fff", borderBottom: "1px solid #e4eaf0" }}>
+      <header style={{ minHeight: 86, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px clamp(22px,5vw,72px)", background: "#fff", borderBottom: "1px solid #e4eaf0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ width: 48, height: 48, borderRadius: 14, display: "grid", placeItems: "center", background: "#0c74bb", color: "#fff", fontSize: 24 }}>🚙</span>
           <span>
@@ -41,13 +48,20 @@ export default async function Pr28WorkspacePreview({ searchParams }: PageProps) 
         </section>
 
         <nav style={{ margin: "18px 0", display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <a href="/partner/pr28-workspace-preview?view=offers" style={pill}>Panoramica</a>
-          <a href="/partner/pr28-workspace-preview?view=offers" style={view === "offers" ? activePill : pill}>Offerte</a>
-          <span style={pill}>Pratiche</span>
-          <a href="/partner/pr28-workspace-preview?view=commissions" style={view === "commissions" ? activePill : pill}>Commissioni</a>
+          <a href={href("overview")} style={view === "overview" ? activePill : pill}>Panoramica</a>
+          <a href={href("offers")} style={view === "offers" ? activePill : pill}>Offerte</a>
+          <a href={href("practices")} style={view === "practices" ? activePill : pill}>Pratiche</a>
+          <a href={href("commissions")} style={view === "commissions" ? activePill : pill}>Commissioni</a>
           <a href="/partner/provvigioni" style={pill}>Extra Gara</a>
-          <span style={pill}>Collaboratori</span>
+          <a href={href("team")} style={view === "team" ? activePill : pill}>Collaboratori</a>
         </nav>
+
+        {view === "overview" ? (
+          <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14 }}>
+            <article style={{ ...card, padding: 22 }}><small style={{ color: "#0c5597", fontWeight: 900 }}>OPERATIVITÀ</small><h2 style={{ margin: "8px 0" }}>Cosa richiede attenzione</h2><p style={{ color: "#66768a", marginBottom: 0 }}>Nessuna pratica aperta. Le offerte pubblicate sono operative.</p></article>
+            <article style={{ ...card, padding: 22 }}><small style={{ color: "#0c5597", fontWeight: 900 }}>SICUREZZA</small><h2 style={{ margin: "8px 0" }}>Perimetro della società</h2><p style={{ color: "#66768a", marginBottom: 0 }}>Offerte, pratiche e condizioni economiche restano riservate alla tua organizzazione.</p></article>
+          </section>
+        ) : null}
 
         {view === "offers" ? (
           <section style={{ display: "grid", gap: 14 }}>
@@ -67,14 +81,24 @@ export default async function Pr28WorkspacePreview({ searchParams }: PageProps) 
               </div>
             </article>
           </section>
-        ) : (
+        ) : null}
+
+        {view === "practices" ? (
+          <section style={{ ...card, padding: 24 }}><small style={{ color: "#0c5597", fontWeight: 900 }}>LE TUE PRATICHE</small><h2 style={{ margin: "10px 0" }}>Richieste clienti</h2><p style={{ margin: 0, color: "#66768a" }}>Nessuna pratica associata alla società in questa preview.</p></section>
+        ) : null}
+
+        {view === "commissions" ? (
           <section style={{ ...card, padding: 24 }}>
             <small style={{ color: "#0c5597", fontWeight: 900, letterSpacing: ".08em" }}>PROVVIGIONI DOVUTE</small>
             <h2 style={{ margin: "10px 0", fontSize: 26 }}>0,00 € maturate</h2>
             <p style={{ margin: "12px 0 6px", fontWeight: 850 }}>CONTRATTO ACQUISITO</p>
             <p style={{ margin: 0, color: "#66768a" }}>La provvigione ECCOMI matura quando il contratto viene acquisito.</p>
           </section>
-        )}
+        ) : null}
+
+        {view === "team" ? (
+          <section style={{ ...card, padding: 24 }}><small style={{ color: "#0c5597", fontWeight: 900 }}>PARTNER ADMIN</small><h2 style={{ margin: "10px 0 16px" }}>Collaboratori della tua società</h2><div style={{ border: "1px solid #e0e8f0", borderRadius: 14, padding: 16 }}><strong>Sasa</strong><br /><small>PARTNER_ADMIN · ATTIVO</small></div></section>
+        ) : null}
       </div>
     </main>
   );
