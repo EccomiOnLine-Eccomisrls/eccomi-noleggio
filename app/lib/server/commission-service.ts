@@ -6,6 +6,7 @@ import { isInternalEccomiPartner } from "../partner-identity";
 import { ensurePracticeSchema } from "./practice-schema";
 
 export type EccomiCommissionSource = "LEAD_SNAPSHOT" | "PROMOTION" | "INTERNAL_ECCOMI" | "UNCONFIGURED";
+export type EccomiCommissionRuleScope = "PROMOTION" | "LEAD" | "PARTNER_INCREMENT";
 
 export type EccomiCommissionResolution = {
   configured: boolean;
@@ -14,6 +15,12 @@ export type EccomiCommissionResolution = {
   partnerId: string;
   promotionId: string;
   leadId: string;
+};
+
+export type PromotionEccomiCommission = {
+  baseCents: number;
+  partnerIncrementCents: number;
+  totalCents: number;
 };
 
 function cleanId(value: string) {
@@ -29,11 +36,11 @@ function cleanAmount(value: number) {
   return value;
 }
 
-function termId(scope: "PROMOTION" | "LEAD", entityId: string) {
+function termId(scope: EccomiCommissionRuleScope, entityId: string) {
   return `${scope}:${entityId}`;
 }
 
-async function getTerm(scope: "PROMOTION" | "LEAD", entityId: string) {
+async function getTerm(scope: EccomiCommissionRuleScope, entityId: string) {
   await ensurePracticeSchema();
   const id = cleanId(entityId);
   const [row] = await getDb()
@@ -45,7 +52,7 @@ async function getTerm(scope: "PROMOTION" | "LEAD", entityId: string) {
 }
 
 async function setTerm(
-  scope: "PROMOTION" | "LEAD",
+  scope: EccomiCommissionRuleScope,
   entityId: string,
   amountCents: number,
   actorEmail: string,
@@ -84,6 +91,31 @@ export async function setPromotionEccomiCommission(
   return setTerm("PROMOTION", promotionId, amountCents, actorEmail);
 }
 
+export async function getPartnerPromotionCommissionIncrement(promotionId: string) {
+  return (await getTerm("PARTNER_INCREMENT", promotionId)) ?? 0;
+}
+
+export async function setPartnerPromotionCommissionIncrement(
+  promotionId: string,
+  amountCents: number,
+  actorEmail: string,
+) {
+  return setTerm("PARTNER_INCREMENT", promotionId, amountCents, actorEmail);
+}
+
+export async function getEffectivePromotionEccomiCommission(
+  promotionId: string,
+): Promise<PromotionEccomiCommission | null> {
+  const baseCents = await getPromotionEccomiCommission(promotionId);
+  if (baseCents === null) return null;
+  const partnerIncrementCents = await getPartnerPromotionCommissionIncrement(promotionId);
+  return {
+    baseCents,
+    partnerIncrementCents,
+    totalCents: baseCents + partnerIncrementCents,
+  };
+}
+
 export async function getLeadEccomiCommissionSnapshot(leadId: string) {
   return getTerm("LEAD", leadId);
 }
@@ -95,9 +127,9 @@ export async function snapshotEccomiCommissionForLead(input: {
 }) {
   const existing = await getLeadEccomiCommissionSnapshot(input.leadId);
   if (existing !== null) return existing;
-  const offerAmount = await getPromotionEccomiCommission(input.promotionId);
-  if (offerAmount === null) return null;
-  return setTerm("LEAD", input.leadId, offerAmount, input.actorEmail || "system@eccomi.local");
+  const effective = await getEffectivePromotionEccomiCommission(input.promotionId);
+  if (!effective) return null;
+  return setTerm("LEAD", input.leadId, effective.totalCents, input.actorEmail || "system@eccomi.local");
 }
 
 export async function resolveEccomiCommissionForLead(leadId: string): Promise<EccomiCommissionResolution | null> {
@@ -123,8 +155,8 @@ export async function resolveEccomiCommissionForLead(leadId: string): Promise<Ec
     return { configured: true, amountCents: snapshot, source: "LEAD_SNAPSHOT", ...row };
   }
 
-  const promotionAmount = await getPromotionEccomiCommission(row.promotionId);
-  if (promotionAmount !== null) {
+  const effective = await getEffectivePromotionEccomiCommission(row.promotionId);
+  if (effective) {
     const frozen = await snapshotEccomiCommissionForLead({
       leadId: row.leadId,
       promotionId: row.promotionId,
@@ -142,7 +174,7 @@ export async function resolveEccomiCommissionForLead(leadId: string): Promise<Ec
 
 export function eccomiCommissionSourceLabel(source: EccomiCommissionSource) {
   if (source === "LEAD_SNAPSHOT") return "Importo congelato nella pratica";
-  if (source === "PROMOTION") return "Provvigione dell'offerta";
+  if (source === "PROMOTION") return "Provvigione totale dell'offerta";
   if (source === "INTERNAL_ECCOMI") return "Struttura interna ECCOMI";
   return "Provvigione non configurata";
 }

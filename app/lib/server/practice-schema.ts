@@ -60,13 +60,16 @@ export function ensurePracticeSchema() {
             'LEAD:' || NEW.id,
             'LEAD',
             NEW.id,
-            rule.amount_cents,
+            base_rule.amount_cents + COALESCE(partner_extra.amount_cents, 0),
             'system-lead-snapshot@eccomi.local',
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
-          FROM commission_rules rule
-          WHERE rule.scope = 'PROMOTION'
-            AND rule.entity_id = NEW.promotion_id
+          FROM commission_rules base_rule
+          LEFT JOIN commission_rules partner_extra
+            ON partner_extra.scope = 'PARTNER_INCREMENT'
+           AND partner_extra.entity_id = base_rule.entity_id
+          WHERE base_rule.scope = 'PROMOTION'
+            AND base_rule.entity_id = NEW.promotion_id
           ON CONFLICT (id) DO NOTHING;
           RETURN NEW;
         END;
