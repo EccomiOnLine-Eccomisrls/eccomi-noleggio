@@ -140,6 +140,22 @@ function CeoServerSafeDashboard({
             <a className="ceo-server-secondary" href="/ceo/partners">Apri gestione partner</a>
           </div>
         </article>
+
+        <article className="ceo-server-promotion">
+          <div className="ceo-server-promotion__vehicle">
+            <small>ECONOMIA PARTNER</small>
+            <strong>Commissioni</strong>
+            <em className="ceo-server-status ceo-server-status--online">DELIVERY</em>
+          </div>
+          <div className="ceo-server-promotion__copy">
+            <small>MATURAZIONE AUTOMATICA</small>
+            <h2>Centro Commissioni</h2>
+            <p>Configura base Partner e override, poi gestisci maturate, fatturate e pagate.</p>
+          </div>
+          <div className="ceo-server-promotion__actions">
+            <a className="ceo-server-secondary" href="/ceo/commissions">Apri commissioni</a>
+          </div>
+        </article>
       </section>
     </main>
   );
