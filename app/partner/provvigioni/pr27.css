@@ -1,0 +1,19 @@
+[data-pr27-partner-commission="true"] .ceo-server-promotion {
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 2fr);
+}
+
+[data-pr27-partner-commission="true"] .ceo-server-promotion__vehicle strong {
+  white-space: nowrap;
+  font-size: clamp(20px, 2.2vw, 28px);
+  line-height: 1.2;
+}
+
+@media (max-width: 820px) {
+  [data-pr27-partner-commission="true"] .ceo-server-promotion {
+    grid-template-columns: 1fr;
+  }
+
+  [data-pr27-partner-commission="true"] .ceo-server-promotion__vehicle strong {
+    white-space: normal;
+  }
+}
