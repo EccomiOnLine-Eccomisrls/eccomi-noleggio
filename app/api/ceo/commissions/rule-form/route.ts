@@ -1,11 +1,10 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
-import { auditLogs, hubEvents, leads, partners, promotions } from "../../../../../db/schema";
-import { requireCeo, routeError } from "../../../../lib/server/authz";
+import { auditLogs, hubEvents, promotions } from "../../../../../db/schema";
+import { requirePermission, routeError } from "../../../../lib/server/authz";
 import {
-  clearCommissionRule,
-  type CommissionRuleScope,
-  setCommissionRule,
+  getPromotionEccomiCommission,
+  setPromotionEccomiCommission,
 } from "../../../../lib/server/commission-service";
 import { isRenderPullRequestPreview } from "../../../../lib/server/preview-mode";
 import { publicUrl } from "../../../../lib/server/public-url";
@@ -21,34 +20,14 @@ function text(value: FormDataEntryValue | null, max: number) {
 
 function euroToCents(value: FormDataEntryValue | null) {
   const raw = text(value, 30).replace(",", ".");
-  if (!raw) return null;
   const amount = Number(raw);
-  if (!Number.isFinite(amount) || amount < 0) return Number.NaN;
+  if (!raw || !Number.isFinite(amount) || amount < 0) return Number.NaN;
   return Math.round(amount * 100);
 }
 
 function safeReturnTo(value: FormDataEntryValue | null) {
   const target = text(value, 500);
-  return target.startsWith("/ceo/") ? target : "/ceo/partners";
-}
-
-function cleanScope(value: FormDataEntryValue | null): CommissionRuleScope | null {
-  const scope = text(value, 20).toUpperCase();
-  return scope === "PARTNER" || scope === "PROMOTION" || scope === "LEAD" ? scope : null;
-}
-
-async function entityExists(scope: CommissionRuleScope, entityId: string) {
-  const db = getDb();
-  if (scope === "PARTNER") {
-    const [row] = await db.select({ id: partners.id }).from(partners).where(eq(partners.id, entityId)).limit(1);
-    return Boolean(row);
-  }
-  if (scope === "PROMOTION") {
-    const [row] = await db.select({ id: promotions.id }).from(promotions).where(eq(promotions.id, entityId)).limit(1);
-    return Boolean(row);
-  }
-  const [row] = await db.select({ id: leads.id }).from(leads).where(eq(leads.id, entityId)).limit(1);
-  return Boolean(row);
+  return target.startsWith("/ceo/") ? target : "/ceo/commissions";
 }
 
 export async function POST(request: Request) {
@@ -57,57 +36,61 @@ export async function POST(request: Request) {
       return Response.json({ error: "Richiesta non autorizzata." }, { status: 403 });
     }
     if (isRenderPullRequestPreview(request)) {
-      return Response.json({ error: "Preview sicura: nessuna regola commissionale reale può essere modificata." }, { status: 409 });
+      return Response.json({ error: "Preview sicura: nessuna provvigione reale può essere modificata." }, { status: 409 });
     }
 
-    const actor = await requireCeo(request);
+    const actor = await requirePermission(request, "COMMISSION_SET_ECCOMI");
     const form = await request.formData();
-    const scope = cleanScope(form.get("scope"));
-    const entityId = text(form.get("entityId"), 200);
+    const promotionId = text(form.get("promotionId"), 200);
     const returnTo = safeReturnTo(form.get("returnTo"));
-    const clear = form.get("clear") === "true";
     const amountCents = euroToCents(form.get("amount"));
 
-    if (!scope || !entityId) {
-      return Response.json({ error: "Regola commissionale non valida." }, { status: 422 });
-    }
-    if (!(await entityExists(scope, entityId))) {
-      return Response.json({ error: "Entità commissionale non trovata." }, { status: 404 });
-    }
-    if (!clear && (amountCents === null || Number.isNaN(amountCents) || amountCents > 10_000_000)) {
-      return Response.json({ error: "Importo commissione non valido." }, { status: 422 });
+    if (!promotionId || Number.isNaN(amountCents) || amountCents > 10_000_000) {
+      return Response.json({ error: "Provvigione ECCOMI non valida." }, { status: 422 });
     }
 
-    const now = new Date().toISOString();
-    if (clear) {
-      await clearCommissionRule(scope, entityId);
-    } else {
-      await setCommissionRule(scope, entityId, amountCents as number, actor.email);
+    const [promotion] = await getDb()
+      .select({ id: promotions.id, offerNumber: promotions.offerNumber, brand: promotions.brand, model: promotions.model, status: promotions.status })
+      .from(promotions)
+      .where(eq(promotions.id, promotionId))
+      .limit(1);
+    if (!promotion) return Response.json({ error: "Offerta non trovata." }, { status: 404 });
+    if (["TRASHED", "ARCHIVED"].includes(promotion.status)) {
+      return Response.json({ error: "La provvigione non può essere modificata su un'offerta archiviata." }, { status: 409 });
     }
+
+    const previousAmountCents = await getPromotionEccomiCommission(promotionId);
+    const savedAmountCents = await setPromotionEccomiCommission(promotionId, amountCents, actor.email);
+    const now = new Date().toISOString();
 
     await getDb().insert(auditLogs).values({
       id: crypto.randomUUID(),
       actorEmail: actor.email,
-      action: clear ? `COMMISSION_RULE_${scope}_CLEARED` : `COMMISSION_RULE_${scope}_UPDATED`,
-      entityType: scope.toLowerCase(),
-      entityId,
-      payloadJson: JSON.stringify({ scope, amountCents: clear ? null : amountCents }),
+      action: "ECCOMI_COMMISSION_OFFER_SET",
+      entityType: "promotion",
+      entityId: promotionId,
+      payloadJson: JSON.stringify({
+        offerNumber: promotion.offerNumber,
+        previousAmountCents,
+        amountCents: savedAmountCents,
+        actorRole: actor.role,
+      }),
       createdAt: now,
     });
     await getDb().insert(hubEvents).values({
       id: crypto.randomUUID(),
-      eventType: clear ? "NOLEGGIO_COMMISSION_RULE_CLEARED" : "NOLEGGIO_COMMISSION_RULE_UPDATED",
+      eventType: "NOLEGGIO_ECCOMI_COMMISSION_OFFER_SET",
       ecosystem: "ECCOMI_NOLEGGIO",
-      entityType: scope.toLowerCase(),
-      entityId,
-      title: clear ? `${scope} · regola commissione rimossa` : `${scope} · regola commissione aggiornata`,
-      payloadJson: JSON.stringify({ scope, amountCents: clear ? null : amountCents }),
+      entityType: "promotion",
+      entityId: promotionId,
+      title: `${promotion.brand} ${promotion.model} · provvigione ECCOMI definita`,
+      payloadJson: JSON.stringify({ offerNumber: promotion.offerNumber, previousAmountCents, amountCents: savedAmountCents, actorRole: actor.role }),
       actorEmail: actor.email,
       createdAt: now,
     });
 
     const target = publicUrl(request, returnTo);
-    target.searchParams.set("commissionRule", clear ? "cleared" : "saved");
+    target.searchParams.set("commissionRule", "saved");
     return Response.redirect(target, 303);
   } catch (error) {
     return routeError(error);
