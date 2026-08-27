@@ -4,10 +4,17 @@ import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("expired unpublished partner quotation can return to ECCOMI verification", async () => {
+test("expired or pending unpublished partner quotation stays under ECCOMI approval", async () => {
   const policy = await read("app/lib/server/partner-offer-policy.ts");
-  assert.match(policy, /currentStatus === "EXPIRED" && !input\.wasPublished/);
+  assert.match(policy, /"PENDING_APPROVAL"/);
+  assert.match(policy, /!input\.wasPublished/);
+  assert.match(policy, /\["EXPIRED", "PENDING_APPROVAL"\]\.includes\(input\.currentStatus\)/);
   assert.match(policy, /return "PENDING_APPROVAL"/);
+});
+
+test("pending approval remains extendable by the owning partner", async () => {
+  const policy = await read("app/lib/server/partner-offer-policy.ts");
+  assert.match(policy, /extendableStatuses = new Set\(\[.*"PENDING_APPROVAL"/);
 });
 
 test("extension resumes Shopify preparation only for unpublished quotations without product", async () => {
