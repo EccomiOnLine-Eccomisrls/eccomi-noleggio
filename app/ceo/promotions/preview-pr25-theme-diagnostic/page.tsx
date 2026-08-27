@@ -1,104 +1,69 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- Dedicated PR preview uses native navigation. */
-import { shopifyAdminFetch } from "../../../lib/server/shopify";
 import "../../ceo-server.css";
 
-type ThemeList = {
-  themes: {
-    nodes: Array<{ id: string; name: string; role: string }>;
-  };
-};
-
-type ThemeFiles = {
-  theme: {
-    files: {
-      nodes: Array<{
-        filename: string;
-        checksumMd5: string | null;
-        body:
-          | { content?: string | null }
-          | { contentBase64?: string | null }
-          | { url?: string | null }
-          | null;
-      }>;
-      userErrors: Array<{ code?: string | null; filename?: string | null }>;
-    };
-  } | null;
-};
+const PRODUCT_URL = "https://eccomionline.com/products/fiat-ducato-3-a-noleggio-lungo-termine-624-77-mese-4";
+const HEADING = "Perché scegliere ECCOMI NOLEGGIO";
 
 function excerptAround(source: string, needle: string) {
   const normalized = source || "";
-  const index = normalized.toLocaleLowerCase("it").indexOf(needle.toLocaleLowerCase("it"));
-  if (index < 0) return "La frase non è presente nel file live letto da Shopify.";
-  const start = Math.max(0, index - 2200);
-  const end = Math.min(normalized.length, index + needle.length + 3200);
+  const lower = normalized.toLocaleLowerCase("it");
+  const index = lower.indexOf(needle.toLocaleLowerCase("it"));
+
+  if (index < 0) {
+    const fallbackNeedles = ["perch", "scegliere eccomi", "eccomi noleggio"];
+    const fallbackIndex = fallbackNeedles
+      .map((candidate) => lower.indexOf(candidate))
+      .find((candidateIndex) => candidateIndex >= 0);
+
+    if (fallbackIndex === undefined) {
+      return "La sezione non è stata trovata nell’HTML pubblico ricevuto.";
+    }
+
+    const start = Math.max(0, fallbackIndex - 3000);
+    const end = Math.min(normalized.length, fallbackIndex + 7000);
+    return normalized.slice(start, end);
+  }
+
+  const start = Math.max(0, index - 3200);
+  const end = Math.min(normalized.length, index + needle.length + 8000);
   return normalized.slice(start, end);
 }
 
+function compactHtml(value: string) {
+  return value
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/>\s+</g, "><")
+    .trim();
+}
+
 export default async function Pr25ThemeDiagnosticPreview() {
-  let themeName = "Non disponibile";
-  let themeId = "";
-  let sectionChecksum = "";
-  let templateChecksum = "";
+  let status = 0;
+  let contentType = "";
   let excerpt = "";
   let error = "";
 
   try {
-    const themeList = await shopifyAdminFetch<ThemeList>(
-      `query Pr25MainTheme {
-        themes(first: 5, roles: [MAIN]) {
-          nodes { id name role }
-        }
-      }`,
-    );
-
-    const mainTheme = themeList.themes.nodes.find((theme) => theme.role === "MAIN") || themeList.themes.nodes[0];
-    if (!mainTheme) throw new Error("Tema Shopify MAIN non trovato.");
-
-    themeName = mainTheme.name;
-    themeId = mainTheme.id;
-
-    const fileResult = await shopifyAdminFetch<ThemeFiles>(
-      `query Pr25ThemeFiles($themeId: ID!, $filenames: [String!]!) {
-        theme(id: $themeId) {
-          files(filenames: $filenames) {
-            nodes {
-              filename
-              checksumMd5
-              body {
-                ... on OnlineStoreThemeFileBodyText { content }
-                ... on OnlineStoreThemeFileBodyBase64 { contentBase64 }
-                ... on OnlineStoreThemeFileBodyUrl { url }
-              }
-            }
-            userErrors { code filename }
-          }
-        }
-      }`,
-      {
-        themeId,
-        filenames: [
-          "sections/eccomi-noleggio-product.liquid",
-          "templates/product.eccomi-noleggio.json",
-        ],
+    const response = await fetch(PRODUCT_URL, {
+      cache: "no-store",
+      headers: {
+        accept: "text/html,application/xhtml+xml",
+        "user-agent": "ECCOMI-NOLEGGIO-PR25-DIAGNOSTIC/1.0",
       },
-    );
+    });
 
-    const files = fileResult.theme?.files.nodes || [];
-    const section = files.find((file) => file.filename === "sections/eccomi-noleggio-product.liquid");
-    const template = files.find((file) => file.filename === "templates/product.eccomi-noleggio.json");
-    sectionChecksum = section?.checksumMd5 || "—";
-    templateChecksum = template?.checksumMd5 || "—";
+    status = response.status;
+    contentType = response.headers.get("content-type") || "";
 
-    const content = section?.body && "content" in section.body ? section.body.content || "" : "";
-    excerpt = excerptAround(content, "Perché scegliere ECCOMI NOLEGGIO");
-
-    if (fileResult.theme?.files.userErrors?.length) {
-      error = fileResult.theme.files.userErrors
-        .map((item) => `${item.code || "THEME_FILE_ERROR"}${item.filename ? ` · ${item.filename}` : ""}`)
-        .join(" · ");
+    if (!response.ok) {
+      throw new Error(`La pagina pubblica ha risposto HTTP ${response.status}.`);
     }
+
+    const html = await response.text();
+    excerpt = compactHtml(excerptAround(html, HEADING));
   } catch (caught) {
-    error = caught instanceof Error ? caught.message : "Diagnostica Shopify non disponibile.";
+    error = caught instanceof Error ? caught.message : "Diagnostica storefront non disponibile.";
   }
 
   return (
@@ -112,9 +77,9 @@ export default async function Pr25ThemeDiagnosticPreview() {
       </header>
 
       <section className="ceo-server-heading">
-        <small>TEMA SHOPIFY LIVE · NESSUNA SCRITTURA</small>
+        <small>STOREFRONT SHOPIFY LIVE · NESSUNA SCRITTURA</small>
         <h1>Controllo dei 3 box vuoti</h1>
-        <p>Leggiamo solo il frammento del tema pubblicato relativo a “Perché scegliere ECCOMI NOLEGGIO”.</p>
+        <p>Leggiamo l’HTML già pubblico del Ducato, senza richiedere accesso ai file del tema Shopify.</p>
       </section>
 
       {error ? (
@@ -124,20 +89,21 @@ export default async function Pr25ThemeDiagnosticPreview() {
         </div>
       ) : (
         <div className="ceo-server-result">
-          <strong>TEMA LIVE LETTO CORRETTAMENTE</strong>
-          <div>Nessun dato o file Shopify è stato modificato.</div>
+          <strong>PAGINA PUBBLICA LETTA CORRETTAMENTE</strong>
+          <div>Nessun dato, prodotto o file Shopify è stato modificato.</div>
         </div>
       )}
 
       <section className="ceo-server-panel">
         <article className="ceo-server-promotion">
           <div className="ceo-server-promotion__copy">
-            <small>TEMA PUBBLICATO</small>
-            <h2>{themeName}</h2>
-            <p>{themeId || "ID non disponibile"}</p>
+            <small>PRODOTTO PUBBLICATO · OFFERTA 4022223739</small>
+            <h2>FIAT Ducato 3</h2>
+            <p style={{ overflowWrap: "anywhere" }}>{PRODUCT_URL}</p>
             <div className="ceo-server-promotion__metrics">
-              <span>Section checksum: {sectionChecksum || "—"}</span>
-              <span>Template checksum: {templateChecksum || "—"}</span>
+              <span>HTTP: {status || "—"}</span>
+              <span>Content-Type: {contentType || "—"}</span>
+              <span>Ricerca: “{HEADING}”</span>
             </div>
           </div>
         </article>
@@ -145,7 +111,7 @@ export default async function Pr25ThemeDiagnosticPreview() {
 
       <section className="ceo-server-editor">
         <fieldset>
-          <legend>Frammento live attorno ai 3 box</legend>
+          <legend>HTML live attorno ai 3 box</legend>
           <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 12, lineHeight: 1.55, margin: 0 }}>
             {excerpt || "Nessun frammento disponibile."}
           </pre>
