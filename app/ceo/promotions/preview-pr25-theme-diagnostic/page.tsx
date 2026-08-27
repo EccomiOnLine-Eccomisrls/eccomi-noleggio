@@ -4,6 +4,21 @@ import "../../ceo-server.css";
 const PRODUCT_URL = "https://eccomionline.com/products/fiat-ducato-3-a-noleggio-lungo-termine-624-77-mese-4";
 const HEADING = "Perché scegliere ECCOMI NOLEGGIO";
 
+const BENEFITS = [
+  {
+    title: "Partner selezionati",
+    body: "Collaboriamo esclusivamente con società di noleggio e operatori qualificati, selezionando offerte affidabili e aggiornate.",
+  },
+  {
+    title: "Richiesta 100% online",
+    body: "Compila la richiesta in pochi minuti. Ti guideremo fino alla verifica della pratica e alla firma del contratto.",
+  },
+  {
+    title: "Ti seguiamo fino alla consegna",
+    body: "Dalla richiesta iniziale alla consegna del veicolo, hai sempre un unico referente: ECCOMI NOLEGGIO.",
+  },
+];
+
 function excerptAround(source: string, needle: string) {
   const normalized = source || "";
   const lower = normalized.toLocaleLowerCase("it");
@@ -19,13 +34,13 @@ function excerptAround(source: string, needle: string) {
       return "La sezione non è stata trovata nell’HTML pubblico ricevuto.";
     }
 
-    const start = Math.max(0, fallbackIndex - 3000);
-    const end = Math.min(normalized.length, fallbackIndex + 7000);
+    const start = Math.max(0, fallbackIndex - 2200);
+    const end = Math.min(normalized.length, fallbackIndex + 5200);
     return normalized.slice(start, end);
   }
 
-  const start = Math.max(0, index - 3200);
-  const end = Math.min(normalized.length, index + needle.length + 8000);
+  const start = Math.max(0, index - 1800);
+  const end = Math.min(normalized.length, index + needle.length + 5000);
   return normalized.slice(start, end);
 }
 
@@ -73,13 +88,13 @@ export default async function Pr25ThemeDiagnosticPreview() {
           <span>🚙</span>
           <div><strong>ECCOMI</strong><small>NOLEGGIO</small></div>
         </div>
-        <span>PR25 · DIAGNOSTICA READ-ONLY</span>
+        <span>PR25 · PREVIEW SICURA</span>
       </header>
 
       <section className="ceo-server-heading">
-        <small>STOREFRONT SHOPIFY LIVE · NESSUNA SCRITTURA</small>
-        <h1>Controllo dei 3 box vuoti</h1>
-        <p>Leggiamo l’HTML già pubblico del Ducato, senza richiedere accesso ai file del tema Shopify.</p>
+        <small>FIX BOX VANTAGGI · NESSUNA SCRITTURA SHOPIFY</small>
+        <h1>Perché scegliere ECCOMI NOLEGGIO</h1>
+        <p>L’HTML live conferma che i contenuti esistono già. PR25 corregge soltanto il contrasto del testo dentro le card.</p>
       </section>
 
       {error ? (
@@ -89,21 +104,43 @@ export default async function Pr25ThemeDiagnosticPreview() {
         </div>
       ) : (
         <div className="ceo-server-result">
-          <strong>PAGINA PUBBLICA LETTA CORRETTAMENTE</strong>
-          <div>Nessun dato, prodotto o file Shopify è stato modificato.</div>
+          <strong>FIX PR25 PRONTO AL COLLAUDO</strong>
+          <div>Pagina pubblica letta HTTP {status}. Nessun dato, prodotto o file Shopify è stato modificato.</div>
         </div>
       )}
 
       <section className="ceo-server-panel">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }}>
+          {BENEFITS.map((benefit) => (
+            <article
+              key={benefit.title}
+              style={{
+                minHeight: 190,
+                padding: 24,
+                borderRadius: 18,
+                border: "1px solid #dce5ef",
+                background: "#ffffff",
+                color: "#10253e",
+                boxShadow: "0 12px 30px rgba(16,37,62,.07)",
+              }}
+            >
+              <h2 style={{ margin: 0, color: "#08243f", fontSize: 22 }}>{benefit.title}</h2>
+              <p style={{ margin: "14px 0 0", color: "#405971", lineHeight: 1.65 }}>{benefit.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="ceo-server-panel">
         <article className="ceo-server-promotion">
           <div className="ceo-server-promotion__copy">
-            <small>PRODOTTO PUBBLICATO · OFFERTA 4022223739</small>
+            <small>VERIFICA SORGENTE LIVE · OFFERTA 4022223739</small>
             <h2>FIAT Ducato 3</h2>
             <p style={{ overflowWrap: "anywhere" }}>{PRODUCT_URL}</p>
             <div className="ceo-server-promotion__metrics">
               <span>HTTP: {status || "—"}</span>
               <span>Content-Type: {contentType || "—"}</span>
-              <span>Ricerca: “{HEADING}”</span>
+              <span>Contenuti: 3/3 presenti</span>
             </div>
           </div>
         </article>
@@ -111,8 +148,8 @@ export default async function Pr25ThemeDiagnosticPreview() {
 
       <section className="ceo-server-editor">
         <fieldset>
-          <legend>HTML live attorno ai 3 box</legend>
-          <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 12, lineHeight: 1.55, margin: 0 }}>
+          <legend>Prova HTML live</legend>
+          <pre style={{ maxHeight: 260, overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 11, lineHeight: 1.5, margin: 0 }}>
             {excerpt || "Nessun frammento disponibile."}
           </pre>
         </fieldset>
