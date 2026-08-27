@@ -12,7 +12,7 @@ function sameOrigin(request: Request) {
 
 function safeReturnTo(value: FormDataEntryValue | null) {
   const target = typeof value === "string" ? value.trim().slice(0, 500) : "";
-  return target.startsWith("/ceo/") ? target : "/ceo/partners";
+  return target.startsWith("/ceo/") ? target : "/ceo/commissions";
 }
 
 export async function POST(
@@ -35,7 +35,7 @@ export async function POST(
     const db = getDb();
     const [commission] = await db.select().from(commissions).where(eq(commissions.id, id)).limit(1);
 
-    if (!commission) return Response.json({ error: "Commissione non trovata." }, { status: 404 });
+    if (!commission) return Response.json({ error: "Provvigione ECCOMI non trovata." }, { status: 404 });
 
     const allowed = commission.status === "ACCRUED"
       ? targetStatus === "INVOICED"
@@ -43,7 +43,7 @@ export async function POST(
         ? targetStatus === "PAID"
         : false;
     if (!allowed) {
-      return Response.json({ error: `Passaggio commissione da ${commission.status} a ${targetStatus || "stato non valido"} non consentito.` }, { status: 422 });
+      return Response.json({ error: `Passaggio provvigione da ${commission.status} a ${targetStatus || "stato non valido"} non consentito.` }, { status: 422 });
     }
 
     const now = new Date().toISOString();
@@ -58,7 +58,7 @@ export async function POST(
       await tx.insert(auditLogs).values({
         id: crypto.randomUUID(),
         actorEmail: actor.email,
-        action: `COMMISSION_STATUS_${targetStatus}`,
+        action: `ECCOMI_COMMISSION_STATUS_${targetStatus}`,
         entityType: "commission",
         entityId: id,
         payloadJson: JSON.stringify({
@@ -72,11 +72,11 @@ export async function POST(
       });
       await tx.insert(hubEvents).values({
         id: crypto.randomUUID(),
-        eventType: `NOLEGGIO_COMMISSION_${targetStatus}`,
+        eventType: `NOLEGGIO_ECCOMI_COMMISSION_${targetStatus}`,
         ecosystem: "ECCOMI_NOLEGGIO",
         entityType: "commission",
         entityId: id,
-        title: `${commission.leadId} · commissione ${targetStatus === "INVOICED" ? "fatturata" : "pagata"}`,
+        title: `${commission.leadId} · provvigione ECCOMI ${targetStatus === "INVOICED" ? "fatturata" : "pagata"}`,
         payloadJson: JSON.stringify({ leadId: commission.leadId, partnerId: commission.partnerId, amountCents: commission.amountCents }),
         actorEmail: actor.email,
         createdAt: now,
