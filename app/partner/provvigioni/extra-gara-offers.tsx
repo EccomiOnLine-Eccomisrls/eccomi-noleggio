@@ -136,7 +136,6 @@ export default function ExtraGaraOffers({ offers, canIncrease, preview }: Props)
                       type="number"
                       min={(selected.totalCents + 1) / 100}
                       step="0.01"
-                      placeholder={`Più di ${(selected.totalCents / 100).toFixed(2).replace(".", ",")}`}
                       disabled={preview || !canIncrease || ["ARCHIVED", "TRASHED"].includes(selected.status)}
                       required
                       style={{ flex: 1, minWidth: 0, minHeight: 48, border: "1px solid #cbd8e6", borderRadius: 12, padding: "10px 12px", fontSize: 16 }}
