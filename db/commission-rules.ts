@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
 import { index, integer, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
+// Internal economic terms used by ECCOMI NOLEGGIO.
+// PROMOTION = commission defined by ECCOMI while validating an offer.
+// LEAD = immutable snapshot copied when the customer practice is created.
 export const commissionRules = pgTable("commission_rules", {
   id: text("id").primaryKey(),
   scope: text("scope").notNull(),
