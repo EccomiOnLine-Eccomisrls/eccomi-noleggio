@@ -100,7 +100,7 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
       </header>
 
       <section className="ceo-server-heading">
-        <small>{preview ? "PR26 · PREVIEW SICURA · NESSUNA SCRITTURA REALE" : "ECCOMI · CONTROLLO ECONOMICO"}</small>
+        <small>{preview ? "PR33 · PREVIEW SICURA · NESSUNA SCRITTURA REALE" : "ECCOMI · CONTROLLO ECONOMICO"}</small>
         <h1>Provvigioni ECCOMI</h1>
         <p>ECCOMI definisce il compenso durante la validazione dell'offerta. La pratica lo eredita e lo congela. <strong>Contratto acquisito = provvigione maturata.</strong> Tutti gli importi sono <strong>imponibili, IVA esclusa.</strong></p>
       </section>
@@ -108,9 +108,9 @@ export default async function CeoCommissionCenter({ searchParams }: CommissionPa
       {feedback ? <div className="ceo-server-result"><strong>OPERAZIONE COMPLETATA</strong><div>Provvigioni aggiornate.</div></div> : null}
 
       <section className="ceo-server-kpis" aria-label="Riepilogo provvigioni ECCOMI">
-        <article><small>MATURATE · IMPONIBILE</small><strong>{money(accrued)}</strong><span>IVA esclusa · crediti ECCOMI da fatturare</span></article>
-        <article><small>FATTURATE · IMPONIBILE</small><strong>{money(invoiced)}</strong><span>IVA esclusa · da incassare</span></article>
-        <article><small>PAGATE · IMPONIBILE</small><strong>{money(paid)}</strong><span>IVA esclusa · incassate</span></article>
+        <article><small>DA FATTURARE · IMPONIBILE</small><strong>{money(accrued)}</strong><span>IVA esclusa · crediti ECCOMI da fatturare</span></article>
+        <article><small>DA INCASSARE · IMPONIBILE</small><strong>{money(invoiced)}</strong><span>IVA esclusa · da incassare</span></article>
+        <article><small>INCASSATE · IMPONIBILE</small><strong>{money(paid)}</strong><span>IVA esclusa · incassate</span></article>
       </section>
 
       {preview ? (
