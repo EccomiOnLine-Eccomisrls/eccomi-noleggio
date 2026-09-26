@@ -259,7 +259,10 @@ export default function CustomRequestClient() {
       }
 
       setRequestCode(payload.requestCode);
-      trackOpenAiLeadCreated();
+
+      if (response.status === 201) {
+        trackOpenAiLeadCreated();
+      }
     } catch (error) {
       setSubmitError(
         error instanceof Error
