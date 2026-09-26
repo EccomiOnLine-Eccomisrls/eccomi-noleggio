@@ -16,6 +16,39 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
+
+declare global {
+  interface Window {
+    oaiq?: (...args: unknown[]) => void;
+  }
+}
+
+function trackOpenAiLeadCreated(retries = 20) {
+  try {
+    if (
+      typeof window !== "undefined"
+      && typeof window.oaiq === "function"
+    ) {
+      window.oaiq(
+        "measure",
+        "lead_created",
+        { type: "customer_action" },
+      );
+
+      return;
+    }
+
+    if (retries > 0 && typeof window !== "undefined") {
+      window.setTimeout(
+        () => trackOpenAiLeadCreated(retries - 1),
+        250,
+      );
+    }
+  } catch {
+    // Tracking must never block or alter the customer request flow.
+  }
+}
+
 type CustomerProfile = "" | "PRIVATE" | "PROFESSIONAL" | "COMPANY";
 
 type CustomRequestFields = {
@@ -226,6 +259,7 @@ export default function CustomRequestClient() {
       }
 
       setRequestCode(payload.requestCode);
+      trackOpenAiLeadCreated();
     } catch (error) {
       setSubmitError(
         error instanceof Error
