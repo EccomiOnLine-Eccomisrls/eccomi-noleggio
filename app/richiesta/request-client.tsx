@@ -19,7 +19,10 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 
-function trackOpenAiLeadCreated(retries = 20) {
+function trackOpenAiLeadCreated(
+  retries = 20,
+  onSent?: () => void,
+) {
   try {
     if (typeof window === "undefined") return;
 
@@ -33,12 +36,19 @@ function trackOpenAiLeadCreated(retries = 20) {
         "lead_created",
         { type: "customer_action" },
       );
+
+      try {
+        onSent?.();
+      } catch {
+        // Storage bookkeeping must never affect the conversion event.
+      }
+
       return;
     }
 
     if (retries > 0) {
       window.setTimeout(
-        () => trackOpenAiLeadCreated(retries - 1),
+        () => trackOpenAiLeadCreated(retries - 1, onSent),
         250,
       );
     }
@@ -48,18 +58,20 @@ function trackOpenAiLeadCreated(retries = 20) {
 }
 
 function trackCompletedPracticeLead(practiceCode: string) {
+  if (typeof window === "undefined") return;
+
+  const storageKey =
+    `openai_ads_noleggio_lead_${practiceCode}`;
+
   try {
-    if (typeof window === "undefined") return;
-
-    const storageKey =
-      `openai_ads_noleggio_lead_${practiceCode}`;
-
     if (window.localStorage.getItem(storageKey) === "1") {
       return;
     }
 
-    window.localStorage.setItem(storageKey, "1");
-    trackOpenAiLeadCreated();
+    trackOpenAiLeadCreated(
+      20,
+      () => window.localStorage.setItem(storageKey, "1"),
+    );
   } catch {
     // If storage is unavailable, still attempt the conversion event.
     trackOpenAiLeadCreated();
