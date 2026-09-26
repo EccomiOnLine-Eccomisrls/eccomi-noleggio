@@ -148,6 +148,7 @@ export default function CustomRequestClient() {
   const [submitError, setSubmitError] = useState("");
   const [requestCode, setRequestCode] = useState("");
   const submissionKey = useRef(createSubmissionKey());
+  const conversionTrackingStarted = useRef(false);
 
   const updateField = (
     name: keyof CustomRequestFields,
@@ -249,6 +250,7 @@ export default function CustomRequestClient() {
         ok?: boolean;
         error?: string;
         requestCode?: string;
+        duplicate?: boolean;
       };
 
       if (!response.ok || !payload.requestCode) {
@@ -259,7 +261,18 @@ export default function CustomRequestClient() {
       }
 
       setRequestCode(payload.requestCode);
-      trackOpenAiLeadCreated();
+
+      const shouldTrackLead =
+        response.status === 201
+        || payload.duplicate === true;
+
+      if (
+        shouldTrackLead
+        && !conversionTrackingStarted.current
+      ) {
+        conversionTrackingStarted.current = true;
+        trackOpenAiLeadCreated();
+      }
     } catch (error) {
       setSubmitError(
         error instanceof Error
