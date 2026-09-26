@@ -18,6 +18,54 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+
+function trackOpenAiLeadCreated(retries = 20) {
+  try {
+    if (typeof window === "undefined") return;
+
+    const adsWindow = window as Window & {
+      oaiq?: (...args: unknown[]) => void;
+    };
+
+    if (typeof adsWindow.oaiq === "function") {
+      adsWindow.oaiq(
+        "measure",
+        "lead_created",
+        { type: "customer_action" },
+      );
+      return;
+    }
+
+    if (retries > 0) {
+      window.setTimeout(
+        () => trackOpenAiLeadCreated(retries - 1),
+        250,
+      );
+    }
+  } catch {
+    // Tracking must never block or alter the customer request flow.
+  }
+}
+
+function trackCompletedPracticeLead(practiceCode: string) {
+  try {
+    if (typeof window === "undefined") return;
+
+    const storageKey =
+      `openai_ads_noleggio_lead_${practiceCode}`;
+
+    if (window.localStorage.getItem(storageKey) === "1") {
+      return;
+    }
+
+    window.localStorage.setItem(storageKey, "1");
+    trackOpenAiLeadCreated();
+  } catch {
+    // If storage is unavailable, still attempt the conversion event.
+    trackOpenAiLeadCreated();
+  }
+}
+
 type CustomerProfile = "" | "PRIVATE" | "PROFESSIONAL" | "COMPANY";
 
 type PublicPromotion = {
@@ -201,6 +249,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
           error?: string;
           practiceCode?: string;
           status?: string;
+          duplicate?: boolean;
         };
       }
 
@@ -267,6 +316,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
        */
       if (startPayload.status === "NEW") {
         setPracticeCode(newPracticeCode);
+        trackCompletedPracticeLead(newPracticeCode);
         return;
       }
 
@@ -330,6 +380,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
       }
 
       setPracticeCode(newPracticeCode);
+      trackCompletedPracticeLead(newPracticeCode);
     } catch (error) {
       setSubmitError(
         error instanceof Error
