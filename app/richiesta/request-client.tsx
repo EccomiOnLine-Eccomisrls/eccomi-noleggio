@@ -18,6 +18,66 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+
+function trackOpenAiLeadCreated(
+  retries = 20,
+  onSent?: () => void,
+) {
+  try {
+    if (typeof window === "undefined") return;
+
+    const adsWindow = window as Window & {
+      oaiq?: (...args: unknown[]) => void;
+    };
+
+    if (typeof adsWindow.oaiq === "function") {
+      adsWindow.oaiq(
+        "measure",
+        "lead_created",
+        { type: "customer_action" },
+      );
+
+      try {
+        onSent?.();
+      } catch {
+        // Storage bookkeeping must never affect the conversion event.
+      }
+
+      return;
+    }
+
+    if (retries > 0) {
+      window.setTimeout(
+        () => trackOpenAiLeadCreated(retries - 1, onSent),
+        250,
+      );
+    }
+  } catch {
+    // Tracking must never block or alter the customer request flow.
+  }
+}
+
+function trackCompletedPracticeLead(practiceCode: string) {
+  if (typeof window === "undefined") return;
+
+  const storageKey =
+    `openai_ads_noleggio_lead_${practiceCode}`;
+
+  try {
+    if (window.localStorage.getItem(storageKey) === "1") {
+      return;
+    }
+
+    trackOpenAiLeadCreated(
+      20,
+      () => window.localStorage.setItem(storageKey, "1"),
+    );
+  } catch {
+    // If storage is unavailable, still attempt the conversion event.
+    trackOpenAiLeadCreated();
+  }
+}
+
 type CustomerProfile = "" | "PRIVATE" | "PROFESSIONAL" | "COMPANY";
 
 type PublicPromotion = {
@@ -201,6 +261,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
           error?: string;
           practiceCode?: string;
           status?: string;
+          duplicate?: boolean;
         };
       }
 
@@ -267,6 +328,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
        */
       if (startPayload.status === "NEW") {
         setPracticeCode(newPracticeCode);
+        trackCompletedPracticeLead(newPracticeCode);
         return;
       }
 
@@ -330,6 +392,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
       }
 
       setPracticeCode(newPracticeCode);
+      trackCompletedPracticeLead(newPracticeCode);
     } catch (error) {
       setSubmitError(
         error instanceof Error
