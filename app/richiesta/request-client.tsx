@@ -164,6 +164,16 @@ function quickLeadConversionKey(requestCode: string) {
   return `eccomi_noleggio_quick_lead_conversion_${requestCode}`;
 }
 
+function createDocumentUploadId() {
+  const browserCrypto = globalThis.crypto;
+
+  if (typeof browserCrypto?.randomUUID === "function") {
+    return browserCrypto.randomUUID();
+  }
+
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+}
+
 function createSubmissionKey() {
   const browserCrypto = globalThis.crypto;
   if (typeof browserCrypto?.randomUUID === "function") return `ecn_${browserCrypto.randomUUID()}`;
@@ -201,6 +211,9 @@ export default function RequestClient({
   const [practiceCode, setPracticeCode] = useState("");
   const [preview, setPreview] = useState(false);
   const submissionKey = useRef(createSubmissionKey());
+  const documentUploadIds = useRef(
+    new Map<string, string>(),
+  );
 
   useEffect(() => {
     if (!quickLeadCode || typeof window === "undefined") return;
@@ -373,6 +386,11 @@ export default function RequestClient({
           status?: string;
           duplicate?: boolean;
           preview?: boolean;
+          documentId?: string;
+          objectKey?: string;
+          signedUrl?: string | null;
+          alreadyComplete?: boolean;
+          originalName?: string;
         };
       }
 
@@ -392,6 +410,145 @@ export default function RequestClient({
       vat: "VAT_CERTIFICATE",
       chamber: "CHAMBER_REPORT",
       financial: "FINANCIAL",
+    };
+
+    const uploadDocumentDirectly = async (input: {
+      practiceCode: string;
+      documentType: string;
+      file: File;
+      uploadId: string;
+    }) => {
+      const metadata = {
+        documentType: input.documentType,
+        uploadId: input.uploadId,
+        originalName: input.file.name,
+        mimeType: input.file.type,
+        sizeBytes: input.file.size,
+      };
+
+      const finalize = async () => {
+        const response = await fetch(
+          `/api/public/applications/${encodeURIComponent(input.practiceCode)}/document-upload/complete`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(metadata),
+          },
+        );
+
+        const payload = await readPayload(response);
+
+        return {
+          response,
+          payload,
+        };
+      };
+
+      let lastError =
+        `Caricamento non riuscito: ${input.file.name}.`;
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const prepareResponse = await fetch(
+          `/api/public/applications/${encodeURIComponent(input.practiceCode)}/document-upload/prepare`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(metadata),
+          },
+        );
+
+        const preparePayload =
+          await readPayload(prepareResponse);
+
+        if (!prepareResponse.ok) {
+          throw new Error(
+            preparePayload.error
+              || `Preparazione upload non riuscita: ${input.file.name}.`,
+          );
+        }
+
+        if (preparePayload.alreadyComplete) {
+          return;
+        }
+
+        if (preparePayload.preview) {
+          const previewFinalize = await finalize();
+
+          if (!previewFinalize.response.ok) {
+            throw new Error(
+              previewFinalize.payload.error
+                || `Simulazione upload non riuscita: ${input.file.name}.`,
+            );
+          }
+
+          return;
+        }
+
+        if (!preparePayload.signedUrl) {
+          throw new Error(
+            `URL firmata non disponibile: ${input.file.name}.`,
+          );
+        }
+
+        const directBody = new FormData();
+        directBody.append("cacheControl", "3600");
+        directBody.append("", input.file, input.file.name);
+
+        let directResponse: Response | null = null;
+
+        try {
+          directResponse = await fetch(
+            preparePayload.signedUrl,
+            {
+              method: "PUT",
+              headers: {
+                "x-upsert": "false",
+              },
+              body: directBody,
+            },
+          );
+        } catch {
+          directResponse = null;
+        }
+
+        if (directResponse?.ok) {
+          const completed = await finalize();
+
+          if (completed.response.ok) {
+            return;
+          }
+
+          lastError =
+            completed.payload.error
+            || `Registrazione documento non riuscita: ${input.file.name}.`;
+        } else {
+          /*
+           * Se la rete ha perso la risposta ma Supabase ha già ricevuto
+           * il file, la finalizzazione idempotente lo riconosce e chiude
+           * comunque il documento senza ricaricare byte via Render.
+           */
+          const completed = await finalize();
+
+          if (completed.response.ok) {
+            return;
+          }
+
+          const directDetail = directResponse
+            ? await directResponse.text().catch(() => "")
+            : "";
+
+          lastError =
+            completed.payload.error
+            || directDetail.slice(0, 180)
+            || `Upload diretto non riuscito: ${input.file.name}.`;
+        }
+      }
+
+      throw new Error(lastError);
     };
 
     try {
@@ -449,10 +606,13 @@ export default function RequestClient({
 
       /*
        * FASE 2
-       * Carica ogni documento con una richiesta separata.
+       * I byte dei documenti vanno direttamente dal browser a Supabase
+       * Storage tramite URL firmate. Render gestisce soltanto firma,
+       * verifica e metadati.
        */
       for (const requirement of documentRequirements) {
-        const documentType = documentTypeByKey[requirement.key];
+        const documentType =
+          documentTypeByKey[requirement.key];
 
         if (!documentType) {
           throw new Error(
@@ -460,39 +620,35 @@ export default function RequestClient({
           );
         }
 
-        const selectedFiles = documents[requirement.key] || [];
+        const selectedFiles =
+          documents[requirement.key] || [];
 
-        for (const file of selectedFiles) {
-          /*
-           * Render PR preview:
-           * il file resta esclusivamente nel browser. Non inviamo i byte
-           * neppure al servizio preview, così il collaudo non può toccare
-           * storage e non dipende dai limiti body/proxy dell'ambiente.
-           */
-          if (preview) {
-            continue;
-          }
+        for (const [fileIndex, file] of selectedFiles.entries()) {
+          const fingerprint = [
+            requirement.key,
+            file.name,
+            file.size,
+            file.lastModified,
+            fileIndex,
+          ].join(":");
 
-          const uploadBody = new FormData();
-          uploadBody.set("documentType", documentType);
-          uploadBody.set("file", file, file.name);
+          let uploadId =
+            documentUploadIds.current.get(fingerprint);
 
-          const uploadResponse = await fetch(
-            `/api/public/applications/${encodeURIComponent(newPracticeCode)}/document`,
-            {
-              method: "POST",
-              body: uploadBody,
-            },
-          );
-
-          const uploadPayload = await readPayload(uploadResponse);
-
-          if (!uploadResponse.ok) {
-            throw new Error(
-              uploadPayload.error
-                || `Caricamento non riuscito: ${file.name}.`,
+          if (!uploadId) {
+            uploadId = createDocumentUploadId();
+            documentUploadIds.current.set(
+              fingerprint,
+              uploadId,
             );
           }
+
+          await uploadDocumentDirectly({
+            practiceCode: newPracticeCode,
+            documentType,
+            file,
+            uploadId,
+          });
         }
       }
 
