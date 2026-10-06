@@ -283,3 +283,115 @@ test("PR39 prepare impedisce collisioni documentId tra pratiche diverse", async 
     /Identificativo documento già utilizzato\./,
   );
 });
+
+
+test("PR39 hardening forza i vincoli anche sul bucket Storage esistente", async () => {
+  const storage = await read(
+    "app/lib/server/practice-storage.ts",
+  );
+  const policy = await read(
+    "app/lib/server/practice-document-upload.ts",
+  );
+
+  assert.match(
+    storage,
+    /const current = await response\.json\(\)/,
+  );
+  assert.match(
+    storage,
+    /const needsHardening =/,
+  );
+  assert.match(
+    storage,
+    /current\.public !== false/,
+  );
+  assert.match(
+    storage,
+    /current\.file_size_limit[\s\S]*PRACTICE_DOCUMENT_MAX_BYTES/,
+  );
+  assert.match(
+    storage,
+    /current\.allowed_mime_types/,
+  );
+  assert.match(
+    storage,
+    /method: "PUT"/,
+  );
+  assert.match(
+    storage,
+    /public: false/,
+  );
+  assert.match(
+    storage,
+    /file_size_limit: PRACTICE_DOCUMENT_MAX_BYTES/,
+  );
+  assert.match(
+    storage,
+    /allowed_mime_types: desiredMimeTypes/,
+  );
+
+  assert.match(
+    policy,
+    /PRACTICE_DOCUMENT_MAX_BYTES = 10 \* 1024 \* 1024/,
+  );
+  assert.match(
+    policy,
+    /"application\/pdf"/,
+  );
+  assert.match(
+    policy,
+    /"image\/jpeg"/,
+  );
+  assert.match(
+    policy,
+    /"image\/png"/,
+  );
+});
+
+test("PR39 hardening deriva l'estensione Storage dal MIME validato", async () => {
+  const storage = await read(
+    "app/lib/server/practice-storage.ts",
+  );
+  const policy = await read(
+    "app/lib/server/practice-document-upload.ts",
+  );
+  const prepare = await read(
+    "app/api/public/applications/[id]/document-upload/prepare/route.ts",
+  );
+  const complete = await read(
+    "app/api/public/applications/[id]/document-upload/complete/route.ts",
+  );
+
+  assert.match(
+    policy,
+    /"application\/pdf": "pdf"/,
+  );
+  assert.match(
+    policy,
+    /"image\/jpeg": "jpg"/,
+  );
+  assert.match(
+    policy,
+    /"image\/png": "png"/,
+  );
+  assert.match(
+    storage,
+    /practiceDocumentExtensionForMime\(\s*input\.mimeType/,
+  );
+  assert.match(
+    storage,
+    /practiceDocumentExtensionForMime\(\s*input\.file\.type/,
+  );
+  assert.doesNotMatch(
+    storage,
+    /input\.originalName\.split\("\."\)/,
+  );
+  assert.match(
+    prepare,
+    /mimeType: input\.mimeType/,
+  );
+  assert.match(
+    complete,
+    /mimeType: input\.mimeType/,
+  );
+});
