@@ -10,6 +10,8 @@ import {
 } from "../../../../../../lib/server/practice-document-upload";
 import {
   createPracticeDocumentSignedUpload,
+  getPracticeDocumentObjectInfo,
+  practiceDocumentObjectKey,
 } from "../../../../../../lib/server/practice-storage";
 import {
   corsHeaders,
@@ -100,6 +102,7 @@ export async function POST(
           `preview/${input.documentType}/${input.uploadId}`,
         signedUrl: null,
         alreadyComplete: false,
+        alreadyUploaded: false,
       },
       200,
       origin,
@@ -160,6 +163,60 @@ export async function POST(
           objectKey: existing.storageKey,
           originalName: existing.originalName,
           alreadyComplete: true,
+          alreadyUploaded: true,
+        },
+        200,
+        origin,
+      );
+    }
+
+    const expectedObjectKey = practiceDocumentObjectKey({
+      practiceCode: id,
+      documentType: input.documentType,
+      uploadId: input.uploadId,
+      originalName: input.originalName,
+    });
+
+    const alreadyStored =
+      await getPracticeDocumentObjectInfo(expectedObjectKey);
+
+    if (alreadyStored) {
+      if (
+        alreadyStored.sizeBytes !== null
+        && alreadyStored.sizeBytes !== input.sizeBytes
+      ) {
+        return jsonWithCors(
+          {
+            error:
+              "Esiste già un upload con dimensione diversa. Rimuovi e riseleziona il file.",
+          },
+          409,
+          origin,
+        );
+      }
+
+      if (
+        alreadyStored.mimeType
+        && alreadyStored.mimeType !== input.mimeType
+      ) {
+        return jsonWithCors(
+          {
+            error:
+              "Esiste già un upload con formato diverso. Rimuovi e riseleziona il file.",
+          },
+          409,
+          origin,
+        );
+      }
+
+      return jsonWithCors(
+        {
+          ok: true,
+          documentId: input.documentId,
+          objectKey: expectedObjectKey,
+          signedUrl: null,
+          alreadyComplete: false,
+          alreadyUploaded: true,
         },
         200,
         origin,
@@ -181,6 +238,7 @@ export async function POST(
         objectKey: upload.objectKey,
         signedUrl: upload.signedUrl,
         alreadyComplete: false,
+        alreadyUploaded: false,
       },
       201,
       origin,
