@@ -4,6 +4,7 @@ import { leads, partners, promotions } from "../../../../../db/schema";
 import { encryptSensitivePracticeData } from "../../../../lib/server/credential-crypto";
 import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
 import { corsHeaders, jsonWithCors, publicCorsOrigin } from "../../../../lib/server/public-origin";
+import { isRenderPullRequestPreview } from "../../../../lib/server/preview-mode";
 
 const PRIVACY_VERSION = "ECCOMI-NOLEGGIO-2026-07";
 const customerTypes = new Set(["PRIVATE", "PROFESSIONAL", "COMPANY"]);
@@ -83,6 +84,27 @@ export async function POST(request: Request) {
   if (!validIban(iban)) return jsonWithCors({ error: "Inserisci un IBAN valido." }, 422, origin);
   if (!privacyAccepted) return jsonWithCors({ error: "Il consenso privacy è necessario per gestire la richiesta." }, 422, origin);
   if (!/^[a-zA-Z0-9:_-]{8,100}$/.test(submissionKey)) return jsonWithCors({ error: "Identificativo di invio non valido." }, 422, origin);
+
+  if (isRenderPullRequestPreview(request)) {
+    if (promotionId !== "pr38-preview-valid-offer") {
+      return jsonWithCors(
+        { error: "Offerta completa preview non riconosciuta." },
+        404,
+        origin,
+      );
+    }
+
+    return jsonWithCors(
+      {
+        ok: true,
+        practiceCode: "ECN-PREVIEW-000001",
+        status: "UPLOAD_IN_PROGRESS",
+        preview: true,
+      },
+      201,
+      origin,
+    );
+  }
 
   try {
     await ensurePracticeSchema();
