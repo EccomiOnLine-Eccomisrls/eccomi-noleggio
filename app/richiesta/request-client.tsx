@@ -360,6 +360,16 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
         const selectedFiles = documents[requirement.key] || [];
 
         for (const file of selectedFiles) {
+          /*
+           * Render PR preview:
+           * il file resta esclusivamente nel browser. Non inviamo i byte
+           * neppure al servizio preview, così il collaudo non può toccare
+           * storage e non dipende dai limiti body/proxy dell'ambiente.
+           */
+          if (preview) {
+            continue;
+          }
+
           const uploadBody = new FormData();
           uploadBody.set("documentType", documentType);
           uploadBody.set("file", file, file.name);
@@ -469,7 +479,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
                     {files.length ? <div>{files.map((file, index) => <button type="button" key={`${file.name}-${index}`} onClick={() => removeDocument(item.key, index)} aria-label={`Rimuovi ${file.name}`}>×</button>)}</div> : null}
                   </div>;
                 })}</div>
-                <div className="public-safety"><LockKeyhole size={20} /><p><strong>Area protetta ECCOMI.</strong><small>I documenti e l’IBAN vengono conservati in modo riservato e resi disponibili soltanto agli operatori autorizzati.</small></p></div>
+                <div className="public-safety"><LockKeyhole size={20} /><p><strong>Area protetta ECCOMI.</strong><small>{preview ? "Preview PR38: i file selezionati restano nel browser e non vengono caricati su alcuno storage." : "I documenti e l’IBAN vengono conservati in modo riservato e resi disponibili soltanto agli operatori autorizzati."}</small></p></div>
                 {submitError ? <div className="public-error"><AlertTriangle size={18} /> {submitError}</div> : null}
               </div> : null}
 
