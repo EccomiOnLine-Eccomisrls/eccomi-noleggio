@@ -214,3 +214,14 @@ test("PR38 autorizza il dominio dinamico Render della preview senza aprirlo in p
   assert.match(cors, /origin\.includes\("-pr-"\)/);
   assert.match(cors, /isRenderPullRequestPreview\(request\)/);
 });
+
+
+test("PR38 accetta il POST same-origin dalla Render PR preview senza aprire il CORS", async () => {
+  const cors = await read("app/lib/server/public-origin.ts");
+
+  assert.match(cors, /isRenderPreviewHostname/);
+  assert.match(cors, /requestOrigin === origin/);
+  assert.match(cors, /forwardedOrigin === origin/);
+  assert.match(cors, /isRenderPullRequestPreview\(request\)/);
+  assert.doesNotMatch(cors, /origin\.endsWith\("\.onrender\.com"\)\s*\? origin/);
+});
