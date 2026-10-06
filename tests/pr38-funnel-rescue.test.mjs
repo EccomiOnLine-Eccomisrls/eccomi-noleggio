@@ -399,3 +399,26 @@ test("PR38 complete-practice preview resta completamente isolata", async () => {
     /payload\.preview !== true[\s\S]*response\.status === 201/,
   );
 });
+
+
+test("PR38 preview non invia i byte dei documenti al server", async () => {
+  const client = await read("app/richiesta/request-client.tsx");
+
+  assert.match(
+    client,
+    /if \(preview\) \{\s*continue;\s*\}/,
+  );
+  const previewSkip = client.indexOf("if (preview) {");
+  const formData = client.indexOf("const uploadBody = new FormData()");
+  const uploadFetch = client.indexOf(
+    "/api/public/applications/${encodeURIComponent(newPracticeCode)}/document",
+  );
+
+  assert.ok(previewSkip >= 0);
+  assert.ok(formData > previewSkip);
+  assert.ok(uploadFetch > previewSkip);
+  assert.match(
+    client,
+    /i file selezionati restano nel browser e non vengono caricati su alcuno storage/,
+  );
+});
