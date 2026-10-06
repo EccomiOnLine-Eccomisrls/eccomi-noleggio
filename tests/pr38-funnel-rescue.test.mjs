@@ -52,10 +52,11 @@ test("PR38 non scrive dati reali durante il Render PR preview", async () => {
 
 test("PR38 conserva la sorgente commerciale del lead", async () => {
   const api = await read("app/api/public/custom-requests/route.ts");
+  const attribution = await read("app/lib/attribution.ts");
 
-  assert.match(api, /ECCOMI_NOLEGGIO_ADS/);
-  assert.match(api, /ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT/);
-  assert.match(api, /ECCOMI_NOLEGGIO_SHOPIFY_LANDING/);
+  assert.match(attribution, /ECCOMI_NOLEGGIO_ADS/);
+  assert.match(attribution, /ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT/);
+  assert.match(attribution, /ECCOMI_NOLEGGIO_SHOPIFY_LANDING/);
   assert.match(api, /source: requestSource/);
 });
 
@@ -125,7 +126,7 @@ test("PR38 recupera anche un'offerta scaduta invece di mandare il cliente su una
   );
   assert.match(client, /window\.location\.assign\(/);
   assert.match(client, /nextParams\.toString\(\)/);
-  assert.match(client, /completa=1/);
+  assert.match(client, /completa: "1"/);
   assert.match(client, /L’offerta va aggiornata/);
 });
 
@@ -575,7 +576,7 @@ test("PR38 UX continuity non mostra la conferma intermedia sulle offerte valide"
   assert.ok(requestCodePosition > redirectPosition);
   assert.match(
     interest,
-    /if \(offer\.available\)[\s\S]*window\.location\.assign\(nextUrl\)[\s\S]*return;/,
+    /if \(offer\.available\)[\s\S]*window\.location\.assign\([\s\S]*nextParams\.toString\(\)[\s\S]*return;/,
   );
   assert.match(interest, /Continua alla pratica/);
   assert.doesNotMatch(interest, /Completa ora la pratica/);
