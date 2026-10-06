@@ -176,23 +176,16 @@ export default function OfferInterestClient({
   }, [promotionId]);
 
   const contactComplete = useMemo(() => {
-    const base =
+    return (
       fields.firstName.trim().length >= 2
       && fields.lastName.trim().length >= 2
       && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
         fields.email.trim(),
       )
       && fields.phone.replace(/\D/g, "").length >= 8
-      && fields.province.trim().length >= 2;
-
-    if (!base) return false;
-    if (profile === "PRIVATE") return true;
-
-    return (
-      fields.businessName.trim().length >= 2
-      && fields.vatNumber.replace(/\D/g, "").length === 11
+      && fields.province.trim().length >= 2
     );
-  }, [fields, profile]);
+  }, [fields]);
 
   const canContinue =
     step === 1
@@ -552,43 +545,6 @@ export default function OfferInterestClient({
                           required
                         />
                       </label>
-
-                      {profile !== "PRIVATE" ? (
-                        <>
-                          <label>
-                            <span>
-                              {profile === "COMPANY"
-                                ? "Ragione sociale"
-                                : "Denominazione attività"}
-                            </span>
-                            <input
-                              value={fields.businessName}
-                              onChange={(event) =>
-                                updateField(
-                                  "businessName",
-                                  event.target.value,
-                                )
-                              }
-                              required
-                            />
-                          </label>
-                          <label>
-                            <span>Partita IVA</span>
-                            <input
-                              inputMode="numeric"
-                              maxLength={11}
-                              value={fields.vatNumber}
-                              onChange={(event) =>
-                                updateField(
-                                  "vatNumber",
-                                  event.target.value,
-                                )
-                              }
-                              required
-                            />
-                          </label>
-                        </>
-                      ) : null}
 
                       <label
                         className="public-honeypot"
