@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sum } from "drizzle-orm";
+import { and, count, desc, eq, isNull, ne, sum } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { commissions, customVehicleRequests, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
 import { isPartnerNoleggioRole } from "../../lib/permissions";
@@ -42,6 +42,35 @@ export async function GET(request: Request) {
     const activePracticeFilter = partnerFilter
       ? and(partnerFilter, isNull(leads.deletedAt))
       : isNull(leads.deletedAt);
+
+    const [practiceLeadStats] = await db
+      .select({ total: count() })
+      .from(leads)
+      .where(activePracticeFilter);
+
+    const [newPracticeLeadStats] = await db
+      .select({ total: count() })
+      .from(leads)
+      .where(
+        and(
+          activePracticeFilter,
+          eq(leads.status, "NEW"),
+        ),
+      );
+
+    const [quickLeadStats] = isPartnerNoleggioRole(actor.role)
+      ? [{ total: 0 }]
+      : await db
+          .select({ total: count() })
+          .from(customVehicleRequests)
+          .where(ne(customVehicleRequests.status, "CONVERTED"));
+
+    const [newQuickLeadStats] = isPartnerNoleggioRole(actor.role)
+      ? [{ total: 0 }]
+      : await db
+          .select({ total: count() })
+          .from(customVehicleRequests)
+          .where(eq(customVehicleRequests.status, "NEW"));
 
     const [commissionStats] = await db.select({ total: sum(commissions.amountCents) }).from(commissions).where(commissionPartnerFilter);
     const commissionRows = await db
@@ -109,6 +138,7 @@ export async function GET(request: Request) {
             createdAt: customVehicleRequests.createdAt,
           })
           .from(customVehicleRequests)
+          .where(ne(customVehicleRequests.status, "CONVERTED"))
           .orderBy(desc(customVehicleRequests.createdAt))
           .limit(100);
 
@@ -196,8 +226,12 @@ export async function GET(request: Request) {
         approved: promotionRows.filter((item) => item.status === "APPROVED").length,
         active: promotionRows.filter((item) => item.status === "ONLINE" || item.status === "ACTIVE" || item.status === "EXPIRING").length,
         expired: promotionRows.filter((item) => item.status === "EXPIRED" || item.status === "ARCHIVED").length,
-        leads: dashboardLeads.length,
-        newLeads: dashboardLeads.filter((lead) => lead.status === "NEW").length,
+        leads:
+          Number(practiceLeadStats?.total || 0)
+          + Number(quickLeadStats?.total || 0),
+        newLeads:
+          Number(newPracticeLeadStats?.total || 0)
+          + Number(newQuickLeadStats?.total || 0),
         commissionCents: Number(commissionStats?.total || 0),
       },
     });
