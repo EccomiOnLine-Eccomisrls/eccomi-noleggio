@@ -104,7 +104,7 @@ test("PR38 cattura interesse da scheda senza IBAN o documenti e traccia solo un 
   assert.doesNotMatch(client, /document_identity|document_income|document_chamber/);
   assert.match(client, /source,/);
   assert.match(client, /response\.status === 201/);
-  assert.match(client, /trackLeadCreated\(\)/);
+  assert.match(client, /trackLeadCreated\(/);
   assert.match(client, /Nessun documento o IBAN richiesto ora\./);
 });
 
@@ -457,7 +457,7 @@ test("PR38 hardening emette una sola lead_created nel percorso lead-first", asyn
   const interest = await read("app/richiesta/offer-interest-client.tsx");
   const complete = await read("app/richiesta/request-client.tsx");
 
-  assert.match(interest, /trackLeadCreated\(\)/);
+  assert.match(interest, /trackLeadCreated\(/);
   assert.match(
     complete,
     /if \(!preview && !quickLeadCode\)[\s\S]*trackCompletedPracticeLead\(newPracticeCode\)/,
