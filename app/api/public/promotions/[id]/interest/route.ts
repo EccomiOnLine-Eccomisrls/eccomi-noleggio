@@ -8,6 +8,13 @@ import {
 } from "../../../../../lib/server/public-origin";
 import { isRenderPullRequestPreview } from "../../../../../lib/server/preview-mode";
 
+const interestVisibleStatuses = new Set([
+  "ONLINE",
+  "ACTIVE",
+  "EXPIRING",
+  "EXPIRED",
+]);
+
 function isAvailable(status: string, validUntil: string) {
   const today = new Date().toLocaleDateString("sv-SE", {
     timeZone: "Europe/Rome",
@@ -113,7 +120,10 @@ export async function GET(
     .where(eq(promotions.id, id))
     .limit(1);
 
-  if (!promotion || promotion.status === "TRASHED") {
+  if (
+    !promotion
+    || !interestVisibleStatuses.has(promotion.status)
+  ) {
     return jsonWithCors(
       { error: "Offerta non riconosciuta." },
       404,
