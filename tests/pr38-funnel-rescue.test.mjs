@@ -225,3 +225,13 @@ test("PR38 accetta il POST same-origin dalla Render PR preview senza aprire il C
   assert.match(cors, /isRenderPullRequestPreview\(request\)/);
   assert.doesNotMatch(cors, /origin\.endsWith\("\.onrender\.com"\)\s*\? origin/);
 });
+
+
+test("PR38 accetta la stessa preview Render anche quando il proxy espone requestUrl http", async () => {
+  const origin = await read("app/lib/server/public-origin.ts");
+
+  assert.match(origin, /sameHostBehindProxy/);
+  assert.match(origin, /new URL\(origin\)\.host/);
+  assert.match(origin, /new URL\(request\.url\)\.host/);
+  assert.match(origin, /originHost === requestHost/);
+});
