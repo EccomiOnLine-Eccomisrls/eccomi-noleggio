@@ -106,6 +106,12 @@ export async function GET(request: Request) {
         accountHolder: leads.accountHolder,
         completedAt: leads.completedAt,
         sentToPartnerAt: leads.sentToPartnerAt,
+        source: leads.source,
+        attributionSource: leads.attributionSource,
+        entrySource: leads.entrySource,
+        campaignKey: leads.campaignKey,
+        adGroupKey: leads.adGroupKey,
+        adKey: leads.adKey,
         createdAt: leads.createdAt,
         brand: promotions.brand,
         model: promotions.model,
@@ -135,6 +141,11 @@ export async function GET(request: Request) {
             brand: customVehicleRequests.brand,
             modelOrSegment: customVehicleRequests.modelOrSegment,
             source: customVehicleRequests.source,
+            attributionSource: customVehicleRequests.attributionSource,
+            entrySource: customVehicleRequests.entrySource,
+            campaignKey: customVehicleRequests.campaignKey,
+            adGroupKey: customVehicleRequests.adGroupKey,
+            adKey: customVehicleRequests.adKey,
             createdAt: customVehicleRequests.createdAt,
           })
           .from(customVehicleRequests)
@@ -169,6 +180,12 @@ export async function GET(request: Request) {
         accountHolder: lead.accountHolder,
         completedAt: lead.completedAt,
         sentToPartnerAt: lead.sentToPartnerAt,
+        source: lead.source,
+        attributionSource: lead.attributionSource || "direct",
+        entrySource: lead.entrySource || "direct",
+        campaignKey: lead.campaignKey,
+        adGroupKey: lead.adGroupKey,
+        adKey: lead.adKey,
         createdAt: lead.createdAt,
         vehicle: `${lead.brand} ${lead.model}`,
         offerNumber: lead.offerNumber,
@@ -192,6 +209,24 @@ export async function GET(request: Request) {
         accountHolder: null,
         completedAt: null,
         sentToPartnerAt: null,
+        source: lead.source,
+        attributionSource:
+          lead.attributionSource
+          || (
+            lead.source === "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
+              ? "shopify-product"
+              : "direct"
+          ),
+        entrySource:
+          lead.entrySource
+          || (
+            lead.source === "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
+              ? "shopify-product"
+              : "direct"
+          ),
+        campaignKey: lead.campaignKey,
+        adGroupKey: lead.adGroupKey,
+        adKey: lead.adKey,
         createdAt: lead.createdAt,
         vehicle:
           [lead.brand, lead.modelOrSegment]
