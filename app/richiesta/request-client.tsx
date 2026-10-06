@@ -447,48 +447,78 @@ export default function RequestClient({
       };
 
       const finalize = async () => {
-        const response = await fetch(
-          `/api/public/applications/${encodeURIComponent(input.practiceCode)}/document-upload/complete`,
-          {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
+        try {
+          const response = await fetch(
+            `/api/public/applications/${encodeURIComponent(input.practiceCode)}/document-upload/complete`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+              },
+              body: JSON.stringify(metadata),
             },
-            body: JSON.stringify(metadata),
-          },
-        );
+          );
 
-        const payload = await readPayload(response);
+          const payload = await readPayload(response);
 
-        return {
-          response,
-          payload,
-        };
+          return {
+            response,
+            payload,
+          };
+        } catch {
+          return {
+            response: null,
+            payload: {
+              error:
+                `Connessione interrotta durante la registrazione di ${input.file.name}.`,
+            },
+          };
+        }
       };
 
       let lastError =
         `Caricamento non riuscito: ${input.file.name}.`;
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        const prepareResponse = await fetch(
-          `/api/public/applications/${encodeURIComponent(input.practiceCode)}/document-upload/prepare`,
-          {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-            },
-            body: JSON.stringify(metadata),
-          },
-        );
+        let prepareResponse: Response;
+        let preparePayload: Awaited<
+          ReturnType<typeof readPayload>
+        >;
 
-        const preparePayload =
-          await readPayload(prepareResponse);
+        try {
+          prepareResponse = await fetch(
+            `/api/public/applications/${encodeURIComponent(input.practiceCode)}/document-upload/prepare`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+              },
+              body: JSON.stringify(metadata),
+            },
+          );
+
+          preparePayload = await readPayload(
+            prepareResponse,
+          );
+        } catch {
+          lastError =
+            `Connessione interrotta durante la preparazione di ${input.file.name}.`;
+          continue;
+        }
 
         if (!prepareResponse.ok) {
-          throw new Error(
+          lastError =
             preparePayload.error
-              || `Preparazione upload non riuscita: ${input.file.name}.`,
-          );
+            || `Preparazione upload non riuscita: ${input.file.name}.`;
+
+          if (
+            prepareResponse.status >= 400
+            && prepareResponse.status < 500
+          ) {
+            throw new Error(lastError);
+          }
+
+          continue;
         }
 
         if (preparePayload.alreadyComplete) {
@@ -498,7 +528,7 @@ export default function RequestClient({
         if (preparePayload.preview) {
           const previewFinalize = await finalize();
 
-          if (!previewFinalize.response.ok) {
+          if (!previewFinalize.response?.ok) {
             throw new Error(
               previewFinalize.payload.error
                 || `Simulazione upload non riuscita: ${input.file.name}.`,
@@ -511,7 +541,7 @@ export default function RequestClient({
         if (preparePayload.alreadyUploaded) {
           const completed = await finalize();
 
-          if (completed.response.ok) {
+          if (completed.response?.ok) {
             return;
           }
 
@@ -552,7 +582,7 @@ export default function RequestClient({
         if (directResponse?.ok) {
           const completed = await finalize();
 
-          if (completed.response.ok) {
+          if (completed.response?.ok) {
             return;
           }
 
@@ -567,7 +597,7 @@ export default function RequestClient({
            */
           const completed = await finalize();
 
-          if (completed.response.ok) {
+          if (completed.response?.ok) {
             return;
           }
 
