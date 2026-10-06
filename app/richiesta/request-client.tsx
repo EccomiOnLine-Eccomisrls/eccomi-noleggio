@@ -211,10 +211,18 @@ export default function RequestClient({
   promotionId,
   quickLeadCode = "",
   source = "direct",
+  entry = "direct",
+  campaign = "",
+  adGroup = "",
+  ad = "",
 }: {
   promotionId: string;
   quickLeadCode?: string;
   source?: string;
+  entry?: string;
+  campaign?: string;
+  adGroup?: string;
+  ad?: string;
 }) {
   const [promotion, setPromotion] = useState<PublicPromotion | null>(null);
   const [loading, setLoading] = useState(Boolean(promotionId));
@@ -643,6 +651,10 @@ export default function RequestClient({
           submissionKey: submissionKey.current,
           quickLeadCode,
           source,
+          entry,
+          campaign,
+          adGroup,
+          ad,
         }),
       });
 
