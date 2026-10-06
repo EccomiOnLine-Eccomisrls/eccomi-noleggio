@@ -54,22 +54,40 @@ export async function GET(
   const { id } = await context.params;
 
   if (isRenderPullRequestPreview(request)) {
+    const isValidPracticePreview =
+      id === "pr38-preview-valid-offer";
+
     return jsonWithCors(
       {
-        promotion: {
-          id: id || "pr38-preview-offer",
-          offerNumber: "4022223739",
-          brand: "FIAT",
-          model: "Ducato 3",
-          version: "L2H2 140CV 2.2",
-          monthlyGrossCents: 62477,
-          depositGrossCents: 0,
-          durationMonths: 48,
-          totalKm: 60000,
-          validUntil: "2026-09-20",
-          status: "EXPIRED",
-          available: false,
-        },
+        promotion: isValidPracticePreview
+          ? {
+              id,
+              offerNumber: "PR38-VALID-001",
+              brand: "FIAT",
+              model: "500",
+              version: "Hybrid Icon",
+              monthlyGrossCents: 42900,
+              depositGrossCents: 0,
+              durationMonths: 36,
+              totalKm: 45000,
+              validUntil: "2026-11-30",
+              status: "ONLINE",
+              available: true,
+            }
+          : {
+              id: id || "pr38-preview-offer",
+              offerNumber: "4022223739",
+              brand: "FIAT",
+              model: "Ducato 3",
+              version: "L2H2 140CV 2.2",
+              monthlyGrossCents: 62477,
+              depositGrossCents: 0,
+              durationMonths: 48,
+              totalKm: 60000,
+              validUntil: "2026-09-20",
+              status: "EXPIRED",
+              available: false,
+            },
         preview: true,
       },
       200,
