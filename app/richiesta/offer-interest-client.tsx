@@ -45,6 +45,10 @@ function quickLeadStorageKey(requestCode: string) {
   return `eccomi_noleggio_quick_lead_${requestCode}`;
 }
 
+function quickLeadConversionKey(requestCode: string) {
+  return `eccomi_noleggio_quick_lead_conversion_${requestCode}`;
+}
+
 function createSubmissionKey() {
   const browserCrypto = globalThis.crypto;
 
@@ -57,7 +61,7 @@ function createSubmissionKey() {
     .slice(2)}`;
 }
 
-function trackLeadCreated(retries = 20) {
+function trackLeadCreated(retries = 20): boolean {
   try {
     if (
       typeof window !== "undefined"
@@ -68,7 +72,7 @@ function trackLeadCreated(retries = 20) {
         "lead_created",
         { type: "customer_action" },
       );
-      return;
+      return true;
     }
 
     if (retries > 0 && typeof window !== "undefined") {
@@ -80,6 +84,8 @@ function trackLeadCreated(retries = 20) {
   } catch {
     // Il tracking non deve mai bloccare il contatto.
   }
+
+  return false;
 }
 
 function euro(cents: number) {
@@ -94,7 +100,7 @@ function statusCopy(offer: OfferInterest) {
     return {
       label: "OFFERTA DISPONIBILE",
       text:
-        "Salviamo prima il tuo contatto. Documenti e IBAN verranno richiesti solo se deciderai di procedere con la pratica completa.",
+        "Salviamo prima il tuo contatto e poi continui direttamente con la pratica. Documenti e IBAN arrivano solo nel passaggio successivo.",
     };
   }
 
@@ -279,8 +285,6 @@ export default function OfferInterestClient({
         );
       }
 
-      setRequestCode(payload.requestCode);
-
       try {
         window.sessionStorage.setItem(
           quickLeadStorageKey(payload.requestCode),
@@ -303,14 +307,41 @@ export default function OfferInterestClient({
         // Il prefill è un miglioramento UX e non deve bloccare il lead.
       }
 
+      let conversionSent = false;
+
       if (
         !preview
         && response.status === 201
         && !conversionStarted.current
       ) {
         conversionStarted.current = true;
-        trackLeadCreated();
+        conversionSent = trackLeadCreated(
+          offer.available ? 0 : 20,
+        );
       }
+
+      if (offer.available) {
+        if (!preview && response.status === 201) {
+          try {
+            window.sessionStorage.setItem(
+              quickLeadConversionKey(payload.requestCode),
+              conversionSent ? "sent" : "pending",
+            );
+          } catch {
+            // Il tracking non deve bloccare la continuità del funnel.
+          }
+        }
+
+        const nextUrl =
+          `/richiesta?promozione=${encodeURIComponent(offer.id)}`
+          + `&completa=1&lead=${encodeURIComponent(payload.requestCode)}`
+          + `&source=${encodeURIComponent(source)}`;
+
+        window.location.assign(nextUrl);
+        return;
+      }
+
+      setRequestCode(payload.requestCode);
     } catch (error) {
       setSubmitError(
         error instanceof Error
@@ -681,8 +712,12 @@ export default function OfferInterestClient({
                     </>
                   ) : (
                     <>
-                      Richiedi contatto
-                      <Check size={17} />
+                      {offer.available
+                        ? "Continua alla pratica"
+                        : "Richiedi contatto"}
+                      {offer.available
+                        ? <ArrowRight size={17} />
+                        : <Check size={17} />}
                     </>
                   )}
                 </button>
@@ -710,22 +745,10 @@ export default function OfferInterestClient({
                 </p>
               ) : null}
 
-              {offer.available ? (
-                <a
-                  className="public-button public-button--primary"
-                  href={
-                    `/richiesta?promozione=${encodeURIComponent(offer.id)}&completa=1&lead=${encodeURIComponent(requestCode)}&source=${encodeURIComponent(source)}`
-                  }
-                >
-                  Completa ora la pratica
-                  <ArrowRight size={17} />
-                </a>
-              ) : (
-                <p>
-                  L’offerta va aggiornata: ti proporremo la
-                  versione valida o alternative equivalenti.
-                </p>
-              )}
+              <p>
+                L’offerta va aggiornata: ti proporremo la
+                versione valida o alternative equivalenti.
+              </p>
             </div>
           )}
         </section>
