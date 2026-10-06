@@ -108,6 +108,7 @@ export async function POST(request: Request) {
 
   const province = clean(body.province, 60);
   const businessName = clean(body.businessName, 140);
+  const promotionId = clean(body.promotionId, 100);
   const vatNumber = clean(body.vatNumber, 30).replace(/\D/g, "");
 
   const brand = clean(body.brand, 80);
@@ -147,7 +148,7 @@ export async function POST(request: Request) {
   const website = clean(body.website, 300);
   const sourceInput = clean(body.source, 80).toLowerCase();
   const requestSource =
-    sourceInput === "ads-landing"
+    ["ads", "openai-ads", "ads-landing"].includes(sourceInput)
       ? "ECCOMI_NOLEGGIO_ADS"
       : sourceInput === "shopify-product"
         ? "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
@@ -297,6 +298,7 @@ export async function POST(request: Request) {
       province,
       businessName: businessName || null,
       vatNumber: vatNumber || null,
+      promotionId: promotionId || null,
       brand: brand || null,
       modelOrSegment: modelOrSegment || null,
       monthlyBudgetCents,
