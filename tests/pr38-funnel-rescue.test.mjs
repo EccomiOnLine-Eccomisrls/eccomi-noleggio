@@ -152,3 +152,53 @@ test("PR38 usa il dominio ufficiale Noleggio per le future CTA Shopify", async (
     /https:\/\/eccomi-noleggio\.onrender\.com\/richiesta/,
   );
 });
+
+
+test("PR38 rende lead-first anche le richieste da singola offerta", async () => {
+  const page = await read("app/richiesta/page.tsx");
+  const interest = await read("app/richiesta/offer-interest-client.tsx");
+
+  assert.match(page, /OfferInterestClient/);
+  assert.match(page, /params\.completa === "1"/);
+  assert.match(page, /if \(!completePractice\)/);
+  assert.match(interest, /PRIMA IL CONTATTO, POI LA PRATICA/);
+  assert.match(interest, /Nessun IBAN e nessun/);
+  assert.match(interest, /return \(\s*fields\.firstName/);
+  assert.doesNotMatch(
+    interest,
+    /fields\.businessName\.trim\(\)\.length >= 2/,
+  );
+  assert.doesNotMatch(
+    interest,
+    /fields\.vatNumber\.replace\(\/\\D\/g, ""\)\.length === 11/,
+  );
+  assert.doesNotMatch(interest, /<span>Partita IVA<\/span>/);
+  assert.match(interest, /source: "shopify-product"/);
+});
+
+test("PR38 recupera anche offerte scadute come interesse commerciale", async () => {
+  const endpoint = await read(
+    "app/api/public/promotions/[id]/interest/route.ts",
+  );
+
+  assert.match(endpoint, /available: false/);
+  assert.match(endpoint, /status: "EXPIRED"/);
+  assert.match(endpoint, /promotion\.status === "TRASHED"/);
+  assert.doesNotMatch(
+    endpoint,
+    /!isAvailable\(promotion\.status, promotion\.validUntil\)/,
+  );
+});
+
+test("PR38 usa il dominio ufficiale nei futuri CTA Shopify", async () => {
+  const shopify = await read("app/lib/server/shopify-safe-update.ts");
+
+  assert.match(
+    shopify,
+    /https:\/\/noleggio\.eccomionline\.com\/richiesta/,
+  );
+  assert.doesNotMatch(
+    shopify,
+    /https:\/\/eccomi-noleggio\.onrender\.com\/richiesta/,
+  );
+});
