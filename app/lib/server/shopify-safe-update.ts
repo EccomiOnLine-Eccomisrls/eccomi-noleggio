@@ -139,7 +139,7 @@ export async function updatePromotionOnShopifyWithoutUrlMetafields(
     "eccomi-noleggio";
   const requestBaseUrl =
     runtime.PUBLIC_REQUEST_BASE_URL?.trim() ||
-    "https://eccomi-noleggio.onrender.com/richiesta";
+    "https://noleggio.eccomionline.com/richiesta";
   const productStatus = options.status || "ACTIVE";
   const publicTitle = publicPromotionTitle(promotion);
 
