@@ -156,6 +156,14 @@ function documentsFor(profile: CustomerProfile): DocumentRequirement[] {
   ];
 }
 
+function quickLeadStorageKey(requestCode: string) {
+  return `eccomi_noleggio_quick_lead_${requestCode}`;
+}
+
+function quickLeadConversionKey(requestCode: string) {
+  return `eccomi_noleggio_quick_lead_conversion_${requestCode}`;
+}
+
 function createSubmissionKey() {
   const browserCrypto = globalThis.crypto;
   if (typeof browserCrypto?.randomUUID === "function") return `ecn_${browserCrypto.randomUUID()}`;
@@ -170,7 +178,15 @@ function looksLikeIban(value: string) {
   return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(normalizeIban(value));
 }
 
-export default function RequestClient({ promotionId }: { promotionId: string }) {
+export default function RequestClient({
+  promotionId,
+  quickLeadCode = "",
+  source = "direct",
+}: {
+  promotionId: string;
+  quickLeadCode?: string;
+  source?: string;
+}) {
   const [promotion, setPromotion] = useState<PublicPromotion | null>(null);
   const [loading, setLoading] = useState(Boolean(promotionId));
   const [loadError, setLoadError] = useState(promotionId ? "" : "Il collegamento non contiene un’offerta valida.");
@@ -183,18 +199,112 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [practiceCode, setPracticeCode] = useState("");
+  const [preview, setPreview] = useState(false);
   const submissionKey = useRef(createSubmissionKey());
+
+  useEffect(() => {
+    if (!quickLeadCode || typeof window === "undefined") return;
+
+    try {
+      const conversionState = window.sessionStorage.getItem(
+        quickLeadConversionKey(quickLeadCode),
+      );
+
+      if (conversionState !== "pending") return;
+
+      trackOpenAiLeadCreated(
+        20,
+        () => {
+          try {
+            window.sessionStorage.setItem(
+              quickLeadConversionKey(quickLeadCode),
+              "sent",
+            );
+          } catch {
+            // Tracking bookkeeping must not affect the funnel.
+          }
+        },
+      );
+    } catch {
+      // Tracking must never block the complete-practice step.
+    }
+  }, [quickLeadCode]);
+
+  useEffect(() => {
+    if (!quickLeadCode || typeof window === "undefined") return;
+
+    try {
+      const stored = window.sessionStorage.getItem(
+        quickLeadStorageKey(quickLeadCode),
+      );
+
+      if (!stored) return;
+
+      const prefill = JSON.parse(stored) as {
+        promotionId?: string;
+        customerType?: CustomerProfile;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+        province?: string;
+        businessName?: string;
+        vatNumber?: string;
+        marketingConsent?: boolean;
+      };
+
+      if (
+        prefill.promotionId
+        && prefill.promotionId !== promotionId
+      ) {
+        return;
+      }
+
+      if (
+        prefill.customerType === "PRIVATE"
+        || prefill.customerType === "PROFESSIONAL"
+        || prefill.customerType === "COMPANY"
+      ) {
+        setProfile(prefill.customerType);
+        setStep(2);
+      }
+
+      setFields((current) => ({
+        ...current,
+        firstName: prefill.firstName || "",
+        lastName: prefill.lastName || "",
+        email: prefill.email || "",
+        phone: prefill.phone || "",
+        province: prefill.province || "",
+        businessName: prefill.businessName || "",
+        vatNumber: prefill.vatNumber || "",
+      }));
+      setMarketing(prefill.marketingConsent === true);
+    } catch {
+      // Il prefill è best-effort: la pratica resta compilabile manualmente.
+    }
+  }, [promotionId, quickLeadCode]);
 
   useEffect(() => {
     if (!promotionId) return;
     let mounted = true;
     fetch(`/api/public/promotions/${encodeURIComponent(promotionId)}`, { cache: "no-store" })
       .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Offerta non disponibile.");
-        return payload.promotion as PublicPromotion;
+        const payload = await response.json() as {
+          promotion?: PublicPromotion;
+          preview?: boolean;
+          error?: string;
+        };
+        if (!response.ok || !payload.promotion) {
+          throw new Error(payload.error || "Offerta non disponibile.");
+        }
+        return payload;
       })
-      .then((value) => { if (mounted) setPromotion(value); })
+      .then((payload) => {
+        if (!mounted) return;
+        setPromotion(payload.promotion || null);
+        setPreview(payload.preview === true);
+      })
       .catch((error) => { if (mounted) setLoadError(error instanceof Error ? error.message : "Offerta non disponibile."); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
@@ -262,6 +372,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
           practiceCode?: string;
           status?: string;
           duplicate?: boolean;
+          preview?: boolean;
         };
       }
 
@@ -309,6 +420,8 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
           privacyAccepted: privacy,
           marketingConsent: marketing,
           submissionKey: submissionKey.current,
+          quickLeadCode,
+          source,
         }),
       });
 
@@ -328,7 +441,9 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
        */
       if (startPayload.status === "NEW") {
         setPracticeCode(newPracticeCode);
-        trackCompletedPracticeLead(newPracticeCode);
+        if (!preview && !quickLeadCode) {
+          trackCompletedPracticeLead(newPracticeCode);
+        }
         return;
       }
 
@@ -348,6 +463,16 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
         const selectedFiles = documents[requirement.key] || [];
 
         for (const file of selectedFiles) {
+          /*
+           * Render PR preview:
+           * il file resta esclusivamente nel browser. Non inviamo i byte
+           * neppure al servizio preview, così il collaudo non può toccare
+           * storage e non dipende dai limiti body/proxy dell'ambiente.
+           */
+          if (preview) {
+            continue;
+          }
+
           const uploadBody = new FormData();
           uploadBody.set("documentType", documentType);
           uploadBody.set("file", file, file.name);
@@ -392,7 +517,23 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
       }
 
       setPracticeCode(newPracticeCode);
-      trackCompletedPracticeLead(newPracticeCode);
+
+      if (quickLeadCode && typeof window !== "undefined") {
+        try {
+          window.sessionStorage.removeItem(
+            quickLeadStorageKey(quickLeadCode),
+          );
+          window.sessionStorage.removeItem(
+            quickLeadConversionKey(quickLeadCode),
+          );
+        } catch {
+          // Storage cleanup must never affect the completed practice.
+        }
+      }
+
+      if (!preview && !quickLeadCode) {
+        trackCompletedPracticeLead(newPracticeCode);
+      }
     } catch (error) {
       setSubmitError(
         error instanceof Error
@@ -457,7 +598,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
                     {files.length ? <div>{files.map((file, index) => <button type="button" key={`${file.name}-${index}`} onClick={() => removeDocument(item.key, index)} aria-label={`Rimuovi ${file.name}`}>×</button>)}</div> : null}
                   </div>;
                 })}</div>
-                <div className="public-safety"><LockKeyhole size={20} /><p><strong>Area protetta ECCOMI.</strong><small>I documenti e l’IBAN vengono conservati in modo riservato e resi disponibili soltanto agli operatori autorizzati.</small></p></div>
+                <div className="public-safety"><LockKeyhole size={20} /><p><strong>Area protetta ECCOMI.</strong><small>{preview ? "Preview PR38: i file selezionati restano nel browser e non vengono caricati su alcuno storage." : "I documenti e l’IBAN vengono conservati in modo riservato e resi disponibili soltanto agli operatori autorizzati."}</small></p></div>
                 {submitError ? <div className="public-error"><AlertTriangle size={18} /> {submitError}</div> : null}
               </div> : null}
 
@@ -471,7 +612,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
             </div>
 
             <footer className="public-application-card__footer"><button className="public-button public-button--back" type="button" disabled={submitting} onClick={() => step === 1 ? history.back() : setStep((current) => current - 1)}><ArrowLeft size={17} /> {step === 1 ? "Torna all’offerta" : "Indietro"}</button><span>{step === 3 && !canContinue ? "Completa IBAN e documenti per continuare." : "I dati vengono salvati solo all’invio finale."}</span><button className="public-button public-button--primary" type="button" disabled={!canContinue || submitting} onClick={() => step < 4 ? setStep((current) => current + 1) : submit()}>{submitting ? <><Loader2 className="spin" size={18} /> Invio…</> : step < 4 ? <>Continua <ArrowRight size={17} /></> : <>Invia richiesta <Check size={17} /></>}</button></footer>
-          </> : <div className="public-success"><span><Check size={38} /></span><small>PRATICA COMPLETA REGISTRATA</small><h2>La tua richiesta è stata inviata</h2><p>Dati, IBAN e documenti sono stati collegati all’offerta e assegnati al responsabile competente.</p><div><small>CODICE PRATICA</small><strong>{practiceCode}</strong></div><ul><li><Check size={16} /> ECCOMI verifica la pratica</li><li><Check size={16} /> I documenti restano nell’area protetta</li><li><Check size={16} /> Il partner competente può iniziare la lavorazione</li></ul><a className="public-button public-button--primary" href="https://eccomionline.com"><CarFront size={18} /> Torna su Eccomi Online</a></div>}
+          </> : <div className="public-success"><span><Check size={38} /></span><small>{preview ? "SIMULAZIONE PRATICA COMPLETA" : "PRATICA COMPLETA REGISTRATA"}</small><h2>{preview ? "Collaudo completato in sicurezza" : "La tua richiesta è stata inviata"}</h2><p>{preview ? "La preview ha simulato dati, IBAN e documenti senza salvarli e senza generare eventi reali." : "Dati, IBAN e documenti sono stati collegati all’offerta e assegnati al responsabile competente."}</p><div><small>CODICE PRATICA</small><strong>{practiceCode}</strong></div>{preview ? <div className="public-safety"><ShieldCheck size={20} /><p><strong>Preview PR38 isolata.</strong><small>Nessuna scrittura DB, nessun file su storage, nessun evento Ads o audit reale.</small></p></div> : <ul><li><Check size={16} /> ECCOMI verifica la pratica</li><li><Check size={16} /> I documenti restano nell’area protetta</li><li><Check size={16} /> Il partner competente può iniziare la lavorazione</li></ul>}<a className="public-button public-button--primary" href="https://eccomionline.com"><CarFront size={18} /> Torna su Eccomi Online</a></div>}
         </section>
       </div>
       <footer className="public-request-footer"><div><ShieldCheck size={17} /><span><strong>Governato da ECCOMI</strong><small>I partner operano. ECCOMI conserva controllo, dati e rapporto cliente.</small></span></div><div><MessageCircle size={17} /><span><strong>Hai bisogno di aiuto?</strong><small>Torna alla pagina dell’offerta e usa il pulsante WhatsApp.</small></span></div></footer>

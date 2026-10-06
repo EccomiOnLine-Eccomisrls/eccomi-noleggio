@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./request-upload.css";
 import RequestClient from "./request-client";
 import CustomRequestClient from "./custom-request-client";
+import OfferInterestClient from "./offer-interest-client";
 
 export const metadata: Metadata = {
   title: "Richiesta di noleggio | ECCOMI NOLEGGIO",
@@ -27,9 +28,49 @@ export default async function RequestPage({
       ? params.promozione
       : "";
 
+  const initialVehicle =
+    typeof params.auto === "string"
+      ? params.auto.slice(0, 160)
+      : "";
+
+  const source =
+    typeof params.source === "string"
+      ? params.source.slice(0, 80)
+      : promotionId
+        ? "shopify-product"
+        : "direct";
+
+  const quickLeadCode =
+    typeof params.lead === "string"
+      ? params.lead.slice(0, 100)
+      : "";
+
+  const completePractice =
+    params.completa === "1";
+
   if (!promotionId) {
-    return <CustomRequestClient />;
+    return (
+      <CustomRequestClient
+        initialVehicle={initialVehicle}
+        source={source}
+      />
+    );
   }
 
-  return <RequestClient promotionId={promotionId} />;
+  if (!completePractice) {
+    return (
+      <OfferInterestClient
+        promotionId={promotionId}
+        source={source}
+      />
+    );
+  }
+
+  return (
+    <RequestClient
+      promotionId={promotionId}
+      quickLeadCode={quickLeadCode}
+      source={source}
+    />
+  );
 }

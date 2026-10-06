@@ -1,4 +1,5 @@
 import { getShopifyConnectionStatus } from "./shopify";
+import { isRenderPullRequestPreview } from "./preview-mode";
 
 function normalizedOrigin(value: string | null | undefined) {
   if (!value) return null;
@@ -27,6 +28,27 @@ export async function publicCorsOrigin(request: Request) {
   const requestOrigin = normalizedOrigin(request.url);
   const forwardedOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : null;
 
+  const originHost = (() => {
+    try {
+      return new URL(origin).host;
+    } catch {
+      return null;
+    }
+  })();
+
+  const requestHost = (() => {
+    try {
+      return new URL(request.url).host;
+    } catch {
+      return null;
+    }
+  })();
+
+  const sameHostBehindProxy =
+    Boolean(originHost)
+    && Boolean(requestHost)
+    && originHost === requestHost;
+
   const allowed = new Set<string>([
     "https://eccomi-noleggio.onrender.com",
     "https://eccomionline.com",
@@ -53,7 +75,23 @@ export async function publicCorsOrigin(request: Request) {
     origin.endsWith(".app.github.dev")
     || origin.endsWith(".githubpreview.dev");
 
-  return allowed.has(origin) || isCodespacesPreview
+  const isRenderPreviewHostname =
+    origin.startsWith("https://")
+    && origin.endsWith(".onrender.com")
+    && origin.includes("-pr-");
+
+  const isRenderPreviewOrigin =
+    isRenderPreviewHostname
+    && (
+      isRenderPullRequestPreview(request)
+      || requestOrigin === origin
+      || forwardedOrigin === origin
+    );
+
+  return allowed.has(origin)
+    || sameHostBehindProxy
+    || isCodespacesPreview
+    || isRenderPreviewOrigin
     ? origin
     : null;
 }

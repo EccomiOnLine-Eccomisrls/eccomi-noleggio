@@ -19,6 +19,7 @@ export function ensureCustomRequestSchema() {
           province text,
           business_name text,
           vat_number text,
+          promotion_id text,
           brand text,
           model_or_segment text,
           monthly_budget_cents integer,
@@ -36,9 +37,26 @@ export function ensureCustomRequestSchema() {
           marketing_consent boolean NOT NULL DEFAULT false,
           submission_key text,
           source text NOT NULL DEFAULT 'ECCOMI_NOLEGGIO_CUSTOM_REQUEST',
+          converted_practice_id text,
+          converted_at text,
           created_at text NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at text NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
+      `);
+
+      await db.execute(sql`
+        ALTER TABLE custom_vehicle_requests
+        ADD COLUMN IF NOT EXISTS promotion_id text
+      `);
+
+      await db.execute(sql`
+        ALTER TABLE custom_vehicle_requests
+        ADD COLUMN IF NOT EXISTS converted_practice_id text
+      `);
+
+      await db.execute(sql`
+        ALTER TABLE custom_vehicle_requests
+        ADD COLUMN IF NOT EXISTS converted_at text
       `);
 
       await db.execute(sql`
@@ -49,6 +67,16 @@ export function ensureCustomRequestSchema() {
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS custom_vehicle_requests_status_idx
         ON custom_vehicle_requests(status)
+      `);
+
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS custom_vehicle_requests_promotion_idx
+        ON custom_vehicle_requests(promotion_id)
+      `);
+
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS custom_vehicle_requests_converted_practice_idx
+        ON custom_vehicle_requests(converted_practice_id)
       `);
 
       await db.execute(sql`

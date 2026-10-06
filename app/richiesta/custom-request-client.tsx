@@ -138,15 +138,25 @@ function optionalInteger(value: string) {
     : null;
 }
 
-export default function CustomRequestClient() {
+export default function CustomRequestClient({
+  initialVehicle = "",
+  source = "direct",
+}: {
+  initialVehicle?: string;
+  source?: string;
+}) {
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<CustomerProfile>("");
-  const [fields, setFields] = useState(initialFields);
+  const [fields, setFields] = useState<CustomRequestFields>(() => ({
+    ...initialFields,
+    modelOrSegment: initialVehicle,
+  }));
   const [privacy, setPrivacy] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [requestCode, setRequestCode] = useState("");
+  const [preview, setPreview] = useState(false);
   const submissionKey = useRef(createSubmissionKey());
   const conversionTrackingStarted = useRef(false);
 
@@ -170,15 +180,8 @@ export default function CustomRequestClient() {
       && fields.phone.replace(/\D/g, "").length >= 8
       && fields.province.trim().length >= 2;
 
-    if (!baseComplete) return false;
-
-    if (profile === "PRIVATE") return true;
-
-    return (
-      fields.businessName.trim().length >= 2
-      && fields.vatNumber.replace(/\D/g, "").length === 11
-    );
-  }, [fields, profile]);
+    return baseComplete;
+  }, [fields]);
 
   const vehicleComplete = useMemo(() => {
     return Boolean(
@@ -242,6 +245,7 @@ export default function CustomRequestClient() {
             marketingConsent: marketing,
             submissionKey: submissionKey.current,
             website: fields.website,
+            source,
           }),
         },
       );
@@ -251,6 +255,7 @@ export default function CustomRequestClient() {
         error?: string;
         requestCode?: string;
         duplicate?: boolean;
+        preview?: boolean;
       };
 
       if (!response.ok || !payload.requestCode) {
@@ -261,10 +266,14 @@ export default function CustomRequestClient() {
       }
 
       setRequestCode(payload.requestCode);
+      setPreview(payload.preview === true);
 
       const shouldTrackLead =
-        response.status === 201
-        || payload.duplicate === true;
+        payload.preview !== true
+        && (
+          response.status === 201
+          || payload.duplicate === true
+        );
 
       if (
         shouldTrackLead
@@ -313,9 +322,13 @@ export default function CustomRequestClient() {
   />
 </div>
 
-          <span>ECCOMI AUTO SU MISURA</span>
+          <span>{initialVehicle ? "AUTO SELEZIONATA" : "ECCOMI AUTO SU MISURA"}</span>
 
-          <h1>Non trovi l’auto giusta? La troviamo noi.</h1>
+          <h1>
+            {initialVehicle
+              ? `Ti interessa ${initialVehicle}?`
+              : "Non trovi l’auto giusta? La troviamo noi."}
+          </h1>
 
           <p>
             Dicci come la immagini. Analizziamo le offerte
@@ -570,44 +583,6 @@ export default function CustomRequestClient() {
                           required
                         />
                       </label>
-
-                      {profile !== "PRIVATE" ? (
-                        <>
-                          <label>
-                            <span>
-                              {profile === "COMPANY"
-                                ? "Ragione sociale"
-                                : "Denominazione attività"}
-                            </span>
-                            <input
-                              value={fields.businessName}
-                              onChange={(event) =>
-                                updateField(
-                                  "businessName",
-                                  event.target.value,
-                                )
-                              }
-                              required
-                            />
-                          </label>
-
-                          <label>
-                            <span>Partita IVA</span>
-                            <input
-                              value={fields.vatNumber}
-                              onChange={(event) =>
-                                updateField(
-                                  "vatNumber",
-                                  event.target.value,
-                                )
-                              }
-                              inputMode="numeric"
-                              maxLength={11}
-                              required
-                            />
-                          </label>
-                        </>
-                      ) : null}
 
                       <label
                         className="public-honeypot"
@@ -996,6 +971,13 @@ export default function CustomRequestClient() {
                 <small>CODICE RICHIESTA</small>
                 <strong>{requestCode}</strong>
               </div>
+
+              {preview ? (
+                <p>
+                  Preview PR38: nessuna scrittura reale è stata
+                  effettuata.
+                </p>
+              ) : null}
 
               <div className="custom-request-next-steps">
                 <h3>Cosa succede adesso?</h3>

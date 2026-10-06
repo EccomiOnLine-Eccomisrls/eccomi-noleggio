@@ -30,11 +30,11 @@ function PreviewNavigationOverride() {
     <>
       <style>{previewNavigationCss}</style>
       <nav className="ec-preview-nav-overrides" aria-label="Navigazione operativa preview">
-        <span className="nav-disabled" aria-disabled="true" title="Sezione in sviluppo">
+        <a href="/?view=leads" data-preview-real-link="leads">
           <i className="nav-icon">♙</i>
           Lead e pratiche
-          <small>IN SVILUPPO</small>
-        </span>
+          <small>QA SAFE</small>
+        </a>
         <a href="/ceo/partners" data-preview-real-link="partner">
           <i className="nav-icon">⌁</i>
           Partner
@@ -66,7 +66,7 @@ export default async function Home({ searchParams }: HomeProps) {
     const query = await searchParams;
     const rawView = Array.isArray(query?.view) ? query?.view[0] : query?.view;
     const rawEdit = Array.isArray(query?.edit) ? query?.edit[0] : query?.edit;
-    const view = rawView === "promotions" ? "promotions" : "dashboard";
+    const view = rawView === "promotions" ? "promotions" : rawView === "leads" ? "leads" : "dashboard";
 
     return (
       <>

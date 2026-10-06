@@ -84,6 +84,7 @@ export const customVehicleRequests = pgTable("custom_vehicle_requests", {
   province: text("province"),
   businessName: text("business_name"),
   vatNumber: text("vat_number"),
+  promotionId: text("promotion_id"),
   brand: text("brand"),
   modelOrSegment: text("model_or_segment"),
   monthlyBudgetCents: integer("monthly_budget_cents"),
@@ -101,11 +102,15 @@ export const customVehicleRequests = pgTable("custom_vehicle_requests", {
   marketingConsent: boolean("marketing_consent").notNull().default(false),
   submissionKey: text("submission_key"),
   source: text("source").notNull().default("ECCOMI_NOLEGGIO_CUSTOM_REQUEST"),
+  convertedPracticeId: text("converted_practice_id"),
+  convertedAt: text("converted_at"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   uniqueIndex("custom_vehicle_requests_submission_key_idx").on(table.submissionKey),
   index("custom_vehicle_requests_status_idx").on(table.status),
+  index("custom_vehicle_requests_promotion_idx").on(table.promotionId),
+  index("custom_vehicle_requests_converted_practice_idx").on(table.convertedPracticeId),
   index("custom_vehicle_requests_created_idx").on(table.createdAt),
 ]);
 

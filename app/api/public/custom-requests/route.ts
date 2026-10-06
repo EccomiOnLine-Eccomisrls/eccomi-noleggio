@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { customVehicleRequests } from "../../../../db/schema";
 import { ensureCustomRequestSchema } from "../../../lib/server/custom-request-schema";
+import { isRenderPullRequestPreview } from "../../../lib/server/preview-mode";
 import {
   corsHeaders,
   jsonWithCors,
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
 
   const province = clean(body.province, 60);
   const businessName = clean(body.businessName, 140);
+  const promotionId = clean(body.promotionId, 100);
   const vatNumber = clean(body.vatNumber, 30).replace(/\D/g, "");
 
   const brand = clean(body.brand, 80);
@@ -144,6 +146,15 @@ export async function POST(request: Request) {
   const privacyAccepted = body.privacyAccepted === true;
   const marketingConsent = body.marketingConsent === true;
   const website = clean(body.website, 300);
+  const sourceInput = clean(body.source, 80).toLowerCase();
+  const requestSource =
+    ["ads", "openai-ads", "ads-landing"].includes(sourceInput)
+      ? "ECCOMI_NOLEGGIO_ADS"
+      : sourceInput === "shopify-product"
+        ? "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
+        : sourceInput === "shopify-landing"
+          ? "ECCOMI_NOLEGGIO_SHOPIFY_LANDING"
+          : "ECCOMI_NOLEGGIO_CUSTOM_REQUEST";
 
   if (website) {
     return jsonWithCors(
@@ -199,28 +210,6 @@ export async function POST(request: Request) {
     );
   }
 
-  if (
-    customerType !== "PRIVATE"
-    && businessName.length < 2
-  ) {
-    return jsonWithCors(
-      { error: "Inserisci la denominazione dell’attività." },
-      422,
-      origin,
-    );
-  }
-
-  if (
-    customerType !== "PRIVATE"
-    && vatNumber.length !== 11
-  ) {
-    return jsonWithCors(
-      { error: "Inserisci una Partita IVA italiana di 11 cifre." },
-      422,
-      origin,
-    );
-  }
-
   if (!brand && !modelOrSegment) {
     return jsonWithCors(
       {
@@ -247,6 +236,19 @@ export async function POST(request: Request) {
     return jsonWithCors(
       { error: "Identificativo di invio non valido." },
       422,
+      origin,
+    );
+  }
+
+  if (isRenderPullRequestPreview(request)) {
+    return jsonWithCors(
+      {
+        ok: true,
+        requestCode: "ECR-PREVIEW-000001",
+        status: "NEW",
+        preview: true,
+      },
+      201,
       origin,
     );
   }
@@ -296,6 +298,7 @@ export async function POST(request: Request) {
       province,
       businessName: businessName || null,
       vatNumber: vatNumber || null,
+      promotionId: promotionId || null,
       brand: brand || null,
       modelOrSegment: modelOrSegment || null,
       monthlyBudgetCents,
@@ -312,7 +315,7 @@ export async function POST(request: Request) {
       privacyAcceptedAt: now,
       marketingConsent,
       submissionKey,
-      source: "ECCOMI_NOLEGGIO_CUSTOM_REQUEST",
+      source: requestSource,
       createdAt: now,
       updatedAt: now,
     });

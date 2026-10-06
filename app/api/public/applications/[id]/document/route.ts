@@ -4,6 +4,7 @@ import { leads, practiceDocuments } from "../../../../../../db/schema";
 import { ensurePracticeSchema } from "../../../../../lib/server/practice-schema";
 import { uploadPracticeDocument } from "../../../../../lib/server/practice-storage";
 import { corsHeaders, jsonWithCors, publicCorsOrigin } from "../../../../../lib/server/public-origin";
+import { isRenderPullRequestPreview } from "../../../../../lib/server/preview-mode";
 
 const ALLOWED_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -21,6 +22,76 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   console.info("[PRACTICE_DOCUMENT] request_received", { practiceCode: id, origin: origin || "DENIED" });
   if (!origin) return jsonWithCors({ error: "Origine non autorizzata." }, 403, null);
+
+  if (isRenderPullRequestPreview(request)) {
+    if (id !== "ECN-PREVIEW-000001") {
+      return jsonWithCors(
+        { error: "Pratica preview non riconosciuta." },
+        404,
+        origin,
+      );
+    }
+
+    let previewForm: FormData;
+    try {
+      previewForm = await request.formData();
+    } catch {
+      return jsonWithCors(
+        { error: "Documento non valido." },
+        400,
+        origin,
+      );
+    }
+
+    const previewDocumentType =
+      typeof previewForm.get("documentType") === "string"
+        ? String(previewForm.get("documentType")).trim().toUpperCase()
+        : "";
+    const previewFile = previewForm.get("file");
+
+    if (!ALLOWED_TYPES.has(previewDocumentType)) {
+      return jsonWithCors(
+        { error: "Tipo documento non valido." },
+        422,
+        origin,
+      );
+    }
+
+    if (!(previewFile instanceof File) || previewFile.size <= 0) {
+      return jsonWithCors(
+        { error: "Seleziona un file valido." },
+        422,
+        origin,
+      );
+    }
+
+    if (previewFile.size > MAX_FILE_BYTES) {
+      return jsonWithCors(
+        { error: "Il file supera 10 MB." },
+        413,
+        origin,
+      );
+    }
+
+    if (!ALLOWED_MIME_TYPES.has(previewFile.type)) {
+      return jsonWithCors(
+        { error: "Usa un file PDF, JPG o PNG." },
+        422,
+        origin,
+      );
+    }
+
+    return jsonWithCors(
+      {
+        ok: true,
+        documentId: `ECD-PREVIEW-${previewDocumentType}`,
+        originalName: previewFile.name,
+        preview: true,
+      },
+      201,
+      origin,
+    );
+  }
 
   try {
     await ensurePracticeSchema();

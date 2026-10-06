@@ -31,11 +31,25 @@ type PreviewDashboardPayload = {
     status: string;
     shopifyProductId: string | null;
   }>;
+  leads: Array<{
+    id: string;
+    customerName: string;
+    email: string;
+    phone: string;
+    province: string;
+    customerType: string;
+    status: string;
+    documentStatus: string;
+    vehicle: string;
+    offerNumber: string;
+    partnerName: string;
+    previewSynthetic?: boolean;
+  }>;
 };
 
 type PreviewDemoProps = {
   payload: PreviewDashboardPayload;
-  view: "dashboard" | "promotions";
+  view: "dashboard" | "promotions" | "leads";
   editId?: string | null;
   query?: PreviewQuery;
 };
@@ -112,7 +126,7 @@ function Sidebar({ view }: { view: PreviewDemoProps["view"] }) {
       <nav aria-label="Navigazione preview">
         <a className={view === "dashboard" ? "active" : ""} href="/?view=dashboard"><span>▦</span> Dashboard</a>
         <a className={view === "promotions" ? "active" : ""} href="/?view=promotions"><span>🚗</span> Promozioni <em>1</em></a>
-        <span className="disabled"><i>♙</i> Lead e pratiche</span>
+        <a className={view === "leads" ? "active" : ""} href="/?view=leads"><span>♙</span> Lead e pratiche <em>1</em></a>
         <span className="disabled"><i>⌁</i> Partner</span>
         <span className="disabled"><i>€</i> Commissioni</span>
       </nav>
@@ -145,7 +159,7 @@ function DashboardView({ payload }: { payload: PreviewDashboardPayload }) {
         <a className="ec-preview-primary" href="/?view=promotions">Gestisci promozioni <b>→</b></a>
         <div className="ec-preview-hero-metrics">
           <article><span>⚠</span><div><small>DA ATTENZIONARE</small><strong>1</strong><p>{promotion.brand} {promotion.model} · {promotion.days}</p></div><b>›</b></article>
-          <article><span>♙</span><div><small>LEAD E PRATICHE</small><strong>0</strong><p>Nessun dato reale caricato</p></div><b>›</b></article>
+          <article><span>♙</span><div><small>LEAD E PRATICHE</small><strong>{payload.leads.length}</strong><p>Fixture sintetica · nessun dato reale</p></div><b>›</b></article>
           <article><span>✓</span><div><small>STATO SISTEMA</small><strong className="green">Isolato</strong><p>Supabase e Shopify non usati</p></div></article>
         </div>
       </div>
@@ -182,6 +196,81 @@ function PromotionsView({ promotion }: { promotion: PreviewDashboardPayload["pro
             <div className="ec-preview-promotion-actions"><a className="ec-preview-primary" href={`/?view=promotions&edit=${encodeURIComponent(promotion.id)}`}>✎ Modifica offerta</a><span>Lo stesso shopifyProductId verrà soltanto simulato</span></div>
           </div>
         </article>
+      </div>
+    </section>
+  );
+}
+
+function LeadsView({ leads }: { leads: PreviewDashboardPayload["leads"] }) {
+  const lead = leads[0];
+
+  return (
+    <section className="ec-preview-page">
+      <div className="ec-preview-heading">
+        <div>
+          <span className="ec-preview-kicker">ECCOMI HUB / NOLEGGIO</span>
+          <h1>Lead e pratiche</h1>
+          <p>Collaudo isolato del nuovo funnel lead-first. Nessun dato proviene da Supabase reale.</p>
+        </div>
+        <span className="ec-preview-readonly">FIXTURE QA · READ ONLY</span>
+      </div>
+
+      <div className="ec-preview-kpis">
+        <article><small>NUOVI</small><strong>{leads.length}</strong><span>Lead rapido sintetico</span></article>
+        <article><small>DOCUMENTI</small><strong>0</strong><span>Non richiesti nel primo contatto</span></article>
+        <article><small>PRATICHE COMPLETE</small><strong>0</strong><span>Secondo step non avviato</span></article>
+      </div>
+
+      <div className="ec-preview-promotion-panel">
+        <div className="ec-preview-panel-head">
+          <div><span>PIPELINE PREVIEW</span><strong>{leads.length} lead sintetico</strong></div>
+          <a href="/?view=dashboard">← Torna alla dashboard</a>
+        </div>
+
+        {lead ? (
+          <article className="ec-preview-lead-card">
+            <div className="ec-preview-lead-code">
+              <small>CODICE LEAD</small>
+              <strong>{lead.id}</strong>
+              <span>NUOVO</span>
+            </div>
+
+            <div className="ec-preview-lead-details">
+              <div>
+                <small>CLIENTE</small>
+                <strong>{lead.customerName}</strong>
+                <span>{lead.customerType} · {lead.province}</span>
+              </div>
+              <div>
+                <small>CONTATTI</small>
+                <strong>{lead.email}</strong>
+                <span>{lead.phone}</span>
+              </div>
+              <div>
+                <small>RICHIESTA</small>
+                <strong>{lead.vehicle}</strong>
+                <span>{lead.offerNumber}</span>
+              </div>
+              <div>
+                <small>ASSEGNAZIONE</small>
+                <strong>{lead.partnerName}</strong>
+                <span>Non visibile ai Partner</span>
+              </div>
+              <div>
+                <small>STATO DOCUMENTI</small>
+                <strong>LEAD RAPIDO</strong>
+                <span>Nessun IBAN · nessun documento</span>
+              </div>
+            </div>
+
+            <div className="ec-preview-safety">
+              <strong>FIXTURE SINTETICA</strong>
+              <span>Questo record esiste solo nella preview PR38 e non viene scritto su Supabase.</span>
+            </div>
+          </article>
+        ) : (
+          <div className="ec-preview-empty">Nessun lead fixture disponibile.</div>
+        )}
       </div>
     </section>
   );
@@ -262,7 +351,7 @@ export default function PreviewDemo({ payload, view, editId, query }: PreviewDem
       <Sidebar view={view} />
       <div className="ec-preview-workspace">
         <Topbar />
-        {view === "promotions" ? <PromotionsView promotion={promotion} /> : <DashboardView payload={payload} />}
+        {view === "promotions" ? <PromotionsView promotion={promotion} /> : view === "leads" ? <LeadsView leads={payload.leads} /> : <DashboardView payload={payload} />}
       </div>
       {editorOpen ? <Editor promotion={promotion} query={query} /> : null}
     </div>
