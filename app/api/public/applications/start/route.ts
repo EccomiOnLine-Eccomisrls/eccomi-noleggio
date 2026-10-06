@@ -6,6 +6,10 @@ import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
 import { ensureCustomRequestSchema } from "../../../../lib/server/custom-request-schema";
 import { corsHeaders, jsonWithCors, publicCorsOrigin } from "../../../../lib/server/public-origin";
 import { isRenderPullRequestPreview } from "../../../../lib/server/preview-mode";
+import {
+  legacyRequestSource,
+  normalizeAttribution,
+} from "../../../../lib/attribution";
 
 const PRIVACY_VERSION = "ECCOMI-NOLEGGIO-2026-07";
 const customerTypes = new Set(["PRIVATE", "PROFESSIONAL", "COMPANY"]);
@@ -69,15 +73,21 @@ export async function POST(request: Request) {
   const iban = normalizeIban(clean(body.iban, 40));
   const submissionKey = clean(body.submissionKey, 100);
   const quickLeadCode = clean(body.quickLeadCode, 100);
-  const sourceInput = clean(body.source, 80).toLowerCase();
-  const requestSource =
-    ["ads", "openai-ads", "ads-landing"].includes(sourceInput)
-      ? "ECCOMI_NOLEGGIO_ADS"
-      : sourceInput === "shopify-product"
-        ? "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
-        : sourceInput === "shopify-landing"
-          ? "ECCOMI_NOLEGGIO_SHOPIFY_LANDING"
-          : "ECCOMI_NOLEGGIO_WEB";
+  const requestAttribution = normalizeAttribution(
+    {
+      source: body.source,
+      entry: body.entry,
+      campaign: body.campaign,
+      adGroup: body.adGroup,
+      ad: body.ad,
+    },
+    "direct",
+    promotionId ? "shopify-product" : "direct",
+  );
+  const requestSource = legacyRequestSource(
+    requestAttribution.attributionSource,
+    "ECCOMI_NOLEGGIO_WEB",
+  );
   const privacyAccepted = body.privacyAccepted === true;
   const marketingConsent = body.marketingConsent === true;
 
@@ -158,6 +168,11 @@ export async function POST(request: Request) {
             email: customVehicleRequests.email,
             promotionId: customVehicleRequests.promotionId,
             source: customVehicleRequests.source,
+            attributionSource: customVehicleRequests.attributionSource,
+            entrySource: customVehicleRequests.entrySource,
+            campaignKey: customVehicleRequests.campaignKey,
+            adGroupKey: customVehicleRequests.adGroupKey,
+            adKey: customVehicleRequests.adKey,
             convertedPracticeId: customVehicleRequests.convertedPracticeId,
           })
           .from(customVehicleRequests)
@@ -252,6 +267,26 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const encryptedIban = await encryptSensitivePracticeData(iban);
     const leadSource = quickLead?.source || requestSource;
+    const leadAttribution = {
+      attributionSource:
+        quickLead?.attributionSource
+        || requestAttribution.attributionSource,
+      entrySource:
+        quickLead?.entrySource
+        || requestAttribution.entrySource,
+      campaignKey:
+        quickLead?.campaignKey
+        || requestAttribution.campaignKey
+        || null,
+      adGroupKey:
+        quickLead?.adGroupKey
+        || requestAttribution.adGroupKey
+        || null,
+      adKey:
+        quickLead?.adKey
+        || requestAttribution.adKey
+        || null,
+    };
 
     await db.transaction(async (tx) => {
       await tx.insert(leads).values({
@@ -259,6 +294,11 @@ export async function POST(request: Request) {
         businessName: businessName || null, vatNumber: vatNumber || null, accountHolder, ibanEncrypted: encryptedIban,
         ibanLast4: iban.slice(-4), status: "UPLOAD_IN_PROGRESS", documentStatus: "UPLOADING", emailVerificationStatus: "NOT_REQUIRED",
         privacyVersion: PRIVACY_VERSION, privacyAcceptedAt: now, marketingConsent, submissionKey: effectiveSubmissionKey, source: leadSource,
+        attributionSource: leadAttribution.attributionSource,
+        entrySource: leadAttribution.entrySource,
+        campaignKey: leadAttribution.campaignKey,
+        adGroupKey: leadAttribution.adGroupKey,
+        adKey: leadAttribution.adKey,
         assignedAt: now, createdAt: now, updatedAt: now,
       });
 
@@ -275,7 +315,19 @@ export async function POST(request: Request) {
       }
     });
 
-    console.info("[PRACTICE_START] created", { practiceCode: id, promotionId, customerType, quickLeadCode: quickLeadCode || null, source: leadSource, durationMs: Date.now() - startedAt });
+    console.info("[PRACTICE_START] created", {
+      practiceCode: id,
+      promotionId,
+      customerType,
+      quickLeadCode: quickLeadCode || null,
+      source: leadSource,
+      attributionSource: leadAttribution.attributionSource,
+      entrySource: leadAttribution.entrySource,
+      campaignKey: leadAttribution.campaignKey,
+      adGroupKey: leadAttribution.adGroupKey,
+      adKey: leadAttribution.adKey,
+      durationMs: Date.now() - startedAt,
+    });
     return jsonWithCors({ ok: true, practiceCode: id, status: "UPLOAD_IN_PROGRESS", linkedQuickLead: Boolean(quickLead) }, 201, origin);
   } catch (error) {
     console.error("[PRACTICE_START] fatal", { promotionId, email, submissionKey, durationMs: Date.now() - startedAt, error });
