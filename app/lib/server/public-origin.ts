@@ -54,11 +54,18 @@ export async function publicCorsOrigin(request: Request) {
     origin.endsWith(".app.github.dev")
     || origin.endsWith(".githubpreview.dev");
 
-  const isRenderPreviewOrigin =
+  const isRenderPreviewHostname =
     origin.startsWith("https://")
     && origin.endsWith(".onrender.com")
-    && origin.includes("-pr-")
-    && isRenderPullRequestPreview(request);
+    && origin.includes("-pr-");
+
+  const isRenderPreviewOrigin =
+    isRenderPreviewHostname
+    && (
+      isRenderPullRequestPreview(request)
+      || requestOrigin === origin
+      || forwardedOrigin === origin
+    );
 
   return allowed.has(origin)
     || isCodespacesPreview
