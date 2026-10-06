@@ -102,6 +102,11 @@ export const customVehicleRequests = pgTable("custom_vehicle_requests", {
   marketingConsent: boolean("marketing_consent").notNull().default(false),
   submissionKey: text("submission_key"),
   source: text("source").notNull().default("ECCOMI_NOLEGGIO_CUSTOM_REQUEST"),
+  attributionSource: text("attribution_source"),
+  entrySource: text("entry_source"),
+  campaignKey: text("campaign_key"),
+  adGroupKey: text("ad_group_key"),
+  adKey: text("ad_key"),
   convertedPracticeId: text("converted_practice_id"),
   convertedAt: text("converted_at"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -111,6 +116,8 @@ export const customVehicleRequests = pgTable("custom_vehicle_requests", {
   index("custom_vehicle_requests_status_idx").on(table.status),
   index("custom_vehicle_requests_promotion_idx").on(table.promotionId),
   index("custom_vehicle_requests_converted_practice_idx").on(table.convertedPracticeId),
+  index("custom_vehicle_requests_attribution_source_idx").on(table.attributionSource),
+  index("custom_vehicle_requests_campaign_key_idx").on(table.campaignKey),
   index("custom_vehicle_requests_created_idx").on(table.createdAt),
 ]);
 
@@ -139,6 +146,11 @@ export const leads = pgTable("leads", {
   marketingConsent: boolean("marketing_consent").notNull().default(false),
   submissionKey: text("submission_key"),
   source: text("source").notNull().default("ECCOMI_NOLEGGIO_WEB"),
+  attributionSource: text("attribution_source"),
+  entrySource: text("entry_source"),
+  campaignKey: text("campaign_key"),
+  adGroupKey: text("ad_group_key"),
+  adKey: text("ad_key"),
   priority: text("priority").notNull().default("NORMAL"),
   assignedTo: text("assigned_to"),
   deletedAt: text("deleted_at"),
@@ -154,6 +166,8 @@ export const leads = pgTable("leads", {
   index("leads_partner_idx").on(table.partnerId),
   index("leads_promotion_idx").on(table.promotionId),
   index("leads_status_idx").on(table.status),
+  index("leads_attribution_source_idx").on(table.attributionSource),
+  index("leads_campaign_key_idx").on(table.campaignKey),
 ]);
 
 export const practiceDocuments = pgTable("practice_documents", {
