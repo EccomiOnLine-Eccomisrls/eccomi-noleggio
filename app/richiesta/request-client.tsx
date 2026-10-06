@@ -156,6 +156,10 @@ function documentsFor(profile: CustomerProfile): DocumentRequirement[] {
   ];
 }
 
+function quickLeadStorageKey(requestCode: string) {
+  return `eccomi_noleggio_quick_lead_${requestCode}`;
+}
+
 function createSubmissionKey() {
   const browserCrypto = globalThis.crypto;
   if (typeof browserCrypto?.randomUUID === "function") return `ecn_${browserCrypto.randomUUID()}`;
@@ -170,7 +174,15 @@ function looksLikeIban(value: string) {
   return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(normalizeIban(value));
 }
 
-export default function RequestClient({ promotionId }: { promotionId: string }) {
+export default function RequestClient({
+  promotionId,
+  quickLeadCode = "",
+  source = "direct",
+}: {
+  promotionId: string;
+  quickLeadCode?: string;
+  source?: string;
+}) {
   const [promotion, setPromotion] = useState<PublicPromotion | null>(null);
   const [loading, setLoading] = useState(Boolean(promotionId));
   const [loadError, setLoadError] = useState(promotionId ? "" : "Il collegamento non contiene un’offerta valida.");
@@ -185,6 +197,61 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
   const [practiceCode, setPracticeCode] = useState("");
   const [preview, setPreview] = useState(false);
   const submissionKey = useRef(createSubmissionKey());
+
+  useEffect(() => {
+    if (!quickLeadCode || typeof window === "undefined") return;
+
+    try {
+      const stored = window.sessionStorage.getItem(
+        quickLeadStorageKey(quickLeadCode),
+      );
+
+      if (!stored) return;
+
+      const prefill = JSON.parse(stored) as {
+        promotionId?: string;
+        customerType?: CustomerProfile;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+        province?: string;
+        businessName?: string;
+        vatNumber?: string;
+        marketingConsent?: boolean;
+      };
+
+      if (
+        prefill.promotionId
+        && prefill.promotionId !== promotionId
+      ) {
+        return;
+      }
+
+      if (
+        prefill.customerType === "PRIVATE"
+        || prefill.customerType === "PROFESSIONAL"
+        || prefill.customerType === "COMPANY"
+      ) {
+        setProfile(prefill.customerType);
+        setStep(2);
+      }
+
+      setFields((current) => ({
+        ...current,
+        firstName: prefill.firstName || "",
+        lastName: prefill.lastName || "",
+        email: prefill.email || "",
+        phone: prefill.phone || "",
+        province: prefill.province || "",
+        businessName: prefill.businessName || "",
+        vatNumber: prefill.vatNumber || "",
+      }));
+      setMarketing(prefill.marketingConsent === true);
+    } catch {
+      // Il prefill è best-effort: la pratica resta compilabile manualmente.
+    }
+  }, [promotionId, quickLeadCode]);
 
   useEffect(() => {
     if (!promotionId) return;
@@ -321,6 +388,8 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
           privacyAccepted: privacy,
           marketingConsent: marketing,
           submissionKey: submissionKey.current,
+          quickLeadCode,
+          source,
         }),
       });
 
@@ -340,7 +409,9 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
        */
       if (startPayload.status === "NEW") {
         setPracticeCode(newPracticeCode);
-        if (!preview) trackCompletedPracticeLead(newPracticeCode);
+        if (!preview && !quickLeadCode) {
+          trackCompletedPracticeLead(newPracticeCode);
+        }
         return;
       }
 
@@ -414,7 +485,20 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
       }
 
       setPracticeCode(newPracticeCode);
-      if (!preview) trackCompletedPracticeLead(newPracticeCode);
+
+      if (quickLeadCode && typeof window !== "undefined") {
+        try {
+          window.sessionStorage.removeItem(
+            quickLeadStorageKey(quickLeadCode),
+          );
+        } catch {
+          // Storage cleanup must never affect the completed practice.
+        }
+      }
+
+      if (!preview && !quickLeadCode) {
+        trackCompletedPracticeLead(newPracticeCode);
+      }
     } catch (error) {
       setSubmitError(
         error instanceof Error
