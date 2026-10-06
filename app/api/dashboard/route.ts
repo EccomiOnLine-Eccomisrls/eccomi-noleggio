@@ -2,6 +2,10 @@ import { and, count, desc, eq, isNull, ne, sum } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { commissions, customVehicleRequests, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
 import { isPartnerNoleggioRole } from "../../lib/permissions";
+import {
+  attributionSourceFromLegacy,
+  entrySourceFromLegacy,
+} from "../../lib/attribution";
 import { requireActor, routeError } from "../../lib/server/authz";
 import { getAiConnectionStatus } from "../../lib/server/ai";
 import { ensureCustomRequestSchema } from "../../lib/server/custom-request-schema";
@@ -181,8 +185,12 @@ export async function GET(request: Request) {
         completedAt: lead.completedAt,
         sentToPartnerAt: lead.sentToPartnerAt,
         source: lead.source,
-        attributionSource: lead.attributionSource || "direct",
-        entrySource: lead.entrySource || "direct",
+        attributionSource:
+          lead.attributionSource
+          || attributionSourceFromLegacy(lead.source),
+        entrySource:
+          lead.entrySource
+          || entrySourceFromLegacy(lead.source),
         campaignKey: lead.campaignKey,
         adGroupKey: lead.adGroupKey,
         adKey: lead.adKey,
@@ -212,18 +220,10 @@ export async function GET(request: Request) {
         source: lead.source,
         attributionSource:
           lead.attributionSource
-          || (
-            lead.source === "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
-              ? "shopify-product"
-              : "direct"
-          ),
+          || attributionSourceFromLegacy(lead.source),
         entrySource:
           lead.entrySource
-          || (
-            lead.source === "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
-              ? "shopify-product"
-              : "direct"
-          ),
+          || entrySourceFromLegacy(lead.source),
         campaignKey: lead.campaignKey,
         adGroupKey: lead.adGroupKey,
         adKey: lead.adKey,
