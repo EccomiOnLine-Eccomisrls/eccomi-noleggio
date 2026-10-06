@@ -2,6 +2,10 @@ import { and, count, desc, eq, isNull, ne, sum } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { commissions, customVehicleRequests, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
 import { isPartnerNoleggioRole } from "../../lib/permissions";
+import {
+  attributionSourceFromLegacy,
+  entrySourceFromLegacy,
+} from "../../lib/attribution";
 import { requireActor, routeError } from "../../lib/server/authz";
 import { getAiConnectionStatus } from "../../lib/server/ai";
 import { ensureCustomRequestSchema } from "../../lib/server/custom-request-schema";
@@ -106,6 +110,12 @@ export async function GET(request: Request) {
         accountHolder: leads.accountHolder,
         completedAt: leads.completedAt,
         sentToPartnerAt: leads.sentToPartnerAt,
+        source: leads.source,
+        attributionSource: leads.attributionSource,
+        entrySource: leads.entrySource,
+        campaignKey: leads.campaignKey,
+        adGroupKey: leads.adGroupKey,
+        adKey: leads.adKey,
         createdAt: leads.createdAt,
         brand: promotions.brand,
         model: promotions.model,
@@ -135,6 +145,11 @@ export async function GET(request: Request) {
             brand: customVehicleRequests.brand,
             modelOrSegment: customVehicleRequests.modelOrSegment,
             source: customVehicleRequests.source,
+            attributionSource: customVehicleRequests.attributionSource,
+            entrySource: customVehicleRequests.entrySource,
+            campaignKey: customVehicleRequests.campaignKey,
+            adGroupKey: customVehicleRequests.adGroupKey,
+            adKey: customVehicleRequests.adKey,
             createdAt: customVehicleRequests.createdAt,
           })
           .from(customVehicleRequests)
@@ -169,6 +184,16 @@ export async function GET(request: Request) {
         accountHolder: lead.accountHolder,
         completedAt: lead.completedAt,
         sentToPartnerAt: lead.sentToPartnerAt,
+        source: lead.source,
+        attributionSource:
+          lead.attributionSource
+          || attributionSourceFromLegacy(lead.source),
+        entrySource:
+          lead.entrySource
+          || entrySourceFromLegacy(lead.source),
+        campaignKey: lead.campaignKey,
+        adGroupKey: lead.adGroupKey,
+        adKey: lead.adKey,
         createdAt: lead.createdAt,
         vehicle: `${lead.brand} ${lead.model}`,
         offerNumber: lead.offerNumber,
@@ -192,6 +217,16 @@ export async function GET(request: Request) {
         accountHolder: null,
         completedAt: null,
         sentToPartnerAt: null,
+        source: lead.source,
+        attributionSource:
+          lead.attributionSource
+          || attributionSourceFromLegacy(lead.source),
+        entrySource:
+          lead.entrySource
+          || entrySourceFromLegacy(lead.source),
+        campaignKey: lead.campaignKey,
+        adGroupKey: lead.adGroupKey,
+        adKey: lead.adKey,
         createdAt: lead.createdAt,
         vehicle:
           [lead.brand, lead.modelOrSegment]

@@ -37,6 +37,11 @@ export function ensureCustomRequestSchema() {
           marketing_consent boolean NOT NULL DEFAULT false,
           submission_key text,
           source text NOT NULL DEFAULT 'ECCOMI_NOLEGGIO_CUSTOM_REQUEST',
+          attribution_source text,
+          entry_source text,
+          campaign_key text,
+          ad_group_key text,
+          ad_key text,
           converted_practice_id text,
           converted_at text,
           created_at text NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -47,6 +52,31 @@ export function ensureCustomRequestSchema() {
       await db.execute(sql`
         ALTER TABLE custom_vehicle_requests
         ADD COLUMN IF NOT EXISTS promotion_id text
+      `);
+
+      await db.execute(sql`
+        ALTER TABLE custom_vehicle_requests
+        ADD COLUMN IF NOT EXISTS attribution_source text
+      `);
+
+      await db.execute(sql`
+        ALTER TABLE custom_vehicle_requests
+        ADD COLUMN IF NOT EXISTS entry_source text
+      `);
+
+      await db.execute(sql`
+        ALTER TABLE custom_vehicle_requests
+        ADD COLUMN IF NOT EXISTS campaign_key text
+      `);
+
+      await db.execute(sql`
+        ALTER TABLE custom_vehicle_requests
+        ADD COLUMN IF NOT EXISTS ad_group_key text
+      `);
+
+      await db.execute(sql`
+        ALTER TABLE custom_vehicle_requests
+        ADD COLUMN IF NOT EXISTS ad_key text
       `);
 
       await db.execute(sql`
@@ -77,6 +107,16 @@ export function ensureCustomRequestSchema() {
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS custom_vehicle_requests_converted_practice_idx
         ON custom_vehicle_requests(converted_practice_id)
+      `);
+
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS custom_vehicle_requests_attribution_source_idx
+        ON custom_vehicle_requests(attribution_source)
+      `);
+
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS custom_vehicle_requests_campaign_key_idx
+        ON custom_vehicle_requests(campaign_key)
       `);
 
       await db.execute(sql`

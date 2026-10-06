@@ -13,6 +13,13 @@ export function ensurePracticeSchema() {
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS iban_last4 text`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS completed_at text`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS sent_to_partner_at text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS attribution_source text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS entry_source text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS campaign_key text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS ad_group_key text`);
+      await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS ad_key text`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS leads_attribution_source_idx ON leads(attribution_source)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS leads_campaign_key_idx ON leads(campaign_key)`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'NORMAL'`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_to text`);
       await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_at text`);

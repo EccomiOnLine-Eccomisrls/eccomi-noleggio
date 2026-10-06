@@ -52,10 +52,11 @@ test("PR38 non scrive dati reali durante il Render PR preview", async () => {
 
 test("PR38 conserva la sorgente commerciale del lead", async () => {
   const api = await read("app/api/public/custom-requests/route.ts");
+  const attribution = await read("app/lib/attribution.ts");
 
-  assert.match(api, /ECCOMI_NOLEGGIO_ADS/);
-  assert.match(api, /ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT/);
-  assert.match(api, /ECCOMI_NOLEGGIO_SHOPIFY_LANDING/);
+  assert.match(attribution, /ECCOMI_NOLEGGIO_ADS/);
+  assert.match(attribution, /ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT/);
+  assert.match(attribution, /ECCOMI_NOLEGGIO_SHOPIFY_LANDING/);
   assert.match(api, /source: requestSource/);
 });
 
@@ -123,8 +124,9 @@ test("PR38 recupera anche un'offerta scaduta invece di mandare il cliente su una
     client,
     /possiamo ricontattarti con l'aggiornamento o con alternative equivalenti/,
   );
-  assert.match(client, /window\.location\.assign\(nextUrl\)/);
-  assert.match(client, /completa=1/);
+  assert.match(client, /window\.location\.assign\(/);
+  assert.match(client, /nextParams\.toString\(\)/);
+  assert.match(client, /completa: "1"/);
   assert.match(client, /L’offerta va aggiornata/);
 });
 
@@ -394,7 +396,7 @@ test("PR38 complete-practice preview resta completamente isolata", async () => {
   );
   assert.match(
     interest,
-    /if \(offer\.available\)[\s\S]*window\.location\.assign\(nextUrl\)/,
+    /if \(offer\.available\)[\s\S]*window\.location\.assign\([\s\S]*nextParams\.toString\(\)/,
   );
 
   assert.match(
@@ -478,6 +480,7 @@ test("PR38 hardening preserva attribuzione Ads e Shopify fino alla pratica", asy
   const page = await read("app/richiesta/page.tsx");
   const interest = await read("app/richiesta/offer-interest-client.tsx");
   const custom = await read("app/api/public/custom-requests/route.ts");
+  const attribution = await read("app/lib/attribution.ts");
   const start = await read("app/api/public/applications/start/route.ts");
   const shopify = await read("app/lib/server/shopify-safe-update.ts");
 
@@ -487,8 +490,8 @@ test("PR38 hardening preserva attribuzione Ads e Shopify fino alla pratica", asy
   assert.match(interest, /promotionId: offer\.id/);
   assert.match(interest, /source,/);
 
-  assert.match(custom, /"openai-ads"/);
-  assert.match(custom, /ECCOMI_NOLEGGIO_ADS/);
+  assert.match(attribution, /"openai-ads"/);
+  assert.match(attribution, /ECCOMI_NOLEGGIO_ADS/);
   assert.match(custom, /promotionId: promotionId \|\| null/);
 
   assert.match(start, /leadSource = quickLead\?\.source \|\| requestSource/);
@@ -544,15 +547,10 @@ test("PR38 hardening precompila il secondo step senza mettere PII nella URL", as
   assert.match(page, /params\.lead/);
   assert.match(interest, /window\.sessionStorage\.setItem/);
   assert.match(interest, /quickLeadStorageKey\(payload\.requestCode\)/);
-  assert.match(interest, /const nextUrl =/);
-  assert.match(
-    interest,
-    /&completa=1&lead=\$\{encodeURIComponent\(payload\.requestCode\)\}/,
-  );
-  assert.match(
-    interest,
-    /&source=\$\{encodeURIComponent\(source\)\}/,
-  );
+  assert.match(interest, /const nextParams = new URLSearchParams/);
+  assert.match(interest, /completa: "1"/);
+  assert.match(interest, /lead: payload\.requestCode/);
+  assert.match(interest, /source,/);
 
   assert.match(complete, /window\.sessionStorage\.getItem/);
   assert.match(complete, /setProfile\(prefill\.customerType\)/);
@@ -578,7 +576,7 @@ test("PR38 UX continuity non mostra la conferma intermedia sulle offerte valide"
   assert.ok(requestCodePosition > redirectPosition);
   assert.match(
     interest,
-    /if \(offer\.available\)[\s\S]*window\.location\.assign\(nextUrl\)[\s\S]*return;/,
+    /if \(offer\.available\)[\s\S]*window\.location\.assign\([\s\S]*nextParams\.toString\(\)[\s\S]*return;/,
   );
   assert.match(interest, /Continua alla pratica/);
   assert.doesNotMatch(interest, /Completa ora la pratica/);

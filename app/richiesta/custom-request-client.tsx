@@ -141,9 +141,17 @@ function optionalInteger(value: string) {
 export default function CustomRequestClient({
   initialVehicle = "",
   source = "direct",
+  entry = "direct",
+  campaign = "",
+  adGroup = "",
+  ad = "",
 }: {
   initialVehicle?: string;
   source?: string;
+  entry?: string;
+  campaign?: string;
+  adGroup?: string;
+  ad?: string;
 }) {
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<CustomerProfile>("");
@@ -246,6 +254,10 @@ export default function CustomRequestClient({
             submissionKey: submissionKey.current,
             website: fields.website,
             source,
+            entry,
+            campaign,
+            adGroup,
+            ad,
           }),
         },
       );
