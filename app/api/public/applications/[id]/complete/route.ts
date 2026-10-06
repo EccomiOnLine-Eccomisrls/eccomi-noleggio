@@ -3,6 +3,7 @@ import { getDb } from "../../../../../../db";
 import { auditLogs, leads, practiceDocuments } from "../../../../../../db/schema";
 import { ensurePracticeSchema } from "../../../../../lib/server/practice-schema";
 import { corsHeaders, jsonWithCors, publicCorsOrigin } from "../../../../../lib/server/public-origin";
+import { isRenderPullRequestPreview } from "../../../../../lib/server/preview-mode";
 
 const requiredTypes: Record<string, string[]> = {
   PRIVATE: ["IDENTITY", "TAX_CODE", "INCOME"],
@@ -22,6 +23,27 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   console.info("[PRACTICE_COMPLETE] request_received", { practiceCode: id, origin: origin || "DENIED" });
   if (!origin) return jsonWithCors({ error: "Origine non autorizzata." }, 403, null);
+
+  if (isRenderPullRequestPreview(request)) {
+    if (id !== "ECN-PREVIEW-000001") {
+      return jsonWithCors(
+        { error: "Pratica preview non riconosciuta." },
+        404,
+        origin,
+      );
+    }
+
+    return jsonWithCors(
+      {
+        ok: true,
+        practiceCode: id,
+        status: "NEW",
+        preview: true,
+      },
+      200,
+      origin,
+    );
+  }
 
   try {
     await ensurePracticeSchema();
