@@ -86,10 +86,10 @@ test("PR38 mette il lead rapido prima della pratica completa per una specifica o
   );
   assert.match(page, /params\.completa === "1"/);
   assert.match(page, /<OfferInterestClient\s+promotionId=\{promotionId\}/);
-  assert.match(page, /<RequestClient promotionId=\{promotionId\}/);
+  assert.match(page, /<RequestClient[\s\S]*promotionId=\{promotionId\}/);
 
   const interestPosition = page.indexOf("<OfferInterestClient");
-  const fullPracticePosition = page.indexOf("<RequestClient promotionId={promotionId}");
+  const fullPracticePosition = page.indexOf("<RequestClient");
 
   assert.ok(interestPosition >= 0);
   assert.ok(fullPracticePosition > interestPosition);
@@ -178,7 +178,7 @@ test("PR38 rende lead-first anche le richieste da singola offerta", async () => 
     /fields\.vatNumber\.replace\(\/\\D\/g, ""\)\.length === 11/,
   );
   assert.doesNotMatch(interest, /<span>Partita IVA<\/span>/);
-  assert.match(interest, /source: "shopify-product"/);
+  assert.match(interest, /source = "shopify-product"/);
 });
 
 test("PR38 recupera anche offerte scadute come interesse commerciale", async () => {
@@ -319,13 +319,13 @@ test("PR38 practice start preview termina prima di DB e cifratura", async () => 
   const previewGuard = route.indexOf(
     "isRenderPullRequestPreview(request)",
   );
-  const schemaWrite = route.indexOf("await ensurePracticeSchema()");
+  const productionStart = route.indexOf("await Promise.all([");
   const encryption = route.indexOf(
     "await encryptSensitivePracticeData(iban)",
   );
 
   assert.ok(previewGuard >= 0);
-  assert.ok(schemaWrite > previewGuard);
+  assert.ok(productionStart > previewGuard);
   assert.ok(encryption > previewGuard);
   assert.match(route, /ECN-PREVIEW-000001/);
   assert.match(route, /status: "UPLOAD_IN_PROGRESS"/);
