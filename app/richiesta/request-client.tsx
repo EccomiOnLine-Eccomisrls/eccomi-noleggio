@@ -689,6 +689,7 @@ export default function RequestClient({
 
         for (const [fileIndex, file] of selectedFiles.entries()) {
           const fingerprint = [
+            newPracticeCode,
             requirement.key,
             file.name,
             file.size,
