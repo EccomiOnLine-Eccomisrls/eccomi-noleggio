@@ -210,4 +210,52 @@ test("PR39 usa chiave oggetto deterministica per retry della stessa selezione", 
     client,
     /documentUploadIds\.current\.set/,
   );
+  assert.match(
+    client,
+    /createDocumentUploadId\(\s*fingerprint/,
+  );
+  assert.match(
+    client,
+    /browserCrypto\.subtle\.digest/,
+  );
+});
+
+
+test("PR39 retry copre anche interruzioni prepare e finalize", async () => {
+  const client = await read("app/richiesta/request-client.tsx");
+
+  assert.match(
+    client,
+    /Connessione interrotta durante la preparazione/,
+  );
+  assert.match(
+    client,
+    /Connessione interrotta durante la registrazione/,
+  );
+  assert.match(
+    client,
+    /prepareResponse\.status >= 400[\s\S]*prepareResponse\.status < 500/,
+  );
+  assert.match(
+    client,
+    /if \(completed\.response\?\.ok\)/,
+  );
+});
+
+test("PR39 prepare riconosce file già arrivato su Storage prima di firmarne un altro", async () => {
+  const route = await read(
+    "app/api/public/applications/[id]/document-upload/prepare/route.ts",
+  );
+
+  const info = route.indexOf(
+    "await getPracticeDocumentObjectInfo(expectedObjectKey)",
+  );
+  const sign = route.indexOf(
+    "await createPracticeDocumentSignedUpload",
+  );
+
+  assert.ok(info >= 0);
+  assert.ok(sign > info);
+  assert.match(route, /alreadyUploaded: true/);
+  assert.match(route, /alreadyUploaded: false/);
 });
