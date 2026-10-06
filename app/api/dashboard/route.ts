@@ -1,9 +1,10 @@
 import { and, count, desc, eq, isNull, sum } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { commissions, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
+import { commissions, customVehicleRequests, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
 import { isPartnerNoleggioRole } from "../../lib/permissions";
 import { requireActor, routeError } from "../../lib/server/authz";
 import { getAiConnectionStatus } from "../../lib/server/ai";
+import { ensureCustomRequestSchema } from "../../lib/server/custom-request-schema";
 import { ensurePracticeSchema } from "../../lib/server/practice-schema";
 import { expireStalePromotions, listPromotionsForActor } from "../../lib/server/promotion-service";
 import { previewDashboardPayload } from "../../lib/server/preview-fixture";
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
     const actor = await requireActor(request);
     await seedSystemData(actor.email, actor.displayName);
     await ensurePracticeSchema();
+    await ensureCustomRequestSchema();
     await expireStalePromotions();
 
     const promotionRows = await listPromotionsForActor(actor);
@@ -102,6 +104,28 @@ export async function GET(request: Request) {
       .where(activePracticeFilter)
       .orderBy(desc(leads.createdAt))
       .limit(100);
+    const customRequestRows = isPartnerNoleggioRole(actor.role)
+      ? []
+      : await db
+          .select({
+            id: customVehicleRequests.id,
+            firstName: customVehicleRequests.firstName,
+            lastName: customVehicleRequests.lastName,
+            email: customVehicleRequests.email,
+            phone: customVehicleRequests.phone,
+            province: customVehicleRequests.province,
+            customerType: customVehicleRequests.customerType,
+            businessName: customVehicleRequests.businessName,
+            status: customVehicleRequests.status,
+            brand: customVehicleRequests.brand,
+            modelOrSegment: customVehicleRequests.modelOrSegment,
+            source: customVehicleRequests.source,
+            createdAt: customVehicleRequests.createdAt,
+          })
+          .from(customVehicleRequests)
+          .orderBy(desc(customVehicleRequests.createdAt))
+          .limit(100);
+
     const documentRows = leadRows.length
       ? await db.select({ leadId: practiceDocuments.leadId }).from(practiceDocuments)
       : [];
@@ -111,13 +135,8 @@ export async function GET(request: Request) {
       ? await db.select().from(hubEvents).orderBy(desc(hubEvents.createdAt)).limit(20)
       : [];
 
-    return Response.json({
-      preview: false,
-      readOnly: false,
-      user: actor,
-      promotions: promotionRows,
-      commissions: commissionRows,
-      leads: leadRows.map((lead) => ({
+    const dashboardLeads = [
+      ...leadRows.map((lead) => ({
         id: lead.id,
         promotionId: lead.promotionId,
         partnerId: lead.partnerId,
@@ -140,6 +159,49 @@ export async function GET(request: Request) {
         partnerName: lead.partnerName,
         partnerEmail: lead.partnerEmail,
       })),
+      ...customRequestRows.map((lead) => ({
+        id: lead.id,
+        promotionId: "",
+        partnerId: "eccomi-direct",
+        customerName: `${lead.firstName} ${lead.lastName}`.trim(),
+        email: lead.email,
+        phone: lead.phone,
+        province: lead.province || "—",
+        customerType: lead.customerType || "—",
+        businessName: lead.businessName,
+        status: lead.status,
+        documentStatus: "LEAD_RAPIDO",
+        documentCount: 0,
+        ibanLast4: null,
+        accountHolder: null,
+        completedAt: null,
+        sentToPartnerAt: null,
+        createdAt: lead.createdAt,
+        vehicle:
+          [lead.brand, lead.modelOrSegment]
+            .filter(Boolean)
+            .join(" ")
+            || "Auto da definire",
+        offerNumber:
+          lead.source === "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
+            ? "INTERESSE DA SCHEDA"
+            : "AUTO SU MISURA",
+        partnerName: "ECCOMI",
+        partnerEmail: null,
+      })),
+    ].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime()
+        - new Date(a.createdAt).getTime(),
+    );
+
+    return Response.json({
+      preview: false,
+      readOnly: false,
+      user: actor,
+      promotions: promotionRows,
+      commissions: commissionRows,
+      leads: dashboardLeads,
       integrations: { shopify, ai },
       hubEvents: eventRows,
       stats: {
@@ -148,8 +210,8 @@ export async function GET(request: Request) {
         approved: promotionRows.filter((item) => item.status === "APPROVED").length,
         active: promotionRows.filter((item) => item.status === "ONLINE" || item.status === "ACTIVE" || item.status === "EXPIRING").length,
         expired: promotionRows.filter((item) => item.status === "EXPIRED" || item.status === "ARCHIVED").length,
-        leads: leadStats?.total || 0,
-        newLeads: newLeadStats?.total || 0,
+        leads: dashboardLeads.length,
+        newLeads: dashboardLeads.filter((lead) => lead.status === "NEW").length,
         commissionCents: Number(commissionStats?.total || 0),
       },
     });
