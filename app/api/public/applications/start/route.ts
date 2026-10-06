@@ -1,8 +1,9 @@
 import { and, eq, gte } from "drizzle-orm";
 import { getDb } from "../../../../../db";
-import { leads, partners, promotions } from "../../../../../db/schema";
+import { customVehicleRequests, leads, partners, promotions } from "../../../../../db/schema";
 import { encryptSensitivePracticeData } from "../../../../lib/server/credential-crypto";
 import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
+import { ensureCustomRequestSchema } from "../../../../lib/server/custom-request-schema";
 import { corsHeaders, jsonWithCors, publicCorsOrigin } from "../../../../lib/server/public-origin";
 import { isRenderPullRequestPreview } from "../../../../lib/server/preview-mode";
 
@@ -67,6 +68,16 @@ export async function POST(request: Request) {
   const accountHolder = clean(body.accountHolder, 140);
   const iban = normalizeIban(clean(body.iban, 40));
   const submissionKey = clean(body.submissionKey, 100);
+  const quickLeadCode = clean(body.quickLeadCode, 100);
+  const sourceInput = clean(body.source, 80).toLowerCase();
+  const requestSource =
+    ["ads", "openai-ads", "ads-landing"].includes(sourceInput)
+      ? "ECCOMI_NOLEGGIO_ADS"
+      : sourceInput === "shopify-product"
+        ? "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
+        : sourceInput === "shopify-landing"
+          ? "ECCOMI_NOLEGGIO_SHOPIFY_LANDING"
+          : "ECCOMI_NOLEGGIO_WEB";
   const privacyAccepted = body.privacyAccepted === true;
   const marketingConsent = body.marketingConsent === true;
 
@@ -84,8 +95,20 @@ export async function POST(request: Request) {
   if (!validIban(iban)) return jsonWithCors({ error: "Inserisci un IBAN valido." }, 422, origin);
   if (!privacyAccepted) return jsonWithCors({ error: "Il consenso privacy è necessario per gestire la richiesta." }, 422, origin);
   if (!/^[a-zA-Z0-9:_-]{8,100}$/.test(submissionKey)) return jsonWithCors({ error: "Identificativo di invio non valido." }, 422, origin);
+  if (quickLeadCode && !/^ECR-[A-Z0-9-]{6,90}$/.test(quickLeadCode)) return jsonWithCors({ error: "Codice lead rapido non valido." }, 422, origin);
 
   if (isRenderPullRequestPreview(request)) {
+    if (
+      quickLeadCode
+      && quickLeadCode !== "ECR-PREVIEW-000001"
+    ) {
+      return jsonWithCors(
+        { error: "Lead rapido preview non riconosciuto." },
+        404,
+        origin,
+      );
+    }
+
     if (promotionId !== "pr38-preview-valid-offer") {
       return jsonWithCors(
         { error: "Offerta completa preview non riconosciuta." },
@@ -107,12 +130,89 @@ export async function POST(request: Request) {
   }
 
   try {
-    await ensurePracticeSchema();
+    await Promise.all([
+      ensurePracticeSchema(),
+      ensureCustomRequestSchema(),
+    ]);
     const db = getDb();
-    const [existing] = await db.select({ id: leads.id, status: leads.status }).from(leads).where(eq(leads.submissionKey, submissionKey)).limit(1);
+    const effectiveSubmissionKey =
+      quickLeadCode
+        ? `quick:${quickLeadCode}`
+        : submissionKey;
+
+    const [existing] = await db
+      .select({ id: leads.id, status: leads.status })
+      .from(leads)
+      .where(eq(leads.submissionKey, effectiveSubmissionKey))
+      .limit(1);
+
     if (existing) {
-      console.info("[PRACTICE_START] duplicate_submission", { practiceCode: existing.id, status: existing.status, durationMs: Date.now() - startedAt });
-      return jsonWithCors({ ok: true, practiceCode: existing.id, status: existing.status, duplicate: true }, 200, origin);
+      console.info("[PRACTICE_START] duplicate_submission", { practiceCode: existing.id, status: existing.status, quickLeadCode: quickLeadCode || null, durationMs: Date.now() - startedAt });
+      return jsonWithCors({ ok: true, practiceCode: existing.id, status: existing.status, duplicate: true, linkedQuickLead: Boolean(quickLeadCode) }, 200, origin);
+    }
+
+    const [quickLead] = quickLeadCode
+      ? await db
+          .select({
+            id: customVehicleRequests.id,
+            email: customVehicleRequests.email,
+            promotionId: customVehicleRequests.promotionId,
+            source: customVehicleRequests.source,
+            convertedPracticeId: customVehicleRequests.convertedPracticeId,
+          })
+          .from(customVehicleRequests)
+          .where(eq(customVehicleRequests.id, quickLeadCode))
+          .limit(1)
+      : [];
+
+    if (quickLeadCode && !quickLead) {
+      return jsonWithCors(
+        { error: "Il lead rapido collegato non è stato trovato." },
+        404,
+        origin,
+      );
+    }
+
+    if (
+      quickLead
+      && (
+        quickLead.email !== email
+        || quickLead.promotionId !== promotionId
+      )
+    ) {
+      return jsonWithCors(
+        { error: "Il lead rapido non corrisponde a questa richiesta." },
+        409,
+        origin,
+      );
+    }
+
+    if (quickLead?.convertedPracticeId) {
+      const [converted] = await db
+        .select({ id: leads.id, status: leads.status })
+        .from(leads)
+        .where(eq(leads.id, quickLead.convertedPracticeId))
+        .limit(1);
+
+      if (converted) {
+        return jsonWithCors(
+          {
+            ok: true,
+            practiceCode: converted.id,
+            status: converted.status,
+            duplicate: true,
+            linkedQuickLead: true,
+          },
+          200,
+          origin,
+        );
+      }
+
+      return jsonWithCors(
+        { error: "Il lead rapido risulta già convertito." },
+        409,
+        origin,
+      );
     }
 
     const [offer] = await db.select({ promotion: promotions, partnerStatus: partners.status })
@@ -131,22 +231,52 @@ export async function POST(request: Request) {
     const [recent] = await db.select({ id: leads.id, status: leads.status }).from(leads)
       .where(and(eq(leads.promotionId, promotionId), eq(leads.email, email), gte(leads.createdAt, tenMinutesAgo))).limit(1);
     if (recent) {
-      console.info("[PRACTICE_START] duplicate_recent", { practiceCode: recent.id, status: recent.status, durationMs: Date.now() - startedAt });
-      return jsonWithCors({ ok: true, practiceCode: recent.id, status: recent.status, duplicate: true }, 200, origin);
+      if (quickLead) {
+        const linkedAt = new Date().toISOString();
+        await db
+          .update(customVehicleRequests)
+          .set({
+            status: "CONVERTED",
+            convertedPracticeId: recent.id,
+            convertedAt: linkedAt,
+            updatedAt: linkedAt,
+          })
+          .where(eq(customVehicleRequests.id, quickLead.id));
+      }
+
+      console.info("[PRACTICE_START] duplicate_recent", { practiceCode: recent.id, status: recent.status, quickLeadCode: quickLeadCode || null, durationMs: Date.now() - startedAt });
+      return jsonWithCors({ ok: true, practiceCode: recent.id, status: recent.status, duplicate: true, linkedQuickLead: Boolean(quickLead) }, 200, origin);
     }
 
     const id = practiceCode();
     const now = new Date().toISOString();
     const encryptedIban = await encryptSensitivePracticeData(iban);
-    await db.insert(leads).values({
-      id, promotionId, partnerId: offer.promotion.partnerId, firstName, lastName, phone, email, province, customerType,
-      businessName: businessName || null, vatNumber: vatNumber || null, accountHolder, ibanEncrypted: encryptedIban,
-      ibanLast4: iban.slice(-4), status: "UPLOAD_IN_PROGRESS", documentStatus: "UPLOADING", emailVerificationStatus: "NOT_REQUIRED",
-      privacyVersion: PRIVACY_VERSION, privacyAcceptedAt: now, marketingConsent, submissionKey, source: "ECCOMI_NOLEGGIO_WEB",
-      assignedAt: now, createdAt: now, updatedAt: now,
+    const leadSource = quickLead?.source || requestSource;
+
+    await db.transaction(async (tx) => {
+      await tx.insert(leads).values({
+        id, promotionId, partnerId: offer.promotion.partnerId, firstName, lastName, phone, email, province, customerType,
+        businessName: businessName || null, vatNumber: vatNumber || null, accountHolder, ibanEncrypted: encryptedIban,
+        ibanLast4: iban.slice(-4), status: "UPLOAD_IN_PROGRESS", documentStatus: "UPLOADING", emailVerificationStatus: "NOT_REQUIRED",
+        privacyVersion: PRIVACY_VERSION, privacyAcceptedAt: now, marketingConsent, submissionKey: effectiveSubmissionKey, source: leadSource,
+        assignedAt: now, createdAt: now, updatedAt: now,
+      });
+
+      if (quickLead) {
+        await tx
+          .update(customVehicleRequests)
+          .set({
+            status: "CONVERTED",
+            convertedPracticeId: id,
+            convertedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(customVehicleRequests.id, quickLead.id));
+      }
     });
-    console.info("[PRACTICE_START] created", { practiceCode: id, promotionId, customerType, durationMs: Date.now() - startedAt });
-    return jsonWithCors({ ok: true, practiceCode: id, status: "UPLOAD_IN_PROGRESS" }, 201, origin);
+
+    console.info("[PRACTICE_START] created", { practiceCode: id, promotionId, customerType, quickLeadCode: quickLeadCode || null, source: leadSource, durationMs: Date.now() - startedAt });
+    return jsonWithCors({ ok: true, practiceCode: id, status: "UPLOAD_IN_PROGRESS", linkedQuickLead: Boolean(quickLead) }, 201, origin);
   } catch (error) {
     console.error("[PRACTICE_START] fatal", { promotionId, email, submissionKey, durationMs: Date.now() - startedAt, error });
     return jsonWithCors({ error: error instanceof Error ? error.message : "Creazione pratica non riuscita." }, 500, origin);
