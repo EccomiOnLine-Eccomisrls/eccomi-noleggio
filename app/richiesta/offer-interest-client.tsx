@@ -260,7 +260,7 @@ export default function OfferInterestClient({
             privacyAccepted: true,
             marketingConsent: marketing,
             submissionKey: submissionKey.current,
-            promotionInterestId: offer.id,
+            source: "shopify-product",
             website: fields.website,
           }),
         },
