@@ -75,3 +75,37 @@ export function legacyRequestSource(
 
   return fallback;
 }
+
+export function attributionSourceFromLegacy(
+  legacySource: string | null | undefined,
+  fallback = "direct",
+) {
+  if (legacySource === "ECCOMI_NOLEGGIO_ADS") {
+    return "openai-ads";
+  }
+
+  if (legacySource === "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT") {
+    return "shopify-product";
+  }
+
+  if (legacySource === "ECCOMI_NOLEGGIO_SHOPIFY_LANDING") {
+    return "shopify-landing";
+  }
+
+  return fallback;
+}
+
+export function entrySourceFromLegacy(
+  legacySource: string | null | undefined,
+  fallback = "direct",
+) {
+  if (legacySource === "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT") {
+    return "shopify-product";
+  }
+
+  if (legacySource === "ECCOMI_NOLEGGIO_SHOPIFY_LANDING") {
+    return "shopify-landing";
+  }
+
+  return fallback;
+}
