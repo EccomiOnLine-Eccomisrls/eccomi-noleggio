@@ -204,6 +204,10 @@ test("PR39 usa chiave oggetto deterministica per retry della stessa selezione", 
   );
   assert.match(
     client,
+    /const fingerprint = \[[\s\S]*newPracticeCode[\s\S]*requirement\.key/,
+  );
+  assert.match(
+    client,
     /documentUploadIds\.current\.get\(fingerprint\)/,
   );
   assert.match(
@@ -258,4 +262,24 @@ test("PR39 prepare riconosce file già arrivato su Storage prima di firmarne un 
   assert.ok(sign > info);
   assert.match(route, /alreadyUploaded: true/);
   assert.match(route, /alreadyUploaded: false/);
+});
+
+
+test("PR39 prepare impedisce collisioni documentId tra pratiche diverse", async () => {
+  const prepare = await read(
+    "app/api/public/applications/[id]/document-upload/prepare/route.ts",
+  );
+
+  assert.match(
+    prepare,
+    /leadId: practiceDocuments\.leadId/,
+  );
+  assert.match(
+    prepare,
+    /if \(existing\.leadId !== id\)/,
+  );
+  assert.match(
+    prepare,
+    /Identificativo documento già utilizzato\./,
+  );
 });
