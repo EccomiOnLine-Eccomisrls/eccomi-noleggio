@@ -390,6 +390,7 @@ export default function RequestClient({
           objectKey?: string;
           signedUrl?: string | null;
           alreadyComplete?: boolean;
+          alreadyUploaded?: boolean;
           originalName?: string;
         };
       }
@@ -486,6 +487,20 @@ export default function RequestClient({
           }
 
           return;
+        }
+
+        if (preparePayload.alreadyUploaded) {
+          const completed = await finalize();
+
+          if (completed.response.ok) {
+            return;
+          }
+
+          lastError =
+            completed.payload.error
+            || `Registrazione documento non riuscita: ${input.file.name}.`;
+
+          continue;
         }
 
         if (!preparePayload.signedUrl) {
