@@ -27,8 +27,23 @@ export default async function RequestPage({
       ? params.promozione
       : "";
 
+  const initialVehicle =
+    typeof params.auto === "string"
+      ? params.auto.slice(0, 160)
+      : "";
+
+  const source =
+    typeof params.source === "string"
+      ? params.source.slice(0, 80)
+      : "direct";
+
   if (!promotionId) {
-    return <CustomRequestClient />;
+    return (
+      <CustomRequestClient
+        initialVehicle={initialVehicle}
+        source={source}
+      />
+    );
   }
 
   return <RequestClient promotionId={promotionId} />;
