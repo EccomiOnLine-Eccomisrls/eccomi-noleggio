@@ -36,7 +36,14 @@ export default async function RequestPage({
   const source =
     typeof params.source === "string"
       ? params.source.slice(0, 80)
-      : "direct";
+      : promotionId
+        ? "shopify-product"
+        : "direct";
+
+  const quickLeadCode =
+    typeof params.lead === "string"
+      ? params.lead.slice(0, 100)
+      : "";
 
   const completePractice =
     params.completa === "1";
@@ -54,9 +61,16 @@ export default async function RequestPage({
     return (
       <OfferInterestClient
         promotionId={promotionId}
+        source={source}
       />
     );
   }
 
-  return <RequestClient promotionId={promotionId} />;
+  return (
+    <RequestClient
+      promotionId={promotionId}
+      quickLeadCode={quickLeadCode}
+      source={source}
+    />
+  );
 }
