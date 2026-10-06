@@ -180,7 +180,7 @@ export default function CustomRequestClient({
       && fields.province.trim().length >= 2;
 
     return baseComplete;
-  }, [fields, profile]);
+  }, [fields]);
 
   const vehicleComplete = useMemo(() => {
     return Boolean(
@@ -577,44 +577,6 @@ export default function CustomRequestClient({
                           required
                         />
                       </label>
-
-                      {profile !== "PRIVATE" ? (
-                        <>
-                          <label>
-                            <span>
-                              {profile === "COMPANY"
-                                ? "Ragione sociale"
-                                : "Denominazione attività"}
-                            </span>
-                            <input
-                              value={fields.businessName}
-                              onChange={(event) =>
-                                updateField(
-                                  "businessName",
-                                  event.target.value,
-                                )
-                              }
-                              required
-                            />
-                          </label>
-
-                          <label>
-                            <span>Partita IVA</span>
-                            <input
-                              value={fields.vatNumber}
-                              onChange={(event) =>
-                                updateField(
-                                  "vatNumber",
-                                  event.target.value,
-                                )
-                              }
-                              inputMode="numeric"
-                              maxLength={11}
-                              required
-                            />
-                          </label>
-                        </>
-                      ) : null}
 
                       <label
                         className="public-honeypot"
