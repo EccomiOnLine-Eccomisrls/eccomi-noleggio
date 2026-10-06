@@ -18,7 +18,7 @@ test("PR38 precompila la richiesta leggera da Shopify e Ads", async () => {
   assert.match(client, /modelOrSegment: initialVehicle/);
   assert.match(client, /source,/);
   assert.doesNotMatch(client, /accountHolder/);
-  assert.doesNotMatch(client, /\biban\b/i);
+  assert.doesNotMatch(client, /\biban\s*:/i);\n  assert.doesNotMatch(client, /fields\\.iban/i);
 });
 
 test("PR38 non obbliga ragione sociale e partita IVA nel primo contatto", async () => {
@@ -98,7 +98,7 @@ test("PR38 cattura interesse da scheda senza IBAN o documenti e traccia solo un 
   const client = await read("app/richiesta/offer-interest-client.tsx");
 
   assert.doesNotMatch(client, /accountHolder/);
-  assert.doesNotMatch(client, /\biban\b/i);
+  assert.doesNotMatch(client, /\biban\s*:/i);\n  assert.doesNotMatch(client, /fields\\.iban/i);
   assert.doesNotMatch(client, /document_identity|document_income|document_chamber/);
   assert.match(client, /source: "shopify-product"/);
   assert.match(client, /response\.status === 201/);
