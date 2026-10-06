@@ -102,7 +102,7 @@ test("PR38 cattura interesse da scheda senza IBAN o documenti e traccia solo un 
   assert.doesNotMatch(client, /\biban\s*:/i);
   assert.doesNotMatch(client, /fields\\.iban/i);
   assert.doesNotMatch(client, /document_identity|document_income|document_chamber/);
-  assert.match(client, /source: "shopify-product"/);
+  assert.match(client, /source,/);
   assert.match(client, /response\.status === 201/);
   assert.match(client, /trackLeadCreated\(\)/);
   assert.match(client, /Nessun documento o IBAN richiesto ora\./);
@@ -115,7 +115,8 @@ test("PR38 recupera anche un'offerta scaduta invece di mandare il cliente su una
   const client = await read("app/richiesta/offer-interest-client.tsx");
 
   assert.match(route, /available: isAvailable/);
-  assert.match(route, /promotion\.status === "TRASHED"/);
+  assert.match(route, /interestVisibleStatuses/);
+  assert.match(route, /"EXPIRED"/);
   assert.doesNotMatch(route, /Offerta non disponibile o scaduta\./);
   assert.match(client, /OFFERTA DA AGGIORNARE/);
   assert.match(
@@ -187,7 +188,8 @@ test("PR38 recupera anche offerte scadute come interesse commerciale", async () 
 
   assert.match(endpoint, /available: false/);
   assert.match(endpoint, /status: "EXPIRED"/);
-  assert.match(endpoint, /promotion\.status === "TRASHED"/);
+  assert.match(endpoint, /interestVisibleStatuses/);
+  assert.match(endpoint, /"EXPIRED"/);
   assert.doesNotMatch(
     endpoint,
     /!isAvailable\(promotion\.status, promotion\.validUntil\)/,
@@ -379,7 +381,7 @@ test("PR38 complete-practice preview resta completamente isolata", async () => {
   assert.match(client, /setPreview\(payload\.preview === true\)/);
   assert.match(
     client,
-    /if \(!preview\) trackCompletedPracticeLead\(newPracticeCode\)/,
+    /if \(!preview && !quickLeadCode\)[\s\S]*trackCompletedPracticeLead\(newPracticeCode\)/,
   );
   assert.match(client, /Nessuna scrittura DB/);
   assert.match(client, /nessun file su storage/);
@@ -420,5 +422,130 @@ test("PR38 preview non invia i byte dei documenti al server", async () => {
   assert.match(
     client,
     /i file selezionati restano nel browser e non vengono caricati su alcuno storage/,
+  );
+});
+
+
+test("PR38 hardening collega lead rapido e pratica senza duplicare la pipeline", async () => {
+  const schema = await read("db/schema.ts");
+  const migration = await read("app/lib/server/custom-request-schema.ts");
+  const start = await read("app/api/public/applications/start/route.ts");
+  const dashboard = await read("app/api/dashboard/route.ts");
+
+  assert.match(schema, /promotionId: text\("promotion_id"\)/);
+  assert.match(schema, /convertedPracticeId: text\("converted_practice_id"\)/);
+  assert.match(schema, /convertedAt: text\("converted_at"\)/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS promotion_id text/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS converted_practice_id text/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS converted_at text/);
+
+  assert.match(start, /quickLeadCode/);
+  assert.match(start, /effectiveSubmissionKey/);
+  assert.match(start, /quick:\$\{quickLeadCode\}/);
+  assert.match(start, /status: "CONVERTED"/);
+  assert.match(start, /convertedPracticeId: id/);
+  assert.match(start, /db\.transaction/);
+
+  assert.match(
+    dashboard,
+    /ne\(customVehicleRequests\.status, "CONVERTED"\)/,
+  );
+});
+
+test("PR38 hardening emette una sola lead_created nel percorso lead-first", async () => {
+  const interest = await read("app/richiesta/offer-interest-client.tsx");
+  const complete = await read("app/richiesta/request-client.tsx");
+
+  assert.match(interest, /trackLeadCreated\(\)/);
+  assert.match(
+    complete,
+    /if \(!preview && !quickLeadCode\)[\s\S]*trackCompletedPracticeLead\(newPracticeCode\)/,
+  );
+  assert.match(complete, /quickLeadCode,/);
+});
+
+test("PR38 hardening preserva attribuzione Ads e Shopify fino alla pratica", async () => {
+  const page = await read("app/richiesta/page.tsx");
+  const interest = await read("app/richiesta/offer-interest-client.tsx");
+  const custom = await read("app/api/public/custom-requests/route.ts");
+  const start = await read("app/api/public/applications/start/route.ts");
+  const shopify = await read("app/lib/server/shopify-safe-update.ts");
+
+  assert.match(page, /source=\{source\}/);
+  assert.match(page, /quickLeadCode=\{quickLeadCode\}/);
+  assert.match(interest, /source = "shopify-product"/);
+  assert.match(interest, /promotionId: offer\.id/);
+  assert.match(interest, /source,/);
+
+  assert.match(custom, /"openai-ads"/);
+  assert.match(custom, /ECCOMI_NOLEGGIO_ADS/);
+  assert.match(custom, /promotionId: promotionId \|\| null/);
+
+  assert.match(start, /leadSource = quickLead\?\.source \|\| requestSource/);
+  assert.match(start, /source: leadSource/);
+
+  assert.match(shopify, /searchParams\.has\("source"\)/);
+  assert.match(shopify, /searchParams\.set\("source", "shopify-product"\)/);
+});
+
+test("PR38 hardening usa KPI esatti e non la sola lista limitata", async () => {
+  const dashboard = await read("app/api/dashboard/route.ts");
+
+  assert.match(dashboard, /select\(\{ total: count\(\) \}\)/);
+  assert.match(dashboard, /practiceLeadStats/);
+  assert.match(dashboard, /quickLeadStats/);
+  assert.match(dashboard, /newPracticeLeadStats/);
+  assert.match(dashboard, /newQuickLeadStats/);
+  assert.doesNotMatch(dashboard, /leads: dashboardLeads\.length/);
+});
+
+test("PR38 hardening non espone stati interni nell'interest pubblico", async () => {
+  const interest = await read(
+    "app/api/public/promotions/[id]/interest/route.ts",
+  );
+
+  assert.match(
+    interest,
+    /const interestVisibleStatuses = new Set\(\[[\s\S]*"ONLINE"[\s\S]*"ACTIVE"[\s\S]*"EXPIRING"[\s\S]*"EXPIRED"/,
+  );
+  assert.match(
+    interest,
+    /!interestVisibleStatuses\.has\(promotion\.status\)/,
+  );
+  assert.doesNotMatch(
+    interest,
+    /interestVisibleStatuses[\s\S]{0,120}"DRAFT"/,
+  );
+  assert.doesNotMatch(
+    interest,
+    /interestVisibleStatuses[\s\S]{0,160}"PENDING_APPROVAL"/,
+  );
+  assert.doesNotMatch(
+    interest,
+    /interestVisibleStatuses[\s\S]{0,160}"SUSPENDED"/,
+  );
+});
+
+test("PR38 hardening precompila il secondo step senza mettere PII nella URL", async () => {
+  const page = await read("app/richiesta/page.tsx");
+  const interest = await read("app/richiesta/offer-interest-client.tsx");
+  const complete = await read("app/richiesta/request-client.tsx");
+
+  assert.match(page, /params\.lead/);
+  assert.match(interest, /window\.sessionStorage\.setItem/);
+  assert.match(interest, /quickLeadStorageKey\(payload\.requestCode\)/);
+  assert.match(
+    interest,
+    /completa=1&lead=\$\{encodeURIComponent\(requestCode\)\}&source=/,
+  );
+
+  assert.match(complete, /window\.sessionStorage\.getItem/);
+  assert.match(complete, /setProfile\(prefill\.customerType\)/);
+  assert.match(complete, /setStep\(2\)/);
+  assert.match(complete, /firstName: prefill\.firstName \|\| ""/);
+  assert.match(complete, /email: prefill\.email \|\| ""/);
+  assert.doesNotMatch(
+    interest,
+    /completa=1[^\n]*firstName=/,
   );
 });
