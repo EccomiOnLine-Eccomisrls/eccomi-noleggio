@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./request-upload.css";
 import RequestClient from "./request-client";
 import CustomRequestClient from "./custom-request-client";
+import OfferInterestClient from "./offer-interest-client";
 
 export const metadata: Metadata = {
   title: "Richiesta di noleggio | ECCOMI NOLEGGIO",
@@ -37,11 +38,22 @@ export default async function RequestPage({
       ? params.source.slice(0, 80)
       : "direct";
 
+  const completePractice =
+    params.completa === "1";
+
   if (!promotionId) {
     return (
       <CustomRequestClient
         initialVehicle={initialVehicle}
         source={source}
+      />
+    );
+  }
+
+  if (!completePractice) {
+    return (
+      <OfferInterestClient
+        promotionId={promotionId}
       />
     );
   }
