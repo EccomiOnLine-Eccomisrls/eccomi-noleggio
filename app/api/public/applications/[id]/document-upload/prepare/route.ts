@@ -148,6 +148,7 @@ export async function POST(
     const [existing] = await db
       .select({
         id: practiceDocuments.id,
+        leadId: practiceDocuments.leadId,
         storageKey: practiceDocuments.storageKey,
         originalName: practiceDocuments.originalName,
       })
@@ -156,6 +157,17 @@ export async function POST(
       .limit(1);
 
     if (existing) {
+      if (existing.leadId !== id) {
+        return jsonWithCors(
+          {
+            error:
+              "Identificativo documento già utilizzato.",
+          },
+          409,
+          origin,
+        );
+      }
+
       return jsonWithCors(
         {
           ok: true,
