@@ -73,3 +73,82 @@ test("PR38 porta i lead rapidi nel cruscotto interno senza esporli ai Partner", 
     /Lead commerciali e pratiche complete in un unico punto operativo\./,
   );
 });
+
+test("PR38 mette il lead rapido prima della pratica completa per una specifica offerta", async () => {
+  const page = await read("app/richiesta/page.tsx");
+
+  assert.match(
+    page,
+    /import OfferInterestClient from "\.\/offer-interest-client"/,
+  );
+  assert.match(page, /params\.completa === "1"/);
+  assert.match(page, /<OfferInterestClient\s+promotionId=\{promotionId\}/);
+  assert.match(page, /<RequestClient promotionId=\{promotionId\}/);
+
+  const interestPosition = page.indexOf("<OfferInterestClient");
+  const fullPracticePosition = page.indexOf("<RequestClient promotionId={promotionId}");
+
+  assert.ok(interestPosition >= 0);
+  assert.ok(fullPracticePosition > interestPosition);
+});
+
+test("PR38 cattura interesse da scheda senza IBAN o documenti e traccia solo un nuovo lead reale", async () => {
+  const client = await read("app/richiesta/offer-interest-client.tsx");
+
+  assert.doesNotMatch(client, /accountHolder/);
+  assert.doesNotMatch(client, /\biban\b/i);
+  assert.doesNotMatch(client, /document_identity|document_income|document_chamber/);
+  assert.match(client, /source: "shopify-product"/);
+  assert.match(client, /response\.status === 201/);
+  assert.match(client, /trackLeadCreated\(\)/);
+  assert.match(client, /Nessun documento o IBAN richiesto ora\./);
+});
+
+test("PR38 recupera anche un'offerta scaduta invece di mandare il cliente su una pagina morta", async () => {
+  const route = await read(
+    "app/api/public/promotions/[id]/interest/route.ts",
+  );
+  const client = await read("app/richiesta/offer-interest-client.tsx");
+
+  assert.match(route, /available: isAvailable/);
+  assert.match(route, /promotion\.status === "TRASHED"/);
+  assert.doesNotMatch(route, /Offerta non disponibile o scaduta\./);
+  assert.match(client, /OFFERTA DA AGGIORNARE/);
+  assert.match(
+    client,
+    /possiamo ricontattarti con l'aggiornamento o con alternative equivalenti/,
+  );
+  assert.match(client, /Completa ora la pratica/);
+  assert.match(client, /completa=1/);
+});
+
+test("PR38 mantiene read-only il recupero offerta nella preview Render", async () => {
+  const route = await read(
+    "app/api/public/promotions/[id]/interest/route.ts",
+  );
+  const previewCheck = route.indexOf(
+    "isRenderPullRequestPreview(request)",
+  );
+  const productionRead = route.indexOf(
+    "const [promotion] = await getDb()",
+  );
+
+  assert.ok(previewCheck >= 0);
+  assert.ok(productionRead > previewCheck);
+  assert.match(route, /"4022223739"/);
+  assert.match(route, /status: "EXPIRED"/);
+  assert.match(route, /preview: true/);
+});
+
+test("PR38 usa il dominio ufficiale Noleggio per le future CTA Shopify", async () => {
+  const shopify = await read("app/lib/server/shopify-safe-update.ts");
+
+  assert.match(
+    shopify,
+    /https:\/\/noleggio\.eccomionline\.com\/richiesta/,
+  );
+  assert.doesNotMatch(
+    shopify,
+    /https:\/\/eccomi-noleggio\.onrender\.com\/richiesta/,
+  );
+});
