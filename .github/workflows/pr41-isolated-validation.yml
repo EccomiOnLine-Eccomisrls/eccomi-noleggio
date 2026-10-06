@@ -1,0 +1,32 @@
+name: PR41 isolated validation
+
+on:
+  push:
+    branches:
+      - feature/pr41-attribution-foundation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IS_PULL_REQUEST: "true"
+      RENDER_SERVICE_NAME: "eccomi-noleggio-pr-41-ci"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install
+        run: npm install
+
+      - name: Build and tests
+        run: npm test
