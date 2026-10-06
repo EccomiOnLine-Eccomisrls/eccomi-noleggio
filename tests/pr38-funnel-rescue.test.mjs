@@ -404,25 +404,34 @@ test("PR38 complete-practice preview resta completamente isolata", async () => {
 });
 
 
-test("PR38 preview non invia i byte dei documenti al server", async () => {
+test("PR38 preview non invia i byte dei documenti a Storage reale", async () => {
   const client = await read("app/richiesta/request-client.tsx");
+  const prepare = await read(
+    "app/api/public/applications/[id]/document-upload/prepare/route.ts",
+  );
 
   assert.match(
     client,
-    /if \(preview\) \{\s*continue;\s*\}/,
-  );
-  const previewSkip = client.indexOf("if (preview) {");
-  const formData = client.indexOf("const uploadBody = new FormData()");
-  const uploadFetch = client.indexOf(
-    "/api/public/applications/${encodeURIComponent(newPracticeCode)}/document",
+    /if \(preparePayload\.preview\)[\s\S]*await finalize\(\)[\s\S]*return;/,
   );
 
-  assert.ok(previewSkip >= 0);
-  assert.ok(formData > previewSkip);
-  assert.ok(uploadFetch > previewSkip);
+  const previewBranch = client.indexOf(
+    "if (preparePayload.preview)",
+  );
+  const signedUpload = client.indexOf(
+    "preparePayload.signedUrl",
+  );
+
+  assert.ok(previewBranch >= 0);
+  assert.ok(signedUpload > previewBranch);
+
+  assert.match(
+    prepare,
+    /preview: true[\s\S]*signedUrl: null/,
+  );
   assert.match(
     client,
-    /i file selezionati restano nel browser e non vengono caricati su alcuno storage/,
+    /Preview isolata: i file selezionati non vengono inviati a Storage reale/,
   );
 });
 

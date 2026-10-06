@@ -164,6 +164,35 @@ function quickLeadConversionKey(requestCode: string) {
   return `eccomi_noleggio_quick_lead_conversion_${requestCode}`;
 }
 
+async function createDocumentUploadId(
+  fingerprint: string,
+) {
+  const browserCrypto = globalThis.crypto;
+
+  if (browserCrypto?.subtle) {
+    const digest = await browserCrypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(fingerprint),
+    );
+
+    return Array.from(new Uint8Array(digest))
+      .slice(0, 16)
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  let first = 2166136261;
+  let second = 2246822519;
+
+  for (let index = 0; index < fingerprint.length; index += 1) {
+    const code = fingerprint.charCodeAt(index);
+    first = Math.imul(first ^ code, 16777619);
+    second = Math.imul(second ^ code, 3266489917);
+  }
+
+  return `u${(first >>> 0).toString(16).padStart(8, "0")}${(second >>> 0).toString(16).padStart(8, "0")}`;
+}
+
 function createSubmissionKey() {
   const browserCrypto = globalThis.crypto;
   if (typeof browserCrypto?.randomUUID === "function") return `ecn_${browserCrypto.randomUUID()}`;
@@ -201,6 +230,9 @@ export default function RequestClient({
   const [practiceCode, setPracticeCode] = useState("");
   const [preview, setPreview] = useState(false);
   const submissionKey = useRef(createSubmissionKey());
+  const documentUploadIds = useRef(
+    new Map<string, string>(),
+  );
 
   useEffect(() => {
     if (!quickLeadCode || typeof window === "undefined") return;
@@ -373,6 +405,12 @@ export default function RequestClient({
           status?: string;
           duplicate?: boolean;
           preview?: boolean;
+          documentId?: string;
+          objectKey?: string;
+          signedUrl?: string | null;
+          alreadyComplete?: boolean;
+          alreadyUploaded?: boolean;
+          originalName?: string;
         };
       }
 
@@ -392,6 +430,189 @@ export default function RequestClient({
       vat: "VAT_CERTIFICATE",
       chamber: "CHAMBER_REPORT",
       financial: "FINANCIAL",
+    };
+
+    const uploadDocumentDirectly = async (input: {
+      practiceCode: string;
+      documentType: string;
+      file: File;
+      uploadId: string;
+    }) => {
+      const metadata = {
+        documentType: input.documentType,
+        uploadId: input.uploadId,
+        originalName: input.file.name,
+        mimeType: input.file.type,
+        sizeBytes: input.file.size,
+      };
+
+      const finalize = async () => {
+        try {
+          const response = await fetch(
+            `/api/public/applications/${encodeURIComponent(input.practiceCode)}/document-upload/complete`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+              },
+              body: JSON.stringify(metadata),
+            },
+          );
+
+          const payload = await readPayload(response);
+
+          return {
+            response,
+            payload,
+          };
+        } catch {
+          return {
+            response: null,
+            payload: {
+              error:
+                `Connessione interrotta durante la registrazione di ${input.file.name}.`,
+            },
+          };
+        }
+      };
+
+      let lastError =
+        `Caricamento non riuscito: ${input.file.name}.`;
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        let prepareResponse: Response;
+        let preparePayload: Awaited<
+          ReturnType<typeof readPayload>
+        >;
+
+        try {
+          prepareResponse = await fetch(
+            `/api/public/applications/${encodeURIComponent(input.practiceCode)}/document-upload/prepare`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+              },
+              body: JSON.stringify(metadata),
+            },
+          );
+
+          preparePayload = await readPayload(
+            prepareResponse,
+          );
+        } catch {
+          lastError =
+            `Connessione interrotta durante la preparazione di ${input.file.name}.`;
+          continue;
+        }
+
+        if (!prepareResponse.ok) {
+          lastError =
+            preparePayload.error
+            || `Preparazione upload non riuscita: ${input.file.name}.`;
+
+          if (
+            prepareResponse.status >= 400
+            && prepareResponse.status < 500
+          ) {
+            throw new Error(lastError);
+          }
+
+          continue;
+        }
+
+        if (preparePayload.alreadyComplete) {
+          return;
+        }
+
+        if (preparePayload.preview) {
+          const previewFinalize = await finalize();
+
+          if (!previewFinalize.response?.ok) {
+            throw new Error(
+              previewFinalize.payload.error
+                || `Simulazione upload non riuscita: ${input.file.name}.`,
+            );
+          }
+
+          return;
+        }
+
+        if (preparePayload.alreadyUploaded) {
+          const completed = await finalize();
+
+          if (completed.response?.ok) {
+            return;
+          }
+
+          lastError =
+            completed.payload.error
+            || `Registrazione documento non riuscita: ${input.file.name}.`;
+
+          continue;
+        }
+
+        if (!preparePayload.signedUrl) {
+          throw new Error(
+            `URL firmata non disponibile: ${input.file.name}.`,
+          );
+        }
+
+        const directBody = new FormData();
+        directBody.append("cacheControl", "3600");
+        directBody.append("", input.file, input.file.name);
+
+        let directResponse: Response | null = null;
+
+        try {
+          directResponse = await fetch(
+            preparePayload.signedUrl,
+            {
+              method: "PUT",
+              headers: {
+                "x-upsert": "false",
+              },
+              body: directBody,
+            },
+          );
+        } catch {
+          directResponse = null;
+        }
+
+        if (directResponse?.ok) {
+          const completed = await finalize();
+
+          if (completed.response?.ok) {
+            return;
+          }
+
+          lastError =
+            completed.payload.error
+            || `Registrazione documento non riuscita: ${input.file.name}.`;
+        } else {
+          /*
+           * Se la rete ha perso la risposta ma Supabase ha già ricevuto
+           * il file, la finalizzazione idempotente lo riconosce e chiude
+           * comunque il documento senza ricaricare byte via Render.
+           */
+          const completed = await finalize();
+
+          if (completed.response?.ok) {
+            return;
+          }
+
+          const directDetail = directResponse
+            ? await directResponse.text().catch(() => "")
+            : "";
+
+          lastError =
+            completed.payload.error
+            || directDetail.slice(0, 180)
+            || `Upload diretto non riuscito: ${input.file.name}.`;
+        }
+      }
+
+      throw new Error(lastError);
     };
 
     try {
@@ -449,10 +670,13 @@ export default function RequestClient({
 
       /*
        * FASE 2
-       * Carica ogni documento con una richiesta separata.
+       * I byte dei documenti vanno direttamente dal browser a Supabase
+       * Storage tramite URL firmate. Render gestisce soltanto firma,
+       * verifica e metadati.
        */
       for (const requirement of documentRequirements) {
-        const documentType = documentTypeByKey[requirement.key];
+        const documentType =
+          documentTypeByKey[requirement.key];
 
         if (!documentType) {
           throw new Error(
@@ -460,39 +684,38 @@ export default function RequestClient({
           );
         }
 
-        const selectedFiles = documents[requirement.key] || [];
+        const selectedFiles =
+          documents[requirement.key] || [];
 
-        for (const file of selectedFiles) {
-          /*
-           * Render PR preview:
-           * il file resta esclusivamente nel browser. Non inviamo i byte
-           * neppure al servizio preview, così il collaudo non può toccare
-           * storage e non dipende dai limiti body/proxy dell'ambiente.
-           */
-          if (preview) {
-            continue;
-          }
+        for (const [fileIndex, file] of selectedFiles.entries()) {
+          const fingerprint = [
+            newPracticeCode,
+            requirement.key,
+            file.name,
+            file.size,
+            file.lastModified,
+            fileIndex,
+          ].join(":");
 
-          const uploadBody = new FormData();
-          uploadBody.set("documentType", documentType);
-          uploadBody.set("file", file, file.name);
+          let uploadId =
+            documentUploadIds.current.get(fingerprint);
 
-          const uploadResponse = await fetch(
-            `/api/public/applications/${encodeURIComponent(newPracticeCode)}/document`,
-            {
-              method: "POST",
-              body: uploadBody,
-            },
-          );
-
-          const uploadPayload = await readPayload(uploadResponse);
-
-          if (!uploadResponse.ok) {
-            throw new Error(
-              uploadPayload.error
-                || `Caricamento non riuscito: ${file.name}.`,
+          if (!uploadId) {
+            uploadId = await createDocumentUploadId(
+              fingerprint,
+            );
+            documentUploadIds.current.set(
+              fingerprint,
+              uploadId,
             );
           }
+
+          await uploadDocumentDirectly({
+            practiceCode: newPracticeCode,
+            documentType,
+            file,
+            uploadId,
+          });
         }
       }
 
@@ -598,7 +821,7 @@ export default function RequestClient({
                     {files.length ? <div>{files.map((file, index) => <button type="button" key={`${file.name}-${index}`} onClick={() => removeDocument(item.key, index)} aria-label={`Rimuovi ${file.name}`}>×</button>)}</div> : null}
                   </div>;
                 })}</div>
-                <div className="public-safety"><LockKeyhole size={20} /><p><strong>Area protetta ECCOMI.</strong><small>{preview ? "Preview PR38: i file selezionati restano nel browser e non vengono caricati su alcuno storage." : "I documenti e l’IBAN vengono conservati in modo riservato e resi disponibili soltanto agli operatori autorizzati."}</small></p></div>
+                <div className="public-safety"><LockKeyhole size={20} /><p><strong>Area protetta ECCOMI.</strong><small>{preview ? "Preview isolata: i file selezionati non vengono inviati a Storage reale." : "I documenti e l’IBAN vengono conservati in modo riservato e resi disponibili soltanto agli operatori autorizzati."}</small></p></div>
                 {submitError ? <div className="public-error"><AlertTriangle size={18} /> {submitError}</div> : null}
               </div> : null}
 
@@ -612,7 +835,7 @@ export default function RequestClient({
             </div>
 
             <footer className="public-application-card__footer"><button className="public-button public-button--back" type="button" disabled={submitting} onClick={() => step === 1 ? history.back() : setStep((current) => current - 1)}><ArrowLeft size={17} /> {step === 1 ? "Torna all’offerta" : "Indietro"}</button><span>{step === 3 && !canContinue ? "Completa IBAN e documenti per continuare." : "I dati vengono salvati solo all’invio finale."}</span><button className="public-button public-button--primary" type="button" disabled={!canContinue || submitting} onClick={() => step < 4 ? setStep((current) => current + 1) : submit()}>{submitting ? <><Loader2 className="spin" size={18} /> Invio…</> : step < 4 ? <>Continua <ArrowRight size={17} /></> : <>Invia richiesta <Check size={17} /></>}</button></footer>
-          </> : <div className="public-success"><span><Check size={38} /></span><small>{preview ? "SIMULAZIONE PRATICA COMPLETA" : "PRATICA COMPLETA REGISTRATA"}</small><h2>{preview ? "Collaudo completato in sicurezza" : "La tua richiesta è stata inviata"}</h2><p>{preview ? "La preview ha simulato dati, IBAN e documenti senza salvarli e senza generare eventi reali." : "Dati, IBAN e documenti sono stati collegati all’offerta e assegnati al responsabile competente."}</p><div><small>CODICE PRATICA</small><strong>{practiceCode}</strong></div>{preview ? <div className="public-safety"><ShieldCheck size={20} /><p><strong>Preview PR38 isolata.</strong><small>Nessuna scrittura DB, nessun file su storage, nessun evento Ads o audit reale.</small></p></div> : <ul><li><Check size={16} /> ECCOMI verifica la pratica</li><li><Check size={16} /> I documenti restano nell’area protetta</li><li><Check size={16} /> Il partner competente può iniziare la lavorazione</li></ul>}<a className="public-button public-button--primary" href="https://eccomionline.com"><CarFront size={18} /> Torna su Eccomi Online</a></div>}
+          </> : <div className="public-success"><span><Check size={38} /></span><small>{preview ? "SIMULAZIONE PRATICA COMPLETA" : "PRATICA COMPLETA REGISTRATA"}</small><h2>{preview ? "Collaudo completato in sicurezza" : "La tua richiesta è stata inviata"}</h2><p>{preview ? "La preview ha simulato dati, IBAN e documenti senza salvarli e senza generare eventi reali." : "Dati, IBAN e documenti sono stati collegati all’offerta e assegnati al responsabile competente."}</p><div><small>CODICE PRATICA</small><strong>{practiceCode}</strong></div>{preview ? <div className="public-safety"><ShieldCheck size={20} /><p><strong>Preview Render isolata.</strong><small>Nessuna scrittura DB, nessun file su storage, nessun evento Ads o audit reale.</small></p></div> : <ul><li><Check size={16} /> ECCOMI verifica la pratica</li><li><Check size={16} /> I documenti restano nell’area protetta</li><li><Check size={16} /> Il partner competente può iniziare la lavorazione</li></ul>}<a className="public-button public-button--primary" href="https://eccomionline.com"><CarFront size={18} /> Torna su Eccomi Online</a></div>}
         </section>
       </div>
       <footer className="public-request-footer"><div><ShieldCheck size={17} /><span><strong>Governato da ECCOMI</strong><small>I partner operano. ECCOMI conserva controllo, dati e rapporto cliente.</small></span></div><div><MessageCircle size={17} /><span><strong>Hai bisogno di aiuto?</strong><small>Torna alla pagina dell’offerta e usa il pulsante WhatsApp.</small></span></div></footer>
