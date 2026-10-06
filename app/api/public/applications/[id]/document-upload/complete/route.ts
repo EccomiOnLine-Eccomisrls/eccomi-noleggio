@@ -180,6 +180,7 @@ export async function POST(
       documentType: input.documentType,
       uploadId: input.uploadId,
       originalName: input.originalName,
+      mimeType: input.mimeType,
     });
 
     const stored =
