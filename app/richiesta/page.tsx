@@ -3,6 +3,7 @@ import "./request-upload.css";
 import RequestClient from "./request-client";
 import CustomRequestClient from "./custom-request-client";
 import OfferInterestClient from "./offer-interest-client";
+import { attributionToken } from "../lib/attribution";
 
 export const metadata: Metadata = {
   title: "Richiesta di noleggio | ECCOMI NOLEGGIO",
@@ -34,11 +35,16 @@ export default async function RequestPage({
       : "";
 
   const source =
-    typeof params.source === "string"
-      ? params.source.slice(0, 80)
-      : promotionId
-        ? "shopify-product"
-        : "direct";
+    attributionToken(params.source, 80)
+    || (promotionId ? "shopify-product" : "direct");
+
+  const entry =
+    attributionToken(params.entry, 80)
+    || (promotionId ? "shopify-product" : "direct");
+
+  const campaign = attributionToken(params.campaign, 120);
+  const adGroup = attributionToken(params.ad_group, 120);
+  const ad = attributionToken(params.ad, 120);
 
   const quickLeadCode =
     typeof params.lead === "string"
@@ -53,6 +59,10 @@ export default async function RequestPage({
       <CustomRequestClient
         initialVehicle={initialVehicle}
         source={source}
+        entry={entry}
+        campaign={campaign}
+        adGroup={adGroup}
+        ad={ad}
       />
     );
   }
@@ -62,6 +72,10 @@ export default async function RequestPage({
       <OfferInterestClient
         promotionId={promotionId}
         source={source}
+        entry={entry}
+        campaign={campaign}
+        adGroup={adGroup}
+        ad={ad}
       />
     );
   }
@@ -71,6 +85,10 @@ export default async function RequestPage({
       promotionId={promotionId}
       quickLeadCode={quickLeadCode}
       source={source}
+      entry={entry}
+      campaign={campaign}
+      adGroup={adGroup}
+      ad={ad}
     />
   );
 }
