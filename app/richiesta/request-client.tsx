@@ -183,6 +183,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [practiceCode, setPracticeCode] = useState("");
+  const [preview, setPreview] = useState(false);
   const submissionKey = useRef(createSubmissionKey());
 
   useEffect(() => {
@@ -190,11 +191,21 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
     let mounted = true;
     fetch(`/api/public/promotions/${encodeURIComponent(promotionId)}`, { cache: "no-store" })
       .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Offerta non disponibile.");
-        return payload.promotion as PublicPromotion;
+        const payload = await response.json() as {
+          promotion?: PublicPromotion;
+          preview?: boolean;
+          error?: string;
+        };
+        if (!response.ok || !payload.promotion) {
+          throw new Error(payload.error || "Offerta non disponibile.");
+        }
+        return payload;
       })
-      .then((value) => { if (mounted) setPromotion(value); })
+      .then((payload) => {
+        if (!mounted) return;
+        setPromotion(payload.promotion || null);
+        setPreview(payload.preview === true);
+      })
       .catch((error) => { if (mounted) setLoadError(error instanceof Error ? error.message : "Offerta non disponibile."); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
@@ -262,6 +273,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
           practiceCode?: string;
           status?: string;
           duplicate?: boolean;
+          preview?: boolean;
         };
       }
 
@@ -328,7 +340,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
        */
       if (startPayload.status === "NEW") {
         setPracticeCode(newPracticeCode);
-        trackCompletedPracticeLead(newPracticeCode);
+        if (!preview) trackCompletedPracticeLead(newPracticeCode);
         return;
       }
 
@@ -392,7 +404,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
       }
 
       setPracticeCode(newPracticeCode);
-      trackCompletedPracticeLead(newPracticeCode);
+      if (!preview) trackCompletedPracticeLead(newPracticeCode);
     } catch (error) {
       setSubmitError(
         error instanceof Error
@@ -471,7 +483,7 @@ export default function RequestClient({ promotionId }: { promotionId: string }) 
             </div>
 
             <footer className="public-application-card__footer"><button className="public-button public-button--back" type="button" disabled={submitting} onClick={() => step === 1 ? history.back() : setStep((current) => current - 1)}><ArrowLeft size={17} /> {step === 1 ? "Torna all’offerta" : "Indietro"}</button><span>{step === 3 && !canContinue ? "Completa IBAN e documenti per continuare." : "I dati vengono salvati solo all’invio finale."}</span><button className="public-button public-button--primary" type="button" disabled={!canContinue || submitting} onClick={() => step < 4 ? setStep((current) => current + 1) : submit()}>{submitting ? <><Loader2 className="spin" size={18} /> Invio…</> : step < 4 ? <>Continua <ArrowRight size={17} /></> : <>Invia richiesta <Check size={17} /></>}</button></footer>
-          </> : <div className="public-success"><span><Check size={38} /></span><small>PRATICA COMPLETA REGISTRATA</small><h2>La tua richiesta è stata inviata</h2><p>Dati, IBAN e documenti sono stati collegati all’offerta e assegnati al responsabile competente.</p><div><small>CODICE PRATICA</small><strong>{practiceCode}</strong></div><ul><li><Check size={16} /> ECCOMI verifica la pratica</li><li><Check size={16} /> I documenti restano nell’area protetta</li><li><Check size={16} /> Il partner competente può iniziare la lavorazione</li></ul><a className="public-button public-button--primary" href="https://eccomionline.com"><CarFront size={18} /> Torna su Eccomi Online</a></div>}
+          </> : <div className="public-success"><span><Check size={38} /></span><small>{preview ? "SIMULAZIONE PRATICA COMPLETA" : "PRATICA COMPLETA REGISTRATA"}</small><h2>{preview ? "Collaudo completato in sicurezza" : "La tua richiesta è stata inviata"}</h2><p>{preview ? "La preview ha simulato dati, IBAN e documenti senza salvarli e senza generare eventi reali." : "Dati, IBAN e documenti sono stati collegati all’offerta e assegnati al responsabile competente."}</p><div><small>CODICE PRATICA</small><strong>{practiceCode}</strong></div>{preview ? <div className="public-safety"><ShieldCheck size={20} /><p><strong>Preview PR38 isolata.</strong><small>Nessuna scrittura DB, nessun file su storage, nessun evento Ads o audit reale.</small></p></div> : <ul><li><Check size={16} /> ECCOMI verifica la pratica</li><li><Check size={16} /> I documenti restano nell’area protetta</li><li><Check size={16} /> Il partner competente può iniziare la lavorazione</li></ul>}<a className="public-button public-button--primary" href="https://eccomionline.com"><CarFront size={18} /> Torna su Eccomi Online</a></div>}
         </section>
       </div>
       <footer className="public-request-footer"><div><ShieldCheck size={17} /><span><strong>Governato da ECCOMI</strong><small>I partner operano. ECCOMI conserva controllo, dati e rapporto cliente.</small></span></div><div><MessageCircle size={17} /><span><strong>Hai bisogno di aiuto?</strong><small>Torna alla pagina dell’offerta e usa il pulsante WhatsApp.</small></span></div></footer>
