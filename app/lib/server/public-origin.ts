@@ -1,4 +1,5 @@
 import { getShopifyConnectionStatus } from "./shopify";
+import { isRenderPullRequestPreview } from "./preview-mode";
 
 function normalizedOrigin(value: string | null | undefined) {
   if (!value) return null;
@@ -53,7 +54,15 @@ export async function publicCorsOrigin(request: Request) {
     origin.endsWith(".app.github.dev")
     || origin.endsWith(".githubpreview.dev");
 
-  return allowed.has(origin) || isCodespacesPreview
+  const isRenderPreviewOrigin =
+    origin.startsWith("https://")
+    && origin.endsWith(".onrender.com")
+    && origin.includes("-pr-")
+    && isRenderPullRequestPreview(request);
+
+  return allowed.has(origin)
+    || isCodespacesPreview
+    || isRenderPreviewOrigin
     ? origin
     : null;
 }
