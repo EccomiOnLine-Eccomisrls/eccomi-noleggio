@@ -282,3 +282,120 @@ test("PR38 abilita Lead e pratiche solo come vista QA della preview", async () =
     /Questo record esiste solo nella preview PR38 e non viene scritto su Supabase\./,
   );
 });
+
+
+test("PR38 offre una promozione valida sintetica per il secondo step preview", async () => {
+  const interest = await read(
+    "app/api/public/promotions/[id]/interest/route.ts",
+  );
+  const promotion = await read(
+    "app/api/public/promotions/[id]/route.ts",
+  );
+
+  assert.match(interest, /pr38-preview-valid-offer/);
+  assert.match(interest, /offerNumber: "PR38-VALID-001"/);
+  assert.match(interest, /status: "ONLINE"/);
+  assert.match(interest, /available: true/);
+
+  const previewGuard = promotion.indexOf(
+    "isRenderPullRequestPreview(request)",
+  );
+  const productionDb = promotion.indexOf("const [row] = await getDb()");
+
+  assert.ok(previewGuard >= 0);
+  assert.ok(productionDb > previewGuard);
+  assert.match(promotion, /pr38-preview-valid-offer/);
+  assert.match(promotion, /imageUrl: "\/images\/hero-auto-su-misura\.jpeg"/);
+  assert.match(promotion, /preview: true/);
+});
+
+test("PR38 practice start preview termina prima di DB e cifratura", async () => {
+  const route = await read(
+    "app/api/public/applications/start/route.ts",
+  );
+
+  const previewGuard = route.indexOf(
+    "isRenderPullRequestPreview(request)",
+  );
+  const schemaWrite = route.indexOf("await ensurePracticeSchema()");
+  const encryption = route.indexOf(
+    "await encryptSensitivePracticeData(iban)",
+  );
+
+  assert.ok(previewGuard >= 0);
+  assert.ok(schemaWrite > previewGuard);
+  assert.ok(encryption > previewGuard);
+  assert.match(route, /ECN-PREVIEW-000001/);
+  assert.match(route, /status: "UPLOAD_IN_PROGRESS"/);
+  assert.match(route, /preview: true/);
+});
+
+test("PR38 document upload preview valida il file ma non usa DB o storage", async () => {
+  const route = await read(
+    "app/api/public/applications/[id]/document/route.ts",
+  );
+
+  const previewGuard = route.indexOf(
+    "isRenderPullRequestPreview(request)",
+  );
+  const schemaWrite = route.indexOf("await ensurePracticeSchema()");
+  const storageWrite = route.indexOf(
+    "const stored = await uploadPracticeDocument",
+  );
+
+  assert.ok(previewGuard >= 0);
+  assert.ok(schemaWrite > previewGuard);
+  assert.ok(storageWrite > previewGuard);
+  assert.match(route, /ECN-PREVIEW-000001/);
+  assert.match(route, /ECD-PREVIEW-/);
+  assert.match(route, /preview: true/);
+});
+
+test("PR38 completion preview termina prima di DB e audit reale", async () => {
+  const route = await read(
+    "app/api/public/applications/[id]/complete/route.ts",
+  );
+
+  const previewGuard = route.indexOf(
+    "isRenderPullRequestPreview(request)",
+  );
+  const schemaWrite = route.indexOf("await ensurePracticeSchema()");
+  const auditWrite = route.indexOf("await db.insert(auditLogs)");
+
+  assert.ok(previewGuard >= 0);
+  assert.ok(schemaWrite > previewGuard);
+  assert.ok(auditWrite > previewGuard);
+  assert.match(route, /ECN-PREVIEW-000001/);
+  assert.match(route, /status: "NEW"/);
+  assert.match(route, /preview: true/);
+});
+
+test("PR38 complete-practice preview resta completamente isolata", async () => {
+  const client = await read("app/richiesta/request-client.tsx");
+  const interest = await read("app/richiesta/offer-interest-client.tsx");
+  const generic = await read("app/richiesta/custom-request-client.tsx");
+
+  assert.match(client, /const \[preview, setPreview\] = useState\(false\)/);
+  assert.match(client, /setPreview\(payload\.preview === true\)/);
+  assert.match(
+    client,
+    /if \(!preview\) trackCompletedPracticeLead\(newPracticeCode\)/,
+  );
+  assert.match(client, /Nessuna scrittura DB/);
+  assert.match(client, /nessun file su storage/);
+  assert.match(client, /nessun evento Ads o audit reale/);
+
+  assert.match(
+    interest,
+    /!preview[\s\S]*response\.status === 201[\s\S]*!conversionStarted\.current/,
+  );
+  assert.match(
+    interest,
+    /offer\.available \? \([\s\S]*Completa ora la pratica/,
+  );
+
+  assert.match(
+    generic,
+    /payload\.preview !== true[\s\S]*response\.status === 201/,
+  );
+});
