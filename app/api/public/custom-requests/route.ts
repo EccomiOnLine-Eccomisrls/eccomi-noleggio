@@ -2,6 +2,10 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { customVehicleRequests } from "../../../../db/schema";
 import { ensureCustomRequestSchema } from "../../../lib/server/custom-request-schema";
+import {
+  legacyRequestSource,
+  normalizeAttribution,
+} from "../../../lib/attribution";
 import { isRenderPullRequestPreview } from "../../../lib/server/preview-mode";
 import {
   corsHeaders,
@@ -146,15 +150,21 @@ export async function POST(request: Request) {
   const privacyAccepted = body.privacyAccepted === true;
   const marketingConsent = body.marketingConsent === true;
   const website = clean(body.website, 300);
-  const sourceInput = clean(body.source, 80).toLowerCase();
-  const requestSource =
-    ["ads", "openai-ads", "ads-landing"].includes(sourceInput)
-      ? "ECCOMI_NOLEGGIO_ADS"
-      : sourceInput === "shopify-product"
-        ? "ECCOMI_NOLEGGIO_SHOPIFY_PRODUCT"
-        : sourceInput === "shopify-landing"
-          ? "ECCOMI_NOLEGGIO_SHOPIFY_LANDING"
-          : "ECCOMI_NOLEGGIO_CUSTOM_REQUEST";
+  const attribution = normalizeAttribution(
+    {
+      source: body.source,
+      entry: body.entry,
+      campaign: body.campaign,
+      adGroup: body.adGroup,
+      ad: body.ad,
+    },
+    promotionId ? "shopify-product" : "direct",
+    promotionId ? "shopify-product" : "direct",
+  );
+  const requestSource = legacyRequestSource(
+    attribution.attributionSource,
+    "ECCOMI_NOLEGGIO_CUSTOM_REQUEST",
+  );
 
   if (website) {
     return jsonWithCors(
@@ -316,6 +326,11 @@ export async function POST(request: Request) {
       marketingConsent,
       submissionKey,
       source: requestSource,
+      attributionSource: attribution.attributionSource,
+      entrySource: attribution.entrySource,
+      campaignKey: attribution.campaignKey || null,
+      adGroupKey: attribution.adGroupKey || null,
+      adKey: attribution.adKey || null,
       createdAt: now,
       updatedAt: now,
     });
@@ -324,6 +339,12 @@ export async function POST(request: Request) {
       requestCode: id,
       customerType,
       email,
+      source: requestSource,
+      attributionSource: attribution.attributionSource,
+      entrySource: attribution.entrySource,
+      campaignKey: attribution.campaignKey || null,
+      adGroupKey: attribution.adGroupKey || null,
+      adKey: attribution.adKey || null,
       durationMs: Date.now() - startedAt,
     });
 
