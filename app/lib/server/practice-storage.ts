@@ -4,6 +4,9 @@ import {
   PRACTICE_DOCUMENT_MAX_BYTES,
   practiceDocumentExtensionForMime,
 } from "./practice-document-upload";
+import {
+  isStorageObjectNotFoundResponse,
+} from "./storage-response";
 
 const DEFAULT_BUCKET = "noleggio-documenti";
 
@@ -322,12 +325,18 @@ export async function getPracticeDocumentObjectInfo(
     "Verifica documento caricato non riuscita",
   );
 
-  if (response.status === 404) {
-    return null;
-  }
-
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
+
+    if (
+      isStorageObjectNotFoundResponse(
+        response.status,
+        detail,
+      )
+    ) {
+      return null;
+    }
+
     throw new Error(
       `Impossibile verificare il documento caricato${detail ? `: ${detail.slice(0, 180)}` : "."}`,
     );
