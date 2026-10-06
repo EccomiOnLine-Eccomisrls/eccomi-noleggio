@@ -18,7 +18,8 @@ test("PR38 precompila la richiesta leggera da Shopify e Ads", async () => {
   assert.match(client, /modelOrSegment: initialVehicle/);
   assert.match(client, /source,/);
   assert.doesNotMatch(client, /accountHolder/);
-  assert.doesNotMatch(client, /\biban\s*:/i);\n  assert.doesNotMatch(client, /fields\\.iban/i);
+  assert.doesNotMatch(client, /\biban\s*:/i);
+  assert.doesNotMatch(client, /fields\\.iban/i);
 });
 
 test("PR38 non obbliga ragione sociale e partita IVA nel primo contatto", async () => {
@@ -98,7 +99,8 @@ test("PR38 cattura interesse da scheda senza IBAN o documenti e traccia solo un 
   const client = await read("app/richiesta/offer-interest-client.tsx");
 
   assert.doesNotMatch(client, /accountHolder/);
-  assert.doesNotMatch(client, /\biban\s*:/i);\n  assert.doesNotMatch(client, /fields\\.iban/i);
+  assert.doesNotMatch(client, /\biban\s*:/i);
+  assert.doesNotMatch(client, /fields\\.iban/i);
   assert.doesNotMatch(client, /document_identity|document_income|document_chamber/);
   assert.match(client, /source: "shopify-product"/);
   assert.match(client, /response\.status === 201/);
@@ -234,4 +236,49 @@ test("PR38 accetta la stessa preview Render anche quando il proxy espone request
   assert.match(origin, /new URL\(origin\)\.host/);
   assert.match(origin, /new URL\(request\.url\)\.host/);
   assert.match(origin, /originHost === requestHost/);
+});
+
+
+test("PR38 mostra esplicitamente il SAFE mode anche nella richiesta generica", async () => {
+  const client = await read("app/richiesta/custom-request-client.tsx");
+
+  assert.match(client, /const \[preview, setPreview\] = useState\(false\)/);
+  assert.match(client, /preview\?: boolean/);
+  assert.match(client, /setPreview\(payload\.preview === true\)/);
+  assert.match(
+    client,
+    /Preview PR38: nessuna scrittura reale è stata[\s\S]*effettuata\./,
+  );
+});
+
+test("PR38 espone un solo lead sintetico nella preview back-office senza dati reali", async () => {
+  const fixture = await read("app/lib/server/preview-fixture.ts");
+
+  assert.match(fixture, /ECR-PREVIEW-LEAD-000001/);
+  assert.match(fixture, /preview\.lead@eccomi\.local/);
+  assert.match(fixture, /documentStatus: "LEAD_RAPIDO"/);
+  assert.match(fixture, /previewSynthetic: true/);
+  assert.match(fixture, /ibanLast4: null/);
+  assert.match(fixture, /accountHolder: null/);
+  assert.match(fixture, /leads: 1/);
+  assert.match(fixture, /newLeads: 1/);
+});
+
+test("PR38 abilita Lead e pratiche solo come vista QA della preview", async () => {
+  const page = await read("app/page.tsx");
+  const demo = await read("app/preview-demo.tsx");
+
+  assert.match(page, /rawView === "leads" \? "leads"/);
+  assert.match(page, /href="\/\?view=leads"/);
+  assert.match(page, /QA SAFE/);
+
+  assert.match(demo, /view: "dashboard" \| "promotions" \| "leads"/);
+  assert.match(demo, /function LeadsView/);
+  assert.match(demo, /Fixture sintetica · nessun dato reale/);
+  assert.match(demo, /Non visibile ai Partner/);
+  assert.match(demo, /Nessun IBAN · nessun documento/);
+  assert.match(
+    demo,
+    /Questo record esiste solo nella preview PR38 e non viene scritto su Supabase\./,
+  );
 });
