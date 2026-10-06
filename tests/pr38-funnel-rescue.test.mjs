@@ -204,3 +204,13 @@ test("PR38 usa il dominio ufficiale nei futuri CTA Shopify", async () => {
     /https:\/\/eccomi-noleggio\.onrender\.com\/richiesta/,
   );
 });
+
+
+test("PR38 autorizza il dominio dinamico Render della preview senza aprirlo in produzione", async () => {
+  const cors = await read("app/lib/server/public-origin.ts");
+
+  assert.match(cors, /isRenderPullRequestPreview/);
+  assert.match(cors, /origin\.endsWith\("\.onrender\.com"\)/);
+  assert.match(cors, /origin\.includes\("-pr-"\)/);
+  assert.match(cors, /isRenderPullRequestPreview\(request\)/);
+});
