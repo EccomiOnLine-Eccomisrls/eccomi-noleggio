@@ -123,8 +123,9 @@ test("PR38 recupera anche un'offerta scaduta invece di mandare il cliente su una
     client,
     /possiamo ricontattarti con l'aggiornamento o con alternative equivalenti/,
   );
-  assert.match(client, /Completa ora la pratica/);
+  assert.match(client, /window\.location\.assign\(nextUrl\)/);
   assert.match(client, /completa=1/);
+  assert.match(client, /L’offerta va aggiornata/);
 });
 
 test("PR38 mantiene read-only il recupero offerta nella preview Render", async () => {
@@ -393,7 +394,7 @@ test("PR38 complete-practice preview resta completamente isolata", async () => {
   );
   assert.match(
     interest,
-    /offer\.available \? \([\s\S]*Completa ora la pratica/,
+    /if \(offer\.available\)[\s\S]*window\.location\.assign\(nextUrl\)/,
   );
 
   assert.match(
@@ -534,9 +535,14 @@ test("PR38 hardening precompila il secondo step senza mettere PII nella URL", as
   assert.match(page, /params\.lead/);
   assert.match(interest, /window\.sessionStorage\.setItem/);
   assert.match(interest, /quickLeadStorageKey\(payload\.requestCode\)/);
+  assert.match(interest, /const nextUrl =/);
   assert.match(
     interest,
-    /completa=1&lead=\$\{encodeURIComponent\(requestCode\)\}&source=/,
+    /&completa=1&lead=\$\{encodeURIComponent\(payload\.requestCode\)\}/,
+  );
+  assert.match(
+    interest,
+    /&source=\$\{encodeURIComponent\(source\)\}/,
   );
 
   assert.match(complete, /window\.sessionStorage\.getItem/);
@@ -547,5 +553,47 @@ test("PR38 hardening precompila il secondo step senza mettere PII nella URL", as
   assert.doesNotMatch(
     interest,
     /completa=1[^\n]*firstName=/,
+  );
+});
+
+
+test("PR38 UX continuity non mostra la conferma intermedia sulle offerte valide", async () => {
+  const interest = await read("app/richiesta/offer-interest-client.tsx");
+
+  const redirectPosition = interest.indexOf("if (offer.available)");
+  const requestCodePosition = interest.indexOf(
+    "setRequestCode(payload.requestCode)",
+  );
+
+  assert.ok(redirectPosition >= 0);
+  assert.ok(requestCodePosition > redirectPosition);
+  assert.match(
+    interest,
+    /if \(offer\.available\)[\s\S]*window\.location\.assign\(nextUrl\)[\s\S]*return;/,
+  );
+  assert.match(interest, /Continua alla pratica/);
+  assert.doesNotMatch(interest, /Completa ora la pratica/);
+  assert.match(
+    interest,
+    /L’offerta va aggiornata: ti proporremo la[\s\S]*versione valida o alternative equivalenti/,
+  );
+});
+
+test("PR38 UX continuity preserva una sola conversione durante il redirect", async () => {
+  const interest = await read("app/richiesta/offer-interest-client.tsx");
+  const complete = await read("app/richiesta/request-client.tsx");
+
+  assert.match(interest, /quickLeadConversionKey/);
+  assert.match(
+    interest,
+    /conversionSent \? "sent" : "pending"/,
+  );
+  assert.match(
+    complete,
+    /conversionState !== "pending"/,
+  );
+  assert.match(
+    complete,
+    /trackOpenAiLeadCreated\([\s\S]*quickLeadConversionKey\(quickLeadCode\)[\s\S]*"sent"/,
   );
 });
