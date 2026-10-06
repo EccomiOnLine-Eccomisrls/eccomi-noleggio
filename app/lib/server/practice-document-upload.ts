@@ -1,10 +1,35 @@
 export const PRACTICE_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 
-export const PRACTICE_DOCUMENT_MIME_TYPES = new Set([
+export const PRACTICE_DOCUMENT_ALLOWED_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",
   "image/png",
-]);
+] as const;
+
+export const PRACTICE_DOCUMENT_MIME_TYPES = new Set(
+  PRACTICE_DOCUMENT_ALLOWED_MIME_TYPES,
+);
+
+const PRACTICE_DOCUMENT_EXTENSION_BY_MIME:
+  Record<string, string> = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/png": "png",
+  };
+
+export function practiceDocumentExtensionForMime(
+  mimeType: string,
+) {
+  const normalized = mimeType.trim().toLowerCase();
+  const extension =
+    PRACTICE_DOCUMENT_EXTENSION_BY_MIME[normalized];
+
+  if (!extension) {
+    throw new Error("Formato documento non supportato.");
+  }
+
+  return extension;
+}
 
 export const PRACTICE_DOCUMENT_TYPES = new Set([
   "IDENTITY",
