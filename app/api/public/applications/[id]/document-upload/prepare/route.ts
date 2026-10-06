@@ -187,6 +187,7 @@ export async function POST(
       documentType: input.documentType,
       uploadId: input.uploadId,
       originalName: input.originalName,
+      mimeType: input.mimeType,
     });
 
     const alreadyStored =
@@ -241,6 +242,7 @@ export async function POST(
         documentType: input.documentType,
         uploadId: input.uploadId,
         originalName: input.originalName,
+        mimeType: input.mimeType,
       });
 
     return jsonWithCors(
