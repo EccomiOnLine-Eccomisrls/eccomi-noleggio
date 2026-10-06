@@ -156,6 +156,7 @@ export default function CustomRequestClient({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [requestCode, setRequestCode] = useState("");
+  const [preview, setPreview] = useState(false);
   const submissionKey = useRef(createSubmissionKey());
   const conversionTrackingStarted = useRef(false);
 
@@ -254,6 +255,7 @@ export default function CustomRequestClient({
         error?: string;
         requestCode?: string;
         duplicate?: boolean;
+        preview?: boolean;
       };
 
       if (!response.ok || !payload.requestCode) {
@@ -264,6 +266,7 @@ export default function CustomRequestClient({
       }
 
       setRequestCode(payload.requestCode);
+      setPreview(payload.preview === true);
 
       const shouldTrackLead =
         response.status === 201
@@ -965,6 +968,13 @@ export default function CustomRequestClient({
                 <small>CODICE RICHIESTA</small>
                 <strong>{requestCode}</strong>
               </div>
+
+              {preview ? (
+                <p>
+                  Preview PR38: nessuna scrittura reale è stata
+                  effettuata.
+                </p>
+              ) : null}
 
               <div className="custom-request-next-steps">
                 <h3>Cosa succede adesso?</h3>
