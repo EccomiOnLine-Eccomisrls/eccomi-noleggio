@@ -164,14 +164,33 @@ function quickLeadConversionKey(requestCode: string) {
   return `eccomi_noleggio_quick_lead_conversion_${requestCode}`;
 }
 
-function createDocumentUploadId() {
+async function createDocumentUploadId(
+  fingerprint: string,
+) {
   const browserCrypto = globalThis.crypto;
 
-  if (typeof browserCrypto?.randomUUID === "function") {
-    return browserCrypto.randomUUID();
+  if (browserCrypto?.subtle) {
+    const digest = await browserCrypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(fingerprint),
+    );
+
+    return Array.from(new Uint8Array(digest))
+      .slice(0, 16)
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
   }
 
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+  let first = 2166136261;
+  let second = 2246822519;
+
+  for (let index = 0; index < fingerprint.length; index += 1) {
+    const code = fingerprint.charCodeAt(index);
+    first = Math.imul(first ^ code, 16777619);
+    second = Math.imul(second ^ code, 3266489917);
+  }
+
+  return `u${(first >>> 0).toString(16).padStart(8, "0")}${(second >>> 0).toString(16).padStart(8, "0")}`;
 }
 
 function createSubmissionKey() {
@@ -651,7 +670,9 @@ export default function RequestClient({
             documentUploadIds.current.get(fingerprint);
 
           if (!uploadId) {
-            uploadId = createDocumentUploadId();
+            uploadId = await createDocumentUploadId(
+              fingerprint,
+            );
             documentUploadIds.current.set(
               fingerprint,
               uploadId,
