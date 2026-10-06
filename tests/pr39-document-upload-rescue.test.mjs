@@ -146,6 +146,10 @@ test("PR39 retry e finalize sono idempotenti", async () => {
   );
   assert.match(
     client,
+    /if \(preparePayload\.alreadyUploaded\)/,
+  );
+  assert.match(
+    client,
     /const completed = await finalize\(\)/,
   );
 
