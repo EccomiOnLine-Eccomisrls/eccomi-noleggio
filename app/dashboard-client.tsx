@@ -128,6 +128,12 @@ type LeadSummary = {
   businessName: string | null;
   status: string;
   documentStatus: string;
+  source?: string;
+  attributionSource?: string;
+  entrySource?: string;
+  campaignKey?: string | null;
+  adGroupKey?: string | null;
+  adKey?: string | null;
   createdAt: string;
   vehicle: string;
   offerNumber: string;
@@ -400,6 +406,12 @@ function LeadsView({ leads }: { leads: LeadSummary[] }) {
   const contractCount = leads.filter((lead) => ["CONTRACT", "DELIVERED"].includes(lead.status)).length;
   const profile = (value: string) => ({ PRIVATE: "Privato", PROFESSIONAL: "Professionista", COMPANY: "Azienda" } as Record<string, string>)[value] || value;
   const leadStatus = (value: string) => ({ NEW: "NUOVA", ECCOMI_REVIEW: "IN VERIFICA", NEEDS_INFO: "DA INTEGRARE", SENT_TO_PARTNER: "AL PARTNER", QUOTE: "PREVENTIVO", CONTRACT: "CONTRATTO", DELIVERED: "CONSEGNATA" } as Record<string, string>)[value] || value;
+  const attributionLabel = (value?: string) => ({
+    "openai-ads": "OpenAI Ads",
+    "shopify-product": "Shopify prodotto",
+    "shopify-landing": "Shopify landing",
+    direct: "Diretto",
+  } as Record<string, string>)[value || ""] || value || "Diretto";
   return (
     <div className="dashboard workspace-view">
       <ViewHeading eyebrow="NOLEGGIO / LEAD E PRATICHE" title="Lead e pratiche" description="Lead commerciali e pratiche complete in un unico punto operativo." action={<button className="button button--secondary" type="button"><Download size={17} /> Esporta</button>} />
@@ -409,7 +421,7 @@ function LeadsView({ leads }: { leads: LeadSummary[] }) {
       <section className="pipeline-panel panel">
         <div className="panel__heading"><div><span className="section-kicker">PIPELINE</span><h2>Stato delle richieste</h2><p>Il partner aggiorna solo le pratiche di propria competenza.</p></div></div>
         <div className="pipeline-track">{stages.map((stage, index) => <div className="pipeline-stage" key={stage.label}><span>{String(index + 1).padStart(2, "0")}</span><strong>{stage.label}</strong><em>{leads.filter((lead) => stage.statuses.includes(lead.status)).length}</em></div>)}</div>
-        {leads.length ? <div className="lead-register"><div className="lead-register__heading"><span>CODICE PRATICA</span><span>CLIENTE</span><span>OFFERTA</span><span>ASSEGNAZIONE</span><span>STATO</span></div>{leads.map((lead) => <article className="lead-register__row" key={lead.id}><div><strong>{lead.id}</strong><small>{new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short", year: "numeric", timeZone: "Europe/Rome" }).format(new Date(lead.createdAt))}</small></div><div><strong>{lead.customerName}</strong><small>{profile(lead.customerType)} · {lead.province}</small><small>{lead.email} · {lead.phone}</small></div><div><strong>{lead.vehicle}</strong><small>Offerta {lead.offerNumber}</small></div><div><strong>{lead.partnerName}</strong><small>Assegnata automaticamente</small></div><div><span className={`lead-status lead-status--${lead.status.toLowerCase()}`}>{leadStatus(lead.status)}</span><small>{lead.documentStatus === "LEAD_RAPIDO" ? "Lead rapido · documenti non richiesti" : lead.documentStatus === "PENDING_EMAIL_VERIFICATION" ? "Email da verificare" : "Documenti protetti"}</small></div></article>)}</div> : <div className="empty-state"><span className="empty-state__icon"><UsersRound size={30} /></span><h2>Nessun lead ricevuto</h2><p>Le richieste compariranno qui quando il modulo ECCOMI NOLEGGIO sarà collegato alle pagine Shopify.</p><span className="empty-state__rule"><ShieldCheck size={15} /> Il lead segue sempre il proprietario dell’offerta</span></div>}
+        {leads.length ? <div className="lead-register"><div className="lead-register__heading"><span>CODICE PRATICA</span><span>CLIENTE</span><span>OFFERTA</span><span>ASSEGNAZIONE</span><span>STATO</span></div>{leads.map((lead) => <article className="lead-register__row" key={lead.id}><div><strong>{lead.id}</strong><small>{new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short", year: "numeric", timeZone: "Europe/Rome" }).format(new Date(lead.createdAt))}</small></div><div><strong>{lead.customerName}</strong><small>{profile(lead.customerType)} · {lead.province}</small><small>{lead.email} · {lead.phone}</small></div><div><strong>{lead.vehicle}</strong><small>Offerta {lead.offerNumber}</small><small>Origine {attributionLabel(lead.attributionSource)} · ingresso {attributionLabel(lead.entrySource)}</small>{lead.campaignKey ? <small>Campagna {lead.campaignKey}{lead.adKey ? ` · Ad ${lead.adKey}` : ""}</small> : null}</div><div><strong>{lead.partnerName}</strong><small>Assegnata automaticamente</small></div><div><span className={`lead-status lead-status--${lead.status.toLowerCase()}`}>{leadStatus(lead.status)}</span><small>{lead.documentStatus === "LEAD_RAPIDO" ? "Lead rapido · documenti non richiesti" : lead.documentStatus === "PENDING_EMAIL_VERIFICATION" ? "Email da verificare" : "Documenti protetti"}</small></div></article>)}</div> : <div className="empty-state"><span className="empty-state__icon"><UsersRound size={30} /></span><h2>Nessun lead ricevuto</h2><p>Le richieste compariranno qui quando il modulo ECCOMI NOLEGGIO sarà collegato alle pagine Shopify.</p><span className="empty-state__rule"><ShieldCheck size={15} /> Il lead segue sempre il proprietario dell’offerta</span></div>}
       </section>
     </div>
   );
@@ -1061,6 +1073,11 @@ export default function Home({ initialDashboard = null }: DashboardClientProps) 
           lead.offerNumber,
           lead.partnerName,
           lead.status,
+          lead.attributionSource,
+          lead.entrySource,
+          lead.campaignKey,
+          lead.adGroupKey,
+          lead.adKey,
         ]
           .filter(Boolean)
           .join(" "),
