@@ -269,8 +269,11 @@ export default function CustomRequestClient({
       setPreview(payload.preview === true);
 
       const shouldTrackLead =
-        response.status === 201
-        || payload.duplicate === true;
+        payload.preview !== true
+        && (
+          response.status === 201
+          || payload.duplicate === true
+        );
 
       if (
         shouldTrackLead
