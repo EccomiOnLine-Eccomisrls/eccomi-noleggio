@@ -41,6 +41,10 @@ type OfferInterest = {
   available: boolean;
 };
 
+function quickLeadStorageKey(requestCode: string) {
+  return `eccomi_noleggio_quick_lead_${requestCode}`;
+}
+
 function createSubmissionKey() {
   const browserCrypto = globalThis.crypto;
 
@@ -103,8 +107,10 @@ function statusCopy(offer: OfferInterest) {
 
 export default function OfferInterestClient({
   promotionId,
+  source = "shopify-product",
 }: {
   promotionId: string;
+  source?: string;
 }) {
   const [offer, setOffer] = useState<OfferInterest | null>(null);
   const [preview, setPreview] = useState(false);
@@ -232,6 +238,7 @@ export default function OfferInterestClient({
             phone: fields.phone,
             province: fields.province,
             businessName: fields.businessName,
+            promotionId: offer.id,
             vatNumber: fields.vatNumber,
             brand: offer.brand,
             modelOrSegment: offer.model,
@@ -253,7 +260,7 @@ export default function OfferInterestClient({
             privacyAccepted: true,
             marketingConsent: marketing,
             submissionKey: submissionKey.current,
-            source: "shopify-product",
+            source,
             website: fields.website,
           }),
         },
@@ -273,6 +280,28 @@ export default function OfferInterestClient({
       }
 
       setRequestCode(payload.requestCode);
+
+      try {
+        window.sessionStorage.setItem(
+          quickLeadStorageKey(payload.requestCode),
+          JSON.stringify({
+            requestCode: payload.requestCode,
+            promotionId: offer.id,
+            customerType: profile,
+            firstName: fields.firstName,
+            lastName: fields.lastName,
+            email: fields.email,
+            phone: fields.phone,
+            province: fields.province,
+            businessName: fields.businessName,
+            vatNumber: fields.vatNumber,
+            marketingConsent: marketing,
+            source,
+          }),
+        );
+      } catch {
+        // Il prefill è un miglioramento UX e non deve bloccare il lead.
+      }
 
       if (
         !preview
@@ -685,7 +714,7 @@ export default function OfferInterestClient({
                 <a
                   className="public-button public-button--primary"
                   href={
-                    `/richiesta?promozione=${encodeURIComponent(offer.id)}&completa=1`
+                    `/richiesta?promozione=${encodeURIComponent(offer.id)}&completa=1&lead=${encodeURIComponent(requestCode)}&source=${encodeURIComponent(source)}`
                   }
                 >
                   Completa ora la pratica
