@@ -160,6 +160,10 @@ function quickLeadStorageKey(requestCode: string) {
   return `eccomi_noleggio_quick_lead_${requestCode}`;
 }
 
+function quickLeadConversionKey(requestCode: string) {
+  return `eccomi_noleggio_quick_lead_conversion_${requestCode}`;
+}
+
 function createSubmissionKey() {
   const browserCrypto = globalThis.crypto;
   if (typeof browserCrypto?.randomUUID === "function") return `ecn_${browserCrypto.randomUUID()}`;
@@ -197,6 +201,34 @@ export default function RequestClient({
   const [practiceCode, setPracticeCode] = useState("");
   const [preview, setPreview] = useState(false);
   const submissionKey = useRef(createSubmissionKey());
+
+  useEffect(() => {
+    if (!quickLeadCode || typeof window === "undefined") return;
+
+    try {
+      const conversionState = window.sessionStorage.getItem(
+        quickLeadConversionKey(quickLeadCode),
+      );
+
+      if (conversionState !== "pending") return;
+
+      trackOpenAiLeadCreated(
+        20,
+        () => {
+          try {
+            window.sessionStorage.setItem(
+              quickLeadConversionKey(quickLeadCode),
+              "sent",
+            );
+          } catch {
+            // Tracking bookkeeping must not affect the funnel.
+          }
+        },
+      );
+    } catch {
+      // Tracking must never block the complete-practice step.
+    }
+  }, [quickLeadCode]);
 
   useEffect(() => {
     if (!quickLeadCode || typeof window === "undefined") return;
@@ -490,6 +522,9 @@ export default function RequestClient({
         try {
           window.sessionStorage.removeItem(
             quickLeadStorageKey(quickLeadCode),
+          );
+          window.sessionStorage.removeItem(
+            quickLeadConversionKey(quickLeadCode),
           );
         } catch {
           // Storage cleanup must never affect the completed practice.
