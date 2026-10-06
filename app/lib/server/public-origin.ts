@@ -28,6 +28,27 @@ export async function publicCorsOrigin(request: Request) {
   const requestOrigin = normalizedOrigin(request.url);
   const forwardedOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : null;
 
+  const originHost = (() => {
+    try {
+      return new URL(origin).host;
+    } catch {
+      return null;
+    }
+  })();
+
+  const requestHost = (() => {
+    try {
+      return new URL(request.url).host;
+    } catch {
+      return null;
+    }
+  })();
+
+  const sameHostBehindProxy =
+    Boolean(originHost)
+    && Boolean(requestHost)
+    && originHost === requestHost;
+
   const allowed = new Set<string>([
     "https://eccomi-noleggio.onrender.com",
     "https://eccomionline.com",
@@ -68,6 +89,7 @@ export async function publicCorsOrigin(request: Request) {
     );
 
   return allowed.has(origin)
+    || sameHostBehindProxy
     || isCodespacesPreview
     || isRenderPreviewOrigin
     ? origin
