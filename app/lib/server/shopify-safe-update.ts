@@ -87,6 +87,9 @@ function requestUrlFor(requestBaseUrl: string, promotionId: string) {
   try {
     const url = new URL(requestBaseUrl);
     url.searchParams.set("promozione", promotionId);
+    if (!url.searchParams.has("source")) {
+      url.searchParams.set("source", "shopify-product");
+    }
     return url.toString();
   } catch {
     return "";
