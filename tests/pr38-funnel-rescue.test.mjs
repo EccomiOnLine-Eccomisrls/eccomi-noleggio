@@ -34,6 +34,8 @@ test("PR38 non obbliga ragione sociale e partita IVA nel primo contatto", async 
     api,
     /Inserisci una Partita IVA italiana di 11 cifre\./,
   );
+  assert.doesNotMatch(client, /<span>Partita IVA<\/span>/);
+  assert.doesNotMatch(client, /Ragione sociale/);
 });
 
 test("PR38 non scrive dati reali durante il Render PR preview", async () => {
