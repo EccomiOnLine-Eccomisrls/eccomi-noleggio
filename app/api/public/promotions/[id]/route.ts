@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
 import { partners, promotions } from "../../../../../db/schema";
 import { corsHeaders, jsonWithCors, publicCorsOrigin } from "../../../../lib/server/public-origin";
+import { isRenderPullRequestPreview } from "../../../../lib/server/preview-mode";
 
 function parseJsonArray(value: string) {
   try {
@@ -29,6 +30,52 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!sameOrigin && !origin) return jsonWithCors({ error: "Origine non autorizzata." }, 403, null);
 
   const { id } = await context.params;
+
+  if (isRenderPullRequestPreview(request)) {
+    if (id !== "pr38-preview-valid-offer") {
+      return jsonWithCors(
+        { error: "Offerta completa preview non riconosciuta." },
+        404,
+        origin,
+      );
+    }
+
+    return jsonWithCors(
+      {
+        promotion: {
+          id,
+          offerNumber: "PR38-VALID-001",
+          brand: "FIAT",
+          model: "500",
+          version: "Hybrid Icon",
+          provider: "Partner demo ECCOMI",
+          monthlyGrossCents: 42900,
+          depositGrossCents: 0,
+          durationMonths: 36,
+          totalKm: 45000,
+          validUntil: "2026-11-30",
+          delivery: "Disponibilità demo",
+          fuel: "Hybrid",
+          transmission: "Automatico",
+          color: "Blu",
+          services: [
+            "Manutenzione ordinaria e straordinaria",
+            "Assistenza stradale",
+            "Coperture previste dall'offerta",
+          ],
+          warnings: [
+            "Fixture sintetica PR38",
+            "Nessuna disponibilità reale impegnata",
+          ],
+          imageUrl: "/images/hero-auto-su-misura.jpeg",
+        },
+        preview: true,
+      },
+      200,
+      origin,
+    );
+  }
+
   const [row] = await getDb()
     .select({ promotion: promotions, partnerName: partners.name })
     .from(promotions)
