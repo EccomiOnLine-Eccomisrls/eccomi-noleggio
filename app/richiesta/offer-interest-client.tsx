@@ -114,9 +114,17 @@ function statusCopy(offer: OfferInterest) {
 export default function OfferInterestClient({
   promotionId,
   source = "shopify-product",
+  entry = "shopify-product",
+  campaign = "",
+  adGroup = "",
+  ad = "",
 }: {
   promotionId: string;
   source?: string;
+  entry?: string;
+  campaign?: string;
+  adGroup?: string;
+  ad?: string;
 }) {
   const [offer, setOffer] = useState<OfferInterest | null>(null);
   const [preview, setPreview] = useState(false);
@@ -267,6 +275,10 @@ export default function OfferInterestClient({
             marketingConsent: marketing,
             submissionKey: submissionKey.current,
             source,
+            entry,
+            campaign,
+            adGroup,
+            ad,
             website: fields.website,
           }),
         },
@@ -301,6 +313,10 @@ export default function OfferInterestClient({
             vatNumber: fields.vatNumber,
             marketingConsent: marketing,
             source,
+            entry,
+            campaign,
+            adGroup,
+            ad,
           }),
         );
       } catch {
@@ -332,12 +348,21 @@ export default function OfferInterestClient({
           }
         }
 
-        const nextUrl =
-          `/richiesta?promozione=${encodeURIComponent(offer.id)}`
-          + `&completa=1&lead=${encodeURIComponent(payload.requestCode)}`
-          + `&source=${encodeURIComponent(source)}`;
+        const nextParams = new URLSearchParams({
+          promozione: offer.id,
+          completa: "1",
+          lead: payload.requestCode,
+          source,
+        });
 
-        window.location.assign(nextUrl);
+        if (entry) nextParams.set("entry", entry);
+        if (campaign) nextParams.set("campaign", campaign);
+        if (adGroup) nextParams.set("ad_group", adGroup);
+        if (ad) nextParams.set("ad", ad);
+
+        window.location.assign(
+          `/richiesta?${nextParams.toString()}`,
+        );
         return;
       }
 
