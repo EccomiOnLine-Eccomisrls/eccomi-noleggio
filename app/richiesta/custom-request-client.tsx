@@ -138,10 +138,19 @@ function optionalInteger(value: string) {
     : null;
 }
 
-export default function CustomRequestClient() {
+export default function CustomRequestClient({
+  initialVehicle = "",
+  source = "direct",
+}: {
+  initialVehicle?: string;
+  source?: string;
+}) {
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<CustomerProfile>("");
-  const [fields, setFields] = useState(initialFields);
+  const [fields, setFields] = useState<CustomRequestFields>(() => ({
+    ...initialFields,
+    modelOrSegment: initialVehicle,
+  }));
   const [privacy, setPrivacy] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -170,14 +179,7 @@ export default function CustomRequestClient() {
       && fields.phone.replace(/\D/g, "").length >= 8
       && fields.province.trim().length >= 2;
 
-    if (!baseComplete) return false;
-
-    if (profile === "PRIVATE") return true;
-
-    return (
-      fields.businessName.trim().length >= 2
-      && fields.vatNumber.replace(/\D/g, "").length === 11
-    );
+    return baseComplete;
   }, [fields, profile]);
 
   const vehicleComplete = useMemo(() => {
@@ -242,6 +244,7 @@ export default function CustomRequestClient() {
             marketingConsent: marketing,
             submissionKey: submissionKey.current,
             website: fields.website,
+            source,
           }),
         },
       );
@@ -313,9 +316,13 @@ export default function CustomRequestClient() {
   />
 </div>
 
-          <span>ECCOMI AUTO SU MISURA</span>
+          <span>{initialVehicle ? "AUTO SELEZIONATA" : "ECCOMI AUTO SU MISURA"}</span>
 
-          <h1>Non trovi l’auto giusta? La troviamo noi.</h1>
+          <h1>
+            {initialVehicle
+              ? `Ti interessa ${initialVehicle}?`
+              : "Non trovi l’auto giusta? La troviamo noi."}
+          </h1>
 
           <p>
             Dicci come la immagini. Analizziamo le offerte
