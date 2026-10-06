@@ -130,6 +130,149 @@ export async function uploadPracticeDocument(input: {
   };
 }
 
+
+export function practiceDocumentObjectKey(input: {
+  practiceCode: string;
+  documentType: string;
+  uploadId: string;
+  originalName: string;
+}) {
+  const extension = safePart(
+    input.originalName.split(".").pop() || "bin",
+  );
+
+  return `${safePart(input.practiceCode)}/${safePart(input.documentType)}/${safePart(input.uploadId)}.${extension}`;
+}
+
+export async function createPracticeDocumentSignedUpload(input: {
+  practiceCode: string;
+  documentType: string;
+  uploadId: string;
+  originalName: string;
+}) {
+  await ensureBucket();
+
+  const { url, serviceRoleKey, bucket } = storageConfig();
+  const objectKey = practiceDocumentObjectKey(input);
+  const signUrl =
+    `${url}/storage/v1/object/upload/sign/${encodeURIComponent(bucket)}/`
+    + objectKey.split("/").map(encodeURIComponent).join("/");
+
+  const response = await storageFetch(
+    signUrl,
+    {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+        "content-type": "application/json",
+        "x-upsert": "false",
+      },
+      body: "{}",
+    },
+    "Generazione URL firmata di upload non riuscita",
+  );
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(
+      `Impossibile predisporre il caricamento diretto${detail ? `: ${detail.slice(0, 180)}` : "."}`,
+    );
+  }
+
+  const payload = await response.json() as {
+    url?: string;
+    signedUrl?: string;
+    signedURL?: string;
+  };
+
+  const signedPath =
+    payload.signedUrl
+    || payload.signedURL
+    || payload.url;
+
+  if (!signedPath) {
+    throw new Error(
+      "URL firmata di upload non disponibile.",
+    );
+  }
+
+  const signedUrl = signedPath.startsWith("http")
+    ? signedPath
+    : `${url}/storage/v1${signedPath.startsWith("/") ? signedPath : `/${signedPath}`}`;
+
+  return {
+    bucket,
+    objectKey,
+    signedUrl,
+  };
+}
+
+export async function getPracticeDocumentObjectInfo(
+  objectKey: string,
+) {
+  const { url, serviceRoleKey, bucket } = storageConfig();
+  const infoUrl =
+    `${url}/storage/v1/object/info/${encodeURIComponent(bucket)}/`
+    + objectKey.split("/").map(encodeURIComponent).join("/");
+
+  const response = await storageFetch(
+    infoUrl,
+    {
+      headers: {
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+      },
+    },
+    "Verifica documento caricato non riuscita",
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(
+      `Impossibile verificare il documento caricato${detail ? `: ${detail.slice(0, 180)}` : "."}`,
+    );
+  }
+
+  const payload = await response.json() as {
+    size?: number;
+    mimetype?: string;
+    mimeType?: string;
+    metadata?: {
+      size?: number;
+      mimetype?: string;
+      mimeType?: string;
+      contentType?: string;
+    };
+  };
+
+  const sizeBytes =
+    typeof payload.size === "number"
+      ? payload.size
+      : typeof payload.metadata?.size === "number"
+        ? payload.metadata.size
+        : null;
+
+  const mimeType =
+    payload.mimetype
+    || payload.mimeType
+    || payload.metadata?.mimetype
+    || payload.metadata?.mimeType
+    || payload.metadata?.contentType
+    || null;
+
+  return {
+    bucket,
+    objectKey,
+    sizeBytes,
+    mimeType,
+  };
+}
+
 export async function createPracticeDocumentSignedUrl(objectKey: string, expiresIn = 900) {
   const { url, serviceRoleKey, bucket } = storageConfig();
   const response = await storageFetch(
