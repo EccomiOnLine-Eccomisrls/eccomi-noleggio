@@ -1,15 +1,15 @@
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../../../../../db";
+import { getDb } from "../../../../db";
 import {
   leads,
   practiceDocuments,
   promotions,
-} from "../../../../../db/schema";
-import { ensurePracticeSchema } from "../../../../lib/server/practice-schema";
+} from "../../../../db/schema";
+import { ensurePracticeSchema } from "../../../lib/server/practice-schema";
 import {
   createPracticeDocumentSignedUpload,
   getPracticeDocumentObjectInfo,
-} from "../../../../lib/server/practice-storage";
+} from "../../../lib/server/practice-storage";
 
 const TEST_TOKEN =
   "pr39-real-storage-20261006-approved-8f2c7a41d9e6";
