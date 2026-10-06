@@ -1,4 +1,9 @@
 import { getRuntimeEnv } from "./runtime";
+import {
+  PRACTICE_DOCUMENT_ALLOWED_MIME_TYPES,
+  PRACTICE_DOCUMENT_MAX_BYTES,
+  practiceDocumentExtensionForMime,
+} from "./practice-document-upload";
 
 const DEFAULT_BUCKET = "noleggio-documenti";
 
@@ -65,32 +70,116 @@ async function storageFetch(url: string, init: RequestInit, context: string) {
 
 async function ensureBucket() {
   const { url, serviceRoleKey, bucket } = storageConfig();
-  const response = await storageFetch(`${url}/storage/v1/bucket/${encodeURIComponent(bucket)}`, {
-    headers: {
-      apikey: serviceRoleKey,
-      authorization: `Bearer ${serviceRoleKey}`,
-    },
-  }, "Verifica archivio documentale non riuscita");
+  const bucketUrl =
+    `${url}/storage/v1/bucket/${encodeURIComponent(bucket)}`;
+  const headers = {
+    apikey: serviceRoleKey,
+    authorization: `Bearer ${serviceRoleKey}`,
+  };
+  const desiredMimeTypes = [
+    ...PRACTICE_DOCUMENT_ALLOWED_MIME_TYPES,
+  ];
 
-  if (response.ok) return;
-  if (response.status !== 404) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Impossibile verificare l’archivio documentale${detail ? `: ${detail.slice(0, 180)}` : "."}`);
+  const response = await storageFetch(
+    bucketUrl,
+    { headers },
+    "Verifica archivio documentale non riuscita",
+  );
+
+  if (response.status === 404) {
+    const create = await storageFetch(
+      `${url}/storage/v1/bucket`,
+      {
+        method: "POST",
+        headers: {
+          ...headers,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          id: bucket,
+          name: bucket,
+          public: false,
+          file_size_limit: PRACTICE_DOCUMENT_MAX_BYTES,
+          allowed_mime_types: desiredMimeTypes,
+        }),
+      },
+      "Creazione archivio documentale non riuscita",
+    );
+
+    if (!create.ok && create.status !== 409) {
+      const detail =
+        await create.text().catch(() => "");
+      throw new Error(
+        `Impossibile predisporre l’archivio documentale${detail ? `: ${detail.slice(0, 180)}` : "."}`,
+      );
+    }
+
+    return;
   }
 
-  const create = await storageFetch(`${url}/storage/v1/bucket`, {
-    method: "POST",
-    headers: {
-      apikey: serviceRoleKey,
-      authorization: `Bearer ${serviceRoleKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ id: bucket, name: bucket, public: false, file_size_limit: 10_485_760 }),
-  }, "Creazione archivio documentale non riuscita");
+  if (!response.ok) {
+    const detail =
+      await response.text().catch(() => "");
+    throw new Error(
+      `Impossibile verificare l’archivio documentale${detail ? `: ${detail.slice(0, 180)}` : "."}`,
+    );
+  }
 
-  if (!create.ok && create.status !== 409) {
-    const detail = await create.text().catch(() => "");
-    throw new Error(`Impossibile predisporre l’archivio documentale${detail ? `: ${detail.slice(0, 180)}` : "."}`);
+  const current = await response.json() as {
+    public?: boolean;
+    file_size_limit?: number | null;
+    allowed_mime_types?: string[] | null;
+  };
+
+  const currentMimeTypes =
+    Array.isArray(current.allowed_mime_types)
+      ? [...current.allowed_mime_types].sort()
+      : [];
+  const expectedMimeTypes =
+    [...desiredMimeTypes].sort();
+
+  const mimePolicyMatches =
+    currentMimeTypes.length === expectedMimeTypes.length
+    && currentMimeTypes.every(
+      (value, index) =>
+        value === expectedMimeTypes[index],
+    );
+
+  const needsHardening =
+    current.public !== false
+    || current.file_size_limit
+      !== PRACTICE_DOCUMENT_MAX_BYTES
+    || !mimePolicyMatches;
+
+  if (!needsHardening) {
+    return;
+  }
+
+  const update = await storageFetch(
+    bucketUrl,
+    {
+      method: "PUT",
+      headers: {
+        ...headers,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        id: bucket,
+        name: bucket,
+        public: false,
+        file_size_limit: PRACTICE_DOCUMENT_MAX_BYTES,
+        allowed_mime_types: desiredMimeTypes,
+      }),
+    },
+    "Aggiornamento sicurezza archivio documentale non riuscito",
+  );
+
+  if (!update.ok) {
+    const detail =
+      await update.text().catch(() => "");
+    throw new Error(
+      `Impossibile applicare i vincoli di sicurezza all’archivio documentale${detail ? `: ${detail.slice(0, 180)}` : "."}`,
+    );
   }
 }
 
@@ -101,7 +190,10 @@ export async function uploadPracticeDocument(input: {
 }) {
   await ensureBucket();
   const { url, serviceRoleKey, bucket } = storageConfig();
-  const extension = safePart(input.file.name.split(".").pop() || "bin");
+  const extension =
+    practiceDocumentExtensionForMime(
+      input.file.type,
+    );
   const objectKey = `${safePart(input.practiceCode)}/${safePart(input.documentType)}/${crypto.randomUUID()}.${extension}`;
   const uploadUrl = `${url}/storage/v1/object/${encodeURIComponent(bucket)}/${objectKey.split("/").map(encodeURIComponent).join("/")}`;
 
@@ -136,10 +228,12 @@ export function practiceDocumentObjectKey(input: {
   documentType: string;
   uploadId: string;
   originalName: string;
+  mimeType: string;
 }) {
-  const extension = safePart(
-    input.originalName.split(".").pop() || "bin",
-  );
+  const extension =
+    practiceDocumentExtensionForMime(
+      input.mimeType,
+    );
 
   return `${safePart(input.practiceCode)}/${safePart(input.documentType)}/${safePart(input.uploadId)}.${extension}`;
 }
@@ -149,6 +243,7 @@ export async function createPracticeDocumentSignedUpload(input: {
   documentType: string;
   uploadId: string;
   originalName: string;
+  mimeType: string;
 }) {
   await ensureBucket();
 
