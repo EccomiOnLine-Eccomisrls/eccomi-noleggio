@@ -275,7 +275,8 @@ export default function OfferInterestClient({
       setRequestCode(payload.requestCode);
 
       if (
-        response.status === 201
+        !preview
+        && response.status === 201
         && !conversionStarted.current
       ) {
         conversionStarted.current = true;
@@ -678,7 +679,9 @@ export default function OfferInterestClient({
                   Preview PR38: nessuna scrittura reale è stata
                   effettuata.
                 </p>
-              ) : offer.available ? (
+              ) : null}
+
+              {offer.available ? (
                 <a
                   className="public-button public-button--primary"
                   href={
