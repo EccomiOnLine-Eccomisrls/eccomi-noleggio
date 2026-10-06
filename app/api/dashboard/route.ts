@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, sum } from "drizzle-orm";
+import { and, desc, eq, isNull, sum } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { commissions, customVehicleRequests, hubEvents, leads, partners, practiceDocuments, promotions } from "../../../db/schema";
 import { isPartnerNoleggioRole } from "../../lib/permissions";
@@ -43,20 +43,6 @@ export async function GET(request: Request) {
       ? and(partnerFilter, isNull(leads.deletedAt))
       : isNull(leads.deletedAt);
 
-    const [leadStats] = await db
-      .select({ total: count() })
-      .from(leads)
-      .where(activePracticeFilter);
-
-    const [newLeadStats] = await db
-      .select({ total: count() })
-      .from(leads)
-      .where(
-        and(
-          activePracticeFilter,
-          eq(leads.status, "NEW"),
-        ),
-      );
     const [commissionStats] = await db.select({ total: sum(commissions.amountCents) }).from(commissions).where(commissionPartnerFilter);
     const commissionRows = await db
       .select({
